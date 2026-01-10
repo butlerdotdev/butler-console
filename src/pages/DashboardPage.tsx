@@ -4,14 +4,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { clustersApi } from '@/api'
+import { clustersApi, type Cluster } from '@/api'
 import { Card, Spinner, StatusBadge, FadeIn } from '@/components/ui'
-import type { TenantCluster, ClusterPhase } from '@/types'
 
 export function DashboardPage() {
 	useDocumentTitle('Dashboard')
 
-	const [clusters, setClusters] = useState<TenantCluster[]>([])
+	const [clusters, setClusters] = useState<Cluster[]>([])
 	const [managementReady, setManagementReady] = useState(false)
 	const [loading, setLoading] = useState(true)
 
@@ -95,10 +94,10 @@ export function DashboardPage() {
 	)
 }
 
-function ClusterRow({ cluster }: { cluster: TenantCluster }) {
+function ClusterRow({ cluster }: { cluster: Cluster }) {
 	const name = cluster.metadata.name
 	const namespace = cluster.metadata.namespace
-	const phase = (cluster.status?.phase || 'Unknown') as ClusterPhase
+	const phase = cluster.status?.phase || 'Unknown'
 	const version = cluster.spec.kubernetesVersion || 'Unknown'
 	const workers = cluster.spec.workers?.replicas || 0
 

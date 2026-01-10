@@ -4,12 +4,11 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { clustersApi, type ManagementClusterInfo, type PodInfo } from '@/api'
+import { clustersApi, type ManagementCluster, type ManagementPod, type ManagementNode } from '@/api'
 import { addonsApi, type ManagementAddon } from '@/api/addons'
 import { Card, Spinner, StatusBadge, FadeIn } from '@/components/ui'
 import { ClusterTerminal } from '@/components/terminal'
 import { ManagementAddonsTab } from '@/components/management/ManagementAddonsTab'
-import type { NodeInfo } from '@/types'
 
 const TABS = ['overview', 'nodes', 'pods', 'addons', 'terminal'] as const
 type TabType = typeof TABS[number]
@@ -30,9 +29,9 @@ export function ManagementPage() {
 		setSearchParams({ tab }, { replace: true })
 	}
 
-	const [info, setInfo] = useState<ManagementClusterInfo | null>(null)
-	const [nodes, setNodes] = useState<NodeInfo[]>([])
-	const [pods, setPods] = useState<PodInfo[]>([])
+	const [info, setInfo] = useState<ManagementCluster | null>(null)
+	const [nodes, setNodes] = useState<ManagementNode[]>([])
+	const [pods, setPods] = useState<ManagementPod[]>([])
 	const [managementAddons, setManagementAddons] = useState<ManagementAddon[]>([])
 	const [selectedNamespace, setSelectedNamespace] = useState('butler-system')
 	const [loading, setLoading] = useState(true)
@@ -68,8 +67,8 @@ export function ManagementPage() {
 		try {
 			const data = await clustersApi.getManagementNodes()
 			setNodes(data.nodes || [])
-		} catch (err) {
-			console.error('Failed to load nodes:', err)
+		} catch {
+			// Silently handle error - nodes will remain empty
 		}
 	}
 
@@ -77,8 +76,8 @@ export function ManagementPage() {
 		try {
 			const data = await clustersApi.getManagementPods(namespace)
 			setPods(data.pods || [])
-		} catch (err) {
-			console.error('Failed to load pods:', err)
+		} catch {
+			// Silently handle error - pods will remain empty
 		}
 	}
 
@@ -86,8 +85,8 @@ export function ManagementPage() {
 		try {
 			const data = await addonsApi.getManagementAddons()
 			setManagementAddons(data.addons || [])
-		} catch (err) {
-			console.error('Failed to load management addons:', err)
+		} catch {
+			// Silently handle error - addons will remain empty
 		}
 	}
 
@@ -215,7 +214,7 @@ export function ManagementPage() {
 	)
 }
 
-function OverviewTab({ info }: { info: ManagementClusterInfo }) {
+function OverviewTab({ info }: { info: ManagementCluster }) {
 	const tenantNamespaces = info.tenantNamespaces || []
 
 	return (
@@ -283,7 +282,7 @@ function OverviewTab({ info }: { info: ManagementClusterInfo }) {
 	)
 }
 
-function NodesTab({ nodes }: { nodes: NodeInfo[] }) {
+function NodesTab({ nodes }: { nodes: ManagementNode[] }) {
 	if (nodes.length === 0) {
 		return (
 			<Card className="p-8 text-center">
@@ -328,7 +327,7 @@ function NodesTab({ nodes }: { nodes: NodeInfo[] }) {
 }
 
 interface PodsTabProps {
-	pods: PodInfo[]
+	pods: ManagementPod[]
 	namespaces: Array<{ namespace: string; running: number; total: number }>
 	selectedNamespace: string
 	onNamespaceChange: (ns: string) => void

@@ -4,12 +4,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { clustersApi } from '@/api'
+import { clustersApi, type Cluster, type Node, type Addon, type ClusterEvent } from '@/api'
 import { Card, Spinner, StatusBadge, Button, FadeIn } from '@/components/ui'
 import { ClusterTerminal } from '@/components/terminal'
 import { DeleteClusterModal } from '@/components/clusters/DeleteClusterModal'
 import { useToast } from '@/contexts/ToastContext'
-import type { TenantCluster, NodeInfo, AddonStatus, ClusterEvent, ClusterPhase } from '@/types'
 import { AddonsTab } from '@/components/clusters'
 
 
@@ -36,9 +35,9 @@ export function ClusterDetailPage() {
 
 	useDocumentTitle(name ? `${name} - Cluster` : 'Cluster')
 
-	const [cluster, setCluster] = useState<TenantCluster | null>(null)
-	const [nodes, setNodes] = useState<NodeInfo[]>([])
-	const [addons, setAddons] = useState<AddonStatus[]>([])
+	const [cluster, setCluster] = useState<Cluster | null>(null)
+	const [nodes, setNodes] = useState<Node[]>([])
+	const [addons, setAddons] = useState<Addon[]>([])
 	const [events, setEvents] = useState<ClusterEvent[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
@@ -149,7 +148,7 @@ export function ClusterDetailPage() {
 		)
 	}
 
-	const phase = (cluster.status?.phase || 'Unknown') as ClusterPhase
+	const phase = cluster.status?.phase || 'Unknown'
 	const clusterName = cluster.metadata.name
 	const clusterNamespace = cluster.metadata.namespace
 	const workerCount = cluster.spec.workers?.replicas || 0

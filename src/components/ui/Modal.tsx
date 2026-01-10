@@ -9,9 +9,18 @@ interface ModalProps {
 	onClose: () => void
 	children: ReactNode
 	className?: string
+	size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
 }
 
-export function Modal({ isOpen, onClose, children, className = '' }: ModalProps) {
+const sizeClasses = {
+	sm: 'max-w-sm',
+	md: 'max-w-md',
+	lg: 'max-w-lg',
+	xl: 'max-w-xl',
+	full: 'max-w-4xl w-full',
+}
+
+export function Modal({ isOpen, onClose, children, className = '', size }: ModalProps) {
 	const overlayRef = useRef<HTMLDivElement>(null)
 
 	useEffect(() => {
@@ -35,7 +44,7 @@ export function Modal({ isOpen, onClose, children, className = '' }: ModalProps)
 			onClick={(e) => e.target === overlayRef.current && onClose()}
 			className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
 		>
-			<div className={`relative bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl max-h-[90vh] overflow-auto ${className}`}>
+			<div className={`relative bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl max-h-[90vh] overflow-auto ${size ? sizeClasses[size] : ''} ${className}`}>
 				{children}
 			</div>
 		</div>,

@@ -25,6 +25,7 @@ export interface Provider {
 		proxmox?: {
 			endpoint?: string
 			insecure?: boolean
+			nodes?: string[]
 		}
 	}
 	status?: {

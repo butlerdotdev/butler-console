@@ -43,10 +43,16 @@ interface GitOpsConfig {
 	createPR: boolean
 }
 
+interface SimpleAddon {
+	name: string
+	status: string
+	version?: string
+}
+
 interface AddonsTabProps {
 	clusterNamespace: string
 	clusterName: string
-	addons: InstalledAddon[]
+	addons: SimpleAddon[]
 	onRefresh?: () => void
 }
 

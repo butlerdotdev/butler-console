@@ -1,0 +1,39 @@
+/* Copyright 2025 The Butler Authors. */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+	--color-bg: #0a0a0a;
+	--color-bg-secondary: #171717;
+	--color-bg-tertiary: #262626;
+	--color-text: #fafafa;
+	--color-text-muted: #a3a3a3;
+	--color-border: #404040;
+	--color-brand: #22c55e;
+}
+
+body {
+	background-color: var(--color-bg);
+	color: var(--color-text);
+}
+
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+::-webkit-scrollbar-track {
+	background: var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--color-border);
+	border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: #525252;
+}

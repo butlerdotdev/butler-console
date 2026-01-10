@@ -1,7 +1,7 @@
 // Copyright 2025 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { Button } from '@/components/ui'
 
@@ -28,13 +28,12 @@ export function DeleteClusterModal({
 
 	const isConfirmed = confirmText === clusterName
 
-	useEffect(() => {
-		if (!isOpen) {
-			setConfirmText('')
-			setError(null)
-			setIsDeleting(false)
-		}
-	}, [isOpen])
+	const handleClose = () => {
+		setConfirmText('')
+		setError(null)
+		setIsDeleting(false)
+		onClose()
+	}
 
 	const handleConfirm = async () => {
 		if (!isConfirmed) return
@@ -43,7 +42,7 @@ export function DeleteClusterModal({
 
 		try {
 			await onConfirm()
-			onClose()
+			handleClose()
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to delete cluster')
 			setIsDeleting(false)
@@ -51,7 +50,7 @@ export function DeleteClusterModal({
 	}
 
 	return (
-		<Modal isOpen={isOpen} onClose={isDeleting ? () => { } : onClose} className="w-full max-w-md">
+		<Modal isOpen={isOpen} onClose={isDeleting ? () => { } : handleClose} className="w-full max-w-md">
 			<ModalHeader>
 				<div className="flex items-center gap-3">
 					<div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
@@ -113,7 +112,7 @@ export function DeleteClusterModal({
 			</ModalBody>
 
 			<ModalFooter>
-				<Button variant="secondary" onClick={onClose} disabled={isDeleting}>
+				<Button variant="secondary" onClick={handleClose} disabled={isDeleting}>
 					Cancel
 				</Button>
 				<Button variant="danger" onClick={handleConfirm} disabled={!isConfirmed || isDeleting}>

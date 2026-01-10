@@ -1,7 +1,7 @@
 // Copyright 2025 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { clustersApi } from '@/api'
@@ -44,23 +44,7 @@ export function ClusterDetailPage() {
 	const [error, setError] = useState<string | null>(null)
 	const [showDeleteModal, setShowDeleteModal] = useState(false)
 
-	useEffect(() => {
-		if (namespace && name) {
-			loadCluster()
-		}
-	}, [namespace, name])
-
-	useEffect(() => {
-		if (cluster && activeTab === 'nodes') {
-			loadNodes()
-		} else if (cluster && activeTab === 'addons') {
-			loadAddons()
-		} else if (cluster && activeTab === 'events') {
-			loadEvents()
-		}
-	}, [cluster, activeTab])
-
-	const loadCluster = async () => {
+	const loadCluster = useCallback(async () => {
 		if (!namespace || !name) return
 		try {
 			setLoading(true)
@@ -71,34 +55,53 @@ export function ClusterDetailPage() {
 		} finally {
 			setLoading(false)
 		}
-	}
+	}, [namespace, name])
 
-	const loadNodes = async () => {
+	const loadNodes = useCallback(async () => {
 		if (!namespace || !name) return
 		try {
 			const data = await clustersApi.getNodes(namespace, name)
 			setNodes(data.nodes || [])
-		} catch (err) {
+		} catch {
+			// Silently handle error - nodes will remain empty
 		}
-	}
+	}, [namespace, name])
 
-	const loadAddons = async () => {
+	const loadAddons = useCallback(async () => {
 		if (!namespace || !name) return
 		try {
 			const data = await clustersApi.getAddons(namespace, name)
 			setAddons(data.addons || [])
-		} catch (err) {
+		} catch {
+			// Silently handle error - addons will remain empty
 		}
-	}
+	}, [namespace, name])
 
-	const loadEvents = async () => {
+	const loadEvents = useCallback(async () => {
 		if (!namespace || !name) return
 		try {
 			const data = await clustersApi.getEvents(namespace, name)
 			setEvents(data.events || [])
-		} catch (err) {
+		} catch {
+			// Silently handle error - events will remain empty
 		}
-	}
+	}, [namespace, name])
+
+	useEffect(() => {
+		if (namespace && name) {
+			loadCluster()
+		}
+	}, [namespace, name, loadCluster])
+
+	useEffect(() => {
+		if (cluster && activeTab === 'nodes') {
+			loadNodes()
+		} else if (cluster && activeTab === 'addons') {
+			loadAddons()
+		} else if (cluster && activeTab === 'events') {
+			loadEvents()
+		}
+	}, [cluster, activeTab, loadNodes, loadAddons, loadEvents])
 
 	const handleDelete = async () => {
 		if (!namespace || !name) return

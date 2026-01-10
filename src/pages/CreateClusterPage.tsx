@@ -1,7 +1,7 @@
 // Copyright 2025 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { clustersApi, providersApi, type Provider } from '@/api'
@@ -47,11 +47,7 @@ export function CreateClusterPage() {
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 
-	useEffect(() => {
-		loadProviders()
-	}, [])
-
-	const loadProviders = async () => {
+	const loadProviders = useCallback(async () => {
 		try {
 			const response = await providersApi.list()
 			setProviders(response.providers || [])
@@ -61,12 +57,16 @@ export function CreateClusterPage() {
 				setSelectedProvider(first)
 				setForm(prev => ({ ...prev, providerConfigRef: first.metadata.name }))
 			}
-		} catch (err) {
+		} catch {
 			showError('Error', 'Failed to load providers')
 		} finally {
 			setLoadingProviders(false)
 		}
-	}
+	}, [showError])
+
+	useEffect(() => {
+		loadProviders()
+	}, [loadProviders])
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
 		const { name, value } = e.target

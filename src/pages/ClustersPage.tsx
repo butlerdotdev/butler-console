@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { clustersApi, type ManagementClusterInfo } from '@/api'
-import { Card, Spinner, StatusBadge, EmptyState, FadeIn, Button } from '@/components/ui'
+import { Card, Spinner, StatusBadge, FadeIn, Button } from '@/components/ui'
 import type { TenantCluster, ClusterPhase } from '@/types'
 
 export function ClustersPage() {

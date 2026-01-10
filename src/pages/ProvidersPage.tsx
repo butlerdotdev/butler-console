@@ -247,18 +247,16 @@ function ProviderCard({ provider, onValidate, onDelete, onClick, isValidating, v
 	}
 
 	const createdAt = provider.metadata.creationTimestamp
-	let age = 'Unknown'
-	if (createdAt) {
+	const [age] = useState(() => {
+		if (!createdAt) return 'Unknown'
 		const created = new Date(createdAt)
 		const diffMs = Date.now() - created.getTime()
 		const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-		if (diffDays > 0) age = `${diffDays}d ago`
-		else {
-			const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-			if (diffHours > 0) age = `${diffHours}h ago`
-			else age = 'Just now'
-		}
-	}
+		if (diffDays > 0) return `${diffDays}d ago`
+		const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+		if (diffHours > 0) return `${diffHours}h ago`
+		return 'Just now'
+	})
 
 	return (
 		<Card

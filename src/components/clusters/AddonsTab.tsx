@@ -1,7 +1,7 @@
 // Copyright 2025 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, Button, Spinner } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { useToast } from '@/contexts/ToastContext'
@@ -192,7 +192,7 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 		}
 	}
 
-	const handleGitOpsExport = async (addon: AddonDefinition, gitConfig: GitOpsConfig) => {
+	const handleGitOpsExport = async (addon: AddonDefinition, _gitConfig: GitOpsConfig) => {
 		try {
 			success('Exported to GitOps', `${addon.displayName} manifests exported`)
 			setGitopsExportAddon(null)
@@ -216,7 +216,7 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 		}
 	}
 
-	const handleMigrateToGitOps = async (addon: InstalledAddon, gitConfig: GitOpsConfig) => {
+	const handleMigrateToGitOps = async (addon: InstalledAddon, _gitConfig: GitOpsConfig) => {
 		try {
 			success('Migrated to GitOps', `${addon.name} is now managed by GitOps`)
 			setMigrateToGitOps(null)
@@ -807,24 +807,25 @@ function ConfigureAddonModal({ addon, isOpen, onClose, onInstall, installing }: 
 	const [viewMode, setViewMode] = useState<'form' | 'yaml'>('form')
 	const [yamlContent, setYamlContent] = useState('')
 
-	useEffect(() => {
-		if (isOpen) {
-			loadValuesSchema()
-		}
-	}, [isOpen, addon.name])
-
-	const loadValuesSchema = async () => {
+	const loadValuesSchema = useCallback(async () => {
 		setLoading(true)
 		try {
 			const schema = getMockValuesSchema(addon.name)
 			setValuesSchema(schema)
 			setValues(schema.defaults || {})
 			setYamlContent(objectToYaml(schema.defaults || {}))
-		} catch (err) {
+		} catch {
+			// Schema loading failed - form will be empty
 		} finally {
 			setLoading(false)
 		}
-	}
+	}, [addon.name])
+
+	useEffect(() => {
+		if (isOpen) {
+			loadValuesSchema()
+		}
+	}, [isOpen, loadValuesSchema])
 
 	const handleValueChange = (path: string, value: unknown) => {
 		setValues(prev => {

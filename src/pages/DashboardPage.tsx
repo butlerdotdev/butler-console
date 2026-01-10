@@ -28,7 +28,7 @@ export function DashboardPage() {
 			])
 			setClusters(clustersResponse.clusters || [])
 			setManagementReady(mgmt.phase === 'Ready')
-		} catch (err) {
+		} catch {
 			// Failed to load data
 		} finally {
 			setLoading(false)

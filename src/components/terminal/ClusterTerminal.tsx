@@ -1,7 +1,7 @@
 // Copyright 2025 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
@@ -23,10 +23,68 @@ export function ClusterTerminal({ type, namespace, cluster, pod, container }: Te
 	const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting')
 	const [error, setError] = useState<string | null>(null)
 
+	const sendResize = useCallback(() => {
+		if (!termRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+			return
+		}
+		const { cols, rows } = termRef.current
+		wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }))
+	}, [])
+
+	const connect = useCallback((term: Terminal) => {
+		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+		const host = window.location.host
+
+		let wsUrl: string
+		if (type === 'management') {
+			wsUrl = `${protocol}//${host}/ws/terminal/management`
+		} else {
+			wsUrl = `${protocol}//${host}/ws/terminal/${type}/${namespace}/${cluster}`
+			if (pod) {
+				wsUrl += `/${pod}`
+				if (container) {
+					wsUrl += `/${container}`
+				}
+			}
+		}
+
+		term.writeln('\x1b[33mConnecting to cluster...\x1b[0m')
+		setStatus('connecting')
+
+		const ws = new WebSocket(wsUrl)
+		wsRef.current = ws
+
+		ws.onopen = () => {
+			setStatus('connected')
+			term.writeln('\x1b[32mConnected!\x1b[0m\r\n')
+			setTimeout(sendResize, 100)
+		}
+
+		ws.onmessage = (event) => {
+			term.write(event.data)
+		}
+
+		ws.onerror = () => {
+			setStatus('error')
+			setError('Connection error')
+			term.writeln('\r\n\x1b[31mConnection error\x1b[0m')
+		}
+
+		ws.onclose = () => {
+			setStatus('disconnected')
+			term.writeln('\r\n\x1b[33mDisconnected\x1b[0m')
+		}
+
+		term.onData((data) => {
+			if (ws.readyState === WebSocket.OPEN) {
+				ws.send(JSON.stringify({ type: 'data', data }))
+			}
+		})
+	}, [type, namespace, cluster, pod, container, sendResize])
+
 	useEffect(() => {
 		if (!terminalRef.current) return
 
-		// Initialize terminal
 		const term = new Terminal({
 			cursorBlink: true,
 			fontSize: 14,
@@ -60,16 +118,13 @@ export function ClusterTerminal({ type, namespace, cluster, pod, container }: Te
 		term.loadAddon(fitAddon)
 		term.open(terminalRef.current)
 
-		// Fit terminal to container
 		setTimeout(() => fitAddon.fit(), 0)
 
 		termRef.current = term
 		fitAddonRef.current = fitAddon
 
-		// Connect WebSocket
-		connect(term)
+		queueMicrotask(() => connect(term))
 
-		// Handle window resize
 		const handleResize = () => {
 			if (fitAddonRef.current) {
 				fitAddonRef.current.fit()
@@ -78,7 +133,6 @@ export function ClusterTerminal({ type, namespace, cluster, pod, container }: Te
 		}
 		window.addEventListener('resize', handleResize)
 
-		// Cleanup
 		return () => {
 			window.removeEventListener('resize', handleResize)
 			if (wsRef.current) {
@@ -86,72 +140,7 @@ export function ClusterTerminal({ type, namespace, cluster, pod, container }: Te
 			}
 			term.dispose()
 		}
-	}, [type, namespace, cluster, pod, container])
-
-	const connect = (term: Terminal) => {
-		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-		const host = window.location.host
-
-		// Build URL differently for management vs tenant
-		let wsUrl: string
-		if (type === 'management') {
-			wsUrl = `${protocol}//${host}/ws/terminal/management`
-		} else {
-			wsUrl = `${protocol}//${host}/ws/terminal/${type}/${namespace}/${cluster}`
-			if (pod) {
-				wsUrl += `/${pod}`
-				if (container) {
-					wsUrl += `/${container}`
-				}
-			}
-		}
-
-		term.writeln('\x1b[33mConnecting to cluster...\x1b[0m')
-		setStatus('connecting')
-
-		const ws = new WebSocket(wsUrl)
-		wsRef.current = ws
-
-		ws.onopen = () => {
-			setStatus('connected')
-			term.writeln('\x1b[32mConnected!\x1b[0m\r\n')
-
-			// Send initial resize
-			setTimeout(sendResize, 100)
-		}
-
-		ws.onmessage = (event) => {
-			// Write received data to terminal
-			term.write(event.data)
-		}
-
-		ws.onerror = (event) => {
-			setStatus('error')
-			setError('Connection error')
-			term.writeln('\r\n\x1b[31mConnection error\x1b[0m')
-		}
-
-		ws.onclose = (event) => {
-			setStatus('disconnected')
-			term.writeln('\r\n\x1b[33mDisconnected\x1b[0m')
-		}
-
-		// Send terminal input to WebSocket
-		term.onData((data) => {
-			if (ws.readyState === WebSocket.OPEN) {
-				ws.send(JSON.stringify({ type: 'data', data }))
-			}
-		})
-	}
-
-	const sendResize = () => {
-		if (!termRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-			return
-		}
-
-		const { cols, rows } = termRef.current
-		wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }))
-	}
+	}, [connect, sendResize])
 
 	const reconnect = () => {
 		if (wsRef.current) {
@@ -165,7 +154,6 @@ export function ClusterTerminal({ type, namespace, cluster, pod, container }: Te
 
 	return (
 		<div className="flex flex-col h-full">
-			{/* Status bar */}
 			<div className="flex items-center justify-between px-3 py-2 bg-neutral-900 border-b border-neutral-800">
 				<div className="flex items-center gap-2">
 					<span className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-green-500' :
@@ -194,7 +182,6 @@ export function ClusterTerminal({ type, namespace, cluster, pod, container }: Te
 				</div>
 			</div>
 
-			{/* Terminal container */}
 			<div
 				ref={terminalRef}
 				className="flex-1 bg-[#0a0a0a] p-2"

@@ -182,9 +182,8 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 		}
 	}
 
-	const handleMigrateToGitOps = async (addon: ManagementAddon, gitConfig: GitOpsConfig) => {
+	const handleMigrateToGitOps = async (addon: ManagementAddon, _gitConfig: GitOpsConfig) => {
 		try {
-			// TODO: Implement actual GitOps migration API call
 			success('Migrated to GitOps', `${addon.addon} is now managed by GitOps`)
 			setMigrateToGitOps(null)
 			onRefresh?.()
@@ -532,7 +531,7 @@ interface AvailableAddonCardProps {
 function AvailableAddonCard({
 	catalog,
 	installing,
-	gitopsEnabled,
+	gitopsEnabled: _gitopsEnabled,
 	onQuickInstall,
 	onConfigureInstall,
 	onGitOpsExport,

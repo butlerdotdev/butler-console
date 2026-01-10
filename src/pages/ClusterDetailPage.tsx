@@ -255,7 +255,7 @@ export function ClusterDetailPage() {
 	)
 }
 
-function OverviewTab({ cluster }: { cluster: TenantCluster }) {
+function OverviewTab({ cluster }: { cluster: Cluster }) {
 	const spec = cluster.spec
 	const status = cluster.status
 	const provider = spec.providerConfigRef?.name || 'Default'
@@ -306,7 +306,7 @@ function OverviewTab({ cluster }: { cluster: TenantCluster }) {
 	)
 }
 
-function NodesTab({ nodes }: { nodes: NodeInfo[] }) {
+function NodesTab({ nodes }: { nodes: Node[] }) {
 	if (nodes.length === 0) {
 		return (
 			<Card className="p-8 text-center">

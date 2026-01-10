@@ -12,16 +12,16 @@ export type {
 	Cluster,
 	ClusterListResponse,
 	CreateClusterRequest,
-	ManagementCluster,
-	ManagementNode,
-	ManagementPod,
 	Node,
 	Addon,
 	ClusterEvent,
+	ManagementCluster,
+	ManagementNode,
+	ManagementPod,
 } from './clusters'
 export type { AddonDefinition, InstalledAddon, CatalogResponse } from './addons'
 
-// Type aliases for backwards compatibility
-export type ManagementClusterInfo = ManagementCluster
-export type PodInfo = ManagementPod
-export type NodeInfo = Node
+// Backwards compatible aliases
+export type { ManagementCluster as ManagementClusterInfo } from './clusters'
+export type { ManagementPod as PodInfo } from './clusters'
+export type { Node as NodeInfo } from './clusters'

@@ -47,6 +47,8 @@ interface SimpleAddon {
 	name: string
 	status: string
 	version?: string
+	displayName?: string
+	managedBy?: 'butler' | 'platform' | 'gitops'
 }
 
 interface AddonsTabProps {
@@ -73,7 +75,7 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 	const [configureAddon, setConfigureAddon] = useState<AddonDefinition | null>(null)
 	const [gitopsExportAddon, setGitopsExportAddon] = useState<AddonDefinition | null>(null)
 	const [installingAddon, setInstallingAddon] = useState<string | null>(null)
-	const [migrateToGitOps, setMigrateToGitOps] = useState<InstalledAddon | null>(null)
+	const [migrateToGitOps, setMigrateToGitOps] = useState<SimpleAddon | null>(null)
 
 	// Fetch catalog from API
 	useEffect(() => {
@@ -208,7 +210,7 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 		}
 	}
 
-	const handleUninstall = async (addon: InstalledAddon) => {
+	const handleUninstall = async (addon: SimpleAddon) => {
 		if (addon.managedBy === 'gitops') {
 			showError('GitOps Managed', 'This addon is managed by GitOps. Remove it from your Git repository.')
 			return
@@ -222,7 +224,7 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 		}
 	}
 
-	const handleMigrateToGitOps = async (addon: InstalledAddon, _gitConfig: GitOpsConfig) => {
+	const handleMigrateToGitOps = async (addon: SimpleAddon, _gitConfig: GitOpsConfig) => {
 		try {
 			success('Migrated to GitOps', `${addon.name} is now managed by GitOps`)
 			setMigrateToGitOps(null)
@@ -465,7 +467,7 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 
 // Platform Addon Card (Read-only)
 
-function PlatformAddonCard({ addon }: { addon: InstalledAddon }) {
+function PlatformAddonCard({ addon }: { addon: SimpleAddon }) {
 	const statusColor = getStatusColor(addon.status)
 	const statusBg = getStatusBgColor(addon.status)
 
@@ -492,7 +494,7 @@ function PlatformAddonCard({ addon }: { addon: InstalledAddon }) {
 // Installed Addon Card (with manage options)
 
 interface InstalledAddonCardProps {
-	addon: InstalledAddon
+	addon: SimpleAddon
 	catalogInfo?: AddonDefinition
 	gitopsEnabled: boolean
 	onConfigure: () => void
@@ -1156,7 +1158,7 @@ function GitOpsExportModal({ addon, isOpen, onClose, onExport }: GitOpsExportMod
 // Migrate to GitOps Modal
 
 interface MigrateToGitOpsModalProps {
-	addon: InstalledAddon
+	addon: SimpleAddon
 	isOpen: boolean
 	onClose: () => void
 	onMigrate: (config: GitOpsConfig) => void

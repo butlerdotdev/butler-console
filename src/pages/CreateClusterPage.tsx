@@ -149,7 +149,7 @@ export function CreateClusterPage() {
 				if (form.proxmoxTemplateID) payload.proxmoxTemplateID = Number(form.proxmoxTemplateID)
 			}
 
-			await clustersApi.create(payload as Parameters<typeof clustersApi.create>[0])
+			await clustersApi.create(payload as unknown as Parameters<typeof clustersApi.create>[0])
 			success('Cluster Created', `${form.name} is being provisioned`)
 			navigate(`/clusters/${form.namespace}/${form.name}`)
 		} catch (err) {

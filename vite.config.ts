@@ -1,6 +1,9 @@
 // Copyright 2025 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
+// NOTE: This requires @types/node to be installed:
+// npm install -D @types/node
+
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'

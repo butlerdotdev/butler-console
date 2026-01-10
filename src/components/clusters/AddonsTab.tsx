@@ -7,7 +7,7 @@ import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Moda
 import { useToast } from '@/contexts/ToastContext'
 import {
 	addonsApi,
-	type InstalledAddon,
+	// type InstalledAddon,
 	type AddonDefinition,
 	type CategoryInfo,
 } from '@/api/addons'

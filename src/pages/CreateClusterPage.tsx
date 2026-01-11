@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { clustersApi, providersApi, type Provider, type ImageInfo } from '@/api'
+import { clustersApi, providersApi, type Provider, type ImageInfo, type NetworkInfo } from '@/api'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
 import { useToast } from '@/contexts/ToastContext'
 
@@ -21,6 +21,10 @@ export function CreateClusterPage() {
 	// Images
 	const [images, setImages] = useState<ImageInfo[]>([])
 	const [loadingImages, setLoadingImages] = useState(false)
+
+	// Networks
+	const [networks, setNetworks] = useState<NetworkInfo[]>([])
+	const [loadingNetworks, setLoadingNetworks] = useState(false)
 
 	// Form state
 	const [form, setForm] = useState({
@@ -72,24 +76,27 @@ export function CreateClusterPage() {
 		loadProviders()
 	}, [loadProviders])
 
-	// Fetch images when provider changes
+	// Fetch images and networks when provider changes
 	useEffect(() => {
 		if (!selectedProvider) {
 			setImages([])
+			setNetworks([])
 			return
 		}
 
+		const ns = selectedProvider.metadata.namespace || 'butler-system'
+		const providerType = selectedProvider.spec.provider
+
+		// Fetch images
 		const fetchImages = async () => {
 			setLoadingImages(true)
 			try {
-				const ns = selectedProvider.metadata.namespace || 'butler-system'
 				const response = await providersApi.listImages(ns, selectedProvider.metadata.name)
 				setImages(response.images || [])
 
 				// Auto-select first non-Talos image for tenant clusters
 				const defaultImage = response.images?.find(i => i.os && i.os !== 'talos') || response.images?.[0]
 				if (defaultImage) {
-					const providerType = selectedProvider.spec.provider
 					if (providerType === 'harvester') {
 						setForm(prev => ({ ...prev, harvesterImageName: defaultImage.id }))
 					} else if (providerType === 'nutanix') {
@@ -98,13 +105,36 @@ export function CreateClusterPage() {
 				}
 			} catch (err) {
 				console.error('Failed to fetch images:', err)
-				// Don't show error toast - images are optional, user can still type manually
 			} finally {
 				setLoadingImages(false)
 			}
 		}
 
+		// Fetch networks
+		const fetchNetworks = async () => {
+			setLoadingNetworks(true)
+			try {
+				const response = await providersApi.listNetworks(ns, selectedProvider.metadata.name)
+				setNetworks(response.networks || [])
+
+				// Auto-select first network
+				if (response.networks?.length > 0) {
+					const defaultNetwork = response.networks[0]
+					if (providerType === 'harvester') {
+						setForm(prev => ({ ...prev, harvesterNetworkName: defaultNetwork.id }))
+					} else if (providerType === 'nutanix') {
+						setForm(prev => ({ ...prev, nutanixSubnetUUID: defaultNetwork.id }))
+					}
+				}
+			} catch (err) {
+				console.error('Failed to fetch networks:', err)
+			} finally {
+				setLoadingNetworks(false)
+			}
+		}
+
 		fetchImages()
+		fetchNetworks()
 	}, [selectedProvider])
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -119,9 +149,11 @@ export function CreateClusterPage() {
 		setForm(prev => ({
 			...prev,
 			providerConfigRef: providerName,
-			// Reset image when provider changes
+			// Reset provider-specific fields when provider changes
 			harvesterImageName: '',
+			harvesterNetworkName: '',
 			nutanixImageUUID: '',
+			nutanixSubnetUUID: '',
 		}))
 	}
 
@@ -147,7 +179,7 @@ export function CreateClusterPage() {
 		// Validate provider-specific fields
 		if (providerType === 'harvester') {
 			if (!form.harvesterNetworkName) {
-				setError('Network name is required for Harvester')
+				setError('Network is required for Harvester')
 				return
 			}
 			if (!form.harvesterImageName) {
@@ -157,7 +189,7 @@ export function CreateClusterPage() {
 		}
 		if (providerType === 'nutanix') {
 			if (!form.nutanixClusterUUID || !form.nutanixSubnetUUID) {
-				setError('Cluster UUID and Subnet UUID are required for Nutanix')
+				setError('Cluster UUID and Subnet are required for Nutanix')
 				return
 			}
 		}
@@ -310,6 +342,8 @@ export function CreateClusterPage() {
 										onChange={handleChange}
 										images={images}
 										loadingImages={loadingImages}
+										networks={networks}
+										loadingNetworks={loadingNetworks}
 									/>
 								)}
 
@@ -319,6 +353,8 @@ export function CreateClusterPage() {
 										onChange={handleChange}
 										images={images}
 										loadingImages={loadingImages}
+										networks={networks}
+										loadingNetworks={loadingNetworks}
 									/>
 								)}
 
@@ -456,12 +492,14 @@ interface FieldProps {
 	onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void
 }
 
-interface FieldPropsWithImages extends FieldProps {
+interface FieldPropsWithResources extends FieldProps {
 	images: ImageInfo[]
 	loadingImages: boolean
+	networks: NetworkInfo[]
+	loadingNetworks: boolean
 }
 
-function HarvesterFields({ form, onChange, images, loadingImages }: FieldPropsWithImages) {
+function HarvesterFields({ form, onChange, images, loadingImages, networks, loadingNetworks }: FieldPropsWithResources) {
 	return (
 		<div className="grid grid-cols-2 gap-4">
 			<div>
@@ -479,17 +517,38 @@ function HarvesterFields({ form, onChange, images, loadingImages }: FieldPropsWi
 			</div>
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
-					Network Name *
+					Network *
 				</label>
-				<input
-					type="text"
-					name="harvesterNetworkName"
-					value={form.harvesterNetworkName as string}
-					onChange={onChange}
-					placeholder="default/vlan40-workloads"
-					className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-				/>
-				<p className="text-xs text-neutral-500 mt-1">Format: namespace/name</p>
+				{loadingNetworks ? (
+					<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg flex items-center">
+						<Spinner size="sm" className="mr-2" />
+						<span className="text-neutral-400">Loading networks...</span>
+					</div>
+				) : networks.length > 0 ? (
+					<select
+						name="harvesterNetworkName"
+						value={form.harvesterNetworkName as string}
+						onChange={onChange}
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+					>
+						<option value="">Select network...</option>
+						{networks.map((net) => (
+							<option key={net.id} value={net.id}>
+								{net.name} {net.vlan ? `(VLAN ${net.vlan})` : ''}
+							</option>
+						))}
+					</select>
+				) : (
+					<input
+						type="text"
+						name="harvesterNetworkName"
+						value={form.harvesterNetworkName as string}
+						onChange={onChange}
+						placeholder="default/vlan40-workloads"
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+					/>
+				)}
+				<p className="text-xs text-neutral-500 mt-1">VM network for worker nodes</p>
 			</div>
 			<div className="col-span-2">
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -532,7 +591,7 @@ function HarvesterFields({ form, onChange, images, loadingImages }: FieldPropsWi
 	)
 }
 
-function NutanixFields({ form, onChange, images, loadingImages }: FieldPropsWithImages) {
+function NutanixFields({ form, onChange, images, loadingImages, networks, loadingNetworks }: FieldPropsWithResources) {
 	return (
 		<div className="grid grid-cols-2 gap-4">
 			<div>
@@ -550,16 +609,37 @@ function NutanixFields({ form, onChange, images, loadingImages }: FieldPropsWith
 			</div>
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
-					Subnet UUID *
+					Subnet *
 				</label>
-				<input
-					type="text"
-					name="nutanixSubnetUUID"
-					value={form.nutanixSubnetUUID as string}
-					onChange={onChange}
-					placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-					className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-				/>
+				{loadingNetworks ? (
+					<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg flex items-center">
+						<Spinner size="sm" className="mr-2" />
+						<span className="text-neutral-400">Loading subnets...</span>
+					</div>
+				) : networks.length > 0 ? (
+					<select
+						name="nutanixSubnetUUID"
+						value={form.nutanixSubnetUUID as string}
+						onChange={onChange}
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+					>
+						<option value="">Select subnet...</option>
+						{networks.map((net) => (
+							<option key={net.id} value={net.id}>
+								{net.name} {net.vlan ? `(VLAN ${net.vlan})` : ''}
+							</option>
+						))}
+					</select>
+				) : (
+					<input
+						type="text"
+						name="nutanixSubnetUUID"
+						value={form.nutanixSubnetUUID as string}
+						onChange={onChange}
+						placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+					/>
+				)}
 			</div>
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">

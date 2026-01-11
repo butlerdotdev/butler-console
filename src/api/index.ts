@@ -7,7 +7,7 @@ export { clustersApi } from './clusters'
 export { providersApi } from './providers'
 export { addonsApi } from './addons'
 
-export type { Provider, ProviderListResponse, CreateProviderRequest, ImageInfo } from './providers'
+export type { Provider, ProviderListResponse, CreateProviderRequest, ImageInfo, NetworkInfo } from './providers'
 export type {
 	Cluster,
 	ClusterListResponse,

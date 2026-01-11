@@ -81,6 +81,17 @@ export interface ImageListResponse {
 	images: ImageInfo[]
 }
 
+export interface NetworkInfo {
+	name: string
+	id: string
+	vlan?: number
+	description?: string
+}
+
+export interface NetworkListResponse {
+	networks: NetworkInfo[]
+}
+
 export const providersApi = {
 	async list(): Promise<ProviderListResponse> {
 		return apiClient.get<ProviderListResponse>('/providers')
@@ -108,5 +119,9 @@ export const providersApi = {
 
 	async listImages(namespace: string, name: string): Promise<ImageListResponse> {
 		return apiClient.get<ImageListResponse>(`/providers/${namespace}/${name}/images`)
+	},
+
+	async listNetworks(namespace: string, name: string): Promise<NetworkListResponse> {
+		return apiClient.get<NetworkListResponse>(`/providers/${namespace}/${name}/networks`)
 	},
 }

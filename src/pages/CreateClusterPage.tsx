@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { clustersApi, providersApi, type Provider } from '@/api'
+import { clustersApi, providersApi, type Provider, type ImageInfo } from '@/api'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
 import { useToast } from '@/contexts/ToastContext'
 
@@ -17,6 +17,10 @@ export function CreateClusterPage() {
 	const [providers, setProviders] = useState<Provider[]>([])
 	const [loadingProviders, setLoadingProviders] = useState(true)
 	const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null)
+
+	// Images
+	const [images, setImages] = useState<ImageInfo[]>([])
+	const [loadingImages, setLoadingImages] = useState(false)
 
 	// Form state
 	const [form, setForm] = useState({
@@ -68,6 +72,41 @@ export function CreateClusterPage() {
 		loadProviders()
 	}, [loadProviders])
 
+	// Fetch images when provider changes
+	useEffect(() => {
+		if (!selectedProvider) {
+			setImages([])
+			return
+		}
+
+		const fetchImages = async () => {
+			setLoadingImages(true)
+			try {
+				const ns = selectedProvider.metadata.namespace || 'butler-system'
+				const response = await providersApi.listImages(ns, selectedProvider.metadata.name)
+				setImages(response.images || [])
+
+				// Auto-select first non-Talos image for tenant clusters
+				const defaultImage = response.images?.find(i => i.os && i.os !== 'talos') || response.images?.[0]
+				if (defaultImage) {
+					const providerType = selectedProvider.spec.provider
+					if (providerType === 'harvester') {
+						setForm(prev => ({ ...prev, harvesterImageName: defaultImage.id }))
+					} else if (providerType === 'nutanix') {
+						setForm(prev => ({ ...prev, nutanixImageUUID: defaultImage.id }))
+					}
+				}
+			} catch (err) {
+				console.error('Failed to fetch images:', err)
+				// Don't show error toast - images are optional, user can still type manually
+			} finally {
+				setLoadingImages(false)
+			}
+		}
+
+		fetchImages()
+	}, [selectedProvider])
+
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
 		const { name, value } = e.target
 		setForm(prev => ({ ...prev, [name]: value }))
@@ -77,7 +116,13 @@ export function CreateClusterPage() {
 		const providerName = e.target.value
 		const provider = providers.find(p => p.metadata.name === providerName) || null
 		setSelectedProvider(provider)
-		setForm(prev => ({ ...prev, providerConfigRef: providerName }))
+		setForm(prev => ({
+			...prev,
+			providerConfigRef: providerName,
+			// Reset image when provider changes
+			harvesterImageName: '',
+			nutanixImageUUID: '',
+		}))
 	}
 
 	const providerType = selectedProvider?.spec.provider || ''
@@ -100,9 +145,15 @@ export function CreateClusterPage() {
 		}
 
 		// Validate provider-specific fields
-		if (providerType === 'harvester' && !form.harvesterNetworkName) {
-			setError('Network name is required for Harvester')
-			return
+		if (providerType === 'harvester') {
+			if (!form.harvesterNetworkName) {
+				setError('Network name is required for Harvester')
+				return
+			}
+			if (!form.harvesterImageName) {
+				setError('OS Image is required for Harvester')
+				return
+			}
 		}
 		if (providerType === 'nutanix') {
 			if (!form.nutanixClusterUUID || !form.nutanixSubnetUUID) {
@@ -137,7 +188,7 @@ export function CreateClusterPage() {
 			if (providerType === 'harvester') {
 				payload.harvesterNamespace = form.harvesterNamespace
 				payload.harvesterNetworkName = form.harvesterNetworkName
-				if (form.harvesterImageName) payload.harvesterImageName = form.harvesterImageName
+				payload.harvesterImageName = form.harvesterImageName
 			} else if (providerType === 'nutanix') {
 				payload.nutanixClusterUUID = form.nutanixClusterUUID
 				payload.nutanixSubnetUUID = form.nutanixSubnetUUID
@@ -254,11 +305,21 @@ export function CreateClusterPage() {
 								</h3>
 
 								{providerType === 'harvester' && (
-									<HarvesterFields form={form} onChange={handleChange} />
+									<HarvesterFields
+										form={form}
+										onChange={handleChange}
+										images={images}
+										loadingImages={loadingImages}
+									/>
 								)}
 
 								{providerType === 'nutanix' && (
-									<NutanixFields form={form} onChange={handleChange} />
+									<NutanixFields
+										form={form}
+										onChange={handleChange}
+										images={images}
+										loadingImages={loadingImages}
+									/>
 								)}
 
 								{providerType === 'proxmox' && (
@@ -395,7 +456,12 @@ interface FieldProps {
 	onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void
 }
 
-function HarvesterFields({ form, onChange }: FieldProps) {
+interface FieldPropsWithImages extends FieldProps {
+	images: ImageInfo[]
+	loadingImages: boolean
+}
+
+function HarvesterFields({ form, onChange, images, loadingImages }: FieldPropsWithImages) {
 	return (
 		<div className="grid grid-cols-2 gap-4">
 			<div>
@@ -427,22 +493,46 @@ function HarvesterFields({ form, onChange }: FieldProps) {
 			</div>
 			<div className="col-span-2">
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
-					Image Name
+					OS Image *
 				</label>
-				<input
-					type="text"
-					name="harvesterImageName"
-					value={form.harvesterImageName as string}
-					onChange={onChange}
-					placeholder="default/ubuntu-22.04 (optional, uses provider default)"
-					className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-				/>
+				{loadingImages ? (
+					<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg flex items-center">
+						<Spinner size="sm" className="mr-2" />
+						<span className="text-neutral-400">Loading images...</span>
+					</div>
+				) : images.length > 0 ? (
+					<select
+						name="harvesterImageName"
+						value={form.harvesterImageName as string}
+						onChange={onChange}
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+					>
+						<option value="">Select image...</option>
+						{images.map((img) => (
+							<option key={img.id} value={img.id}>
+								{img.name} {img.os && `(${img.os})`}
+							</option>
+						))}
+					</select>
+				) : (
+					<input
+						type="text"
+						name="harvesterImageName"
+						value={form.harvesterImageName as string}
+						onChange={onChange}
+						placeholder="default/rocky-9.4"
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+					/>
+				)}
+				<p className="text-xs text-neutral-500 mt-1">
+					Select Rocky Linux or Ubuntu for tenant clusters (not Talos)
+				</p>
 			</div>
 		</div>
 	)
 }
 
-function NutanixFields({ form, onChange }: FieldProps) {
+function NutanixFields({ form, onChange, images, loadingImages }: FieldPropsWithImages) {
 	return (
 		<div className="grid grid-cols-2 gap-4">
 			<div>
@@ -473,16 +563,37 @@ function NutanixFields({ form, onChange }: FieldProps) {
 			</div>
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
-					Image UUID
+					Image
 				</label>
-				<input
-					type="text"
-					name="nutanixImageUUID"
-					value={form.nutanixImageUUID as string}
-					onChange={onChange}
-					placeholder="Optional, uses provider default"
-					className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-				/>
+				{loadingImages ? (
+					<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg flex items-center">
+						<Spinner size="sm" className="mr-2" />
+						<span className="text-neutral-400">Loading images...</span>
+					</div>
+				) : images.length > 0 ? (
+					<select
+						name="nutanixImageUUID"
+						value={form.nutanixImageUUID as string}
+						onChange={onChange}
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+					>
+						<option value="">Select image (optional)...</option>
+						{images.map((img) => (
+							<option key={img.id} value={img.id}>
+								{img.name} {img.os && `(${img.os})`}
+							</option>
+						))}
+					</select>
+				) : (
+					<input
+						type="text"
+						name="nutanixImageUUID"
+						value={form.nutanixImageUUID as string}
+						onChange={onChange}
+						placeholder="Optional, uses provider default"
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+					/>
+				)}
 			</div>
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">

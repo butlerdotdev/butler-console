@@ -53,17 +53,14 @@ export interface CreateProviderRequest {
 	name: string
 	namespace?: string
 	provider: 'harvester' | 'nutanix' | 'proxmox'
-
 	// Harvester
 	harvesterKubeconfig?: string
-
 	// Nutanix
 	nutanixEndpoint?: string
 	nutanixPort?: number
 	nutanixUsername?: string
 	nutanixPassword?: string
 	nutanixInsecure?: boolean
-
 	// Proxmox
 	proxmoxEndpoint?: string
 	proxmoxUsername?: string
@@ -71,6 +68,17 @@ export interface CreateProviderRequest {
 	proxmoxTokenId?: string
 	proxmoxTokenSecret?: string
 	proxmoxInsecure?: boolean
+}
+
+export interface ImageInfo {
+	name: string
+	id: string
+	description?: string
+	os?: string
+}
+
+export interface ImageListResponse {
+	images: ImageInfo[]
 }
 
 export const providersApi = {
@@ -96,5 +104,9 @@ export const providersApi = {
 
 	async testConnection(data: CreateProviderRequest): Promise<ValidateResponse> {
 		return apiClient.post<ValidateResponse>('/providers/test', data)
+	},
+
+	async listImages(namespace: string, name: string): Promise<ImageListResponse> {
+		return apiClient.get<ImageListResponse>(`/providers/${namespace}/${name}/images`)
 	},
 }

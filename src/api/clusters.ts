@@ -16,6 +16,9 @@ export interface Cluster {
 			name: string
 			namespace?: string
 		}
+		teamRef?: {
+			name: string
+		}
 		workers?: {
 			replicas: number
 			machineTemplate?: {
@@ -74,6 +77,11 @@ export interface ClusterListResponse {
 	clusters: Cluster[]
 }
 
+export interface ClusterListOptions {
+	namespace?: string
+	team?: string
+}
+
 export interface CreateClusterRequest {
 	name: string
 	namespace?: string
@@ -85,6 +93,7 @@ export interface CreateClusterRequest {
 	workerDiskSize?: string
 	loadBalancerStart: string
 	loadBalancerEnd: string
+	teamRef?: string
 
 	// Harvester-specific
 	harvesterNamespace?: string
@@ -181,9 +190,20 @@ export interface ManagementPod {
 }
 
 export const clustersApi = {
-	async list(namespace?: string): Promise<ClusterListResponse> {
-		const params = namespace ? `?namespace=${namespace}` : ''
-		return apiClient.get<ClusterListResponse>(`/clusters${params}`)
+	/**
+	 * List clusters with optional filters
+	 * @param options - Filter options (namespace, team)
+	 */
+	async list(options?: ClusterListOptions): Promise<ClusterListResponse> {
+		const params = new URLSearchParams()
+		if (options?.namespace) {
+			params.set('namespace', options.namespace)
+		}
+		if (options?.team) {
+			params.set('team', options.team)
+		}
+		const queryString = params.toString()
+		return apiClient.get<ClusterListResponse>(`/clusters${queryString ? `?${queryString}` : ''}`)
 	},
 
 	async get(namespace: string, name: string): Promise<Cluster> {

@@ -7,7 +7,7 @@ import { useDocumentTitle } from '@/hooks'
 import { providersApi, type Provider, type ValidateResponse } from '@/api/providers'
 import { Card, Spinner, Button, FadeIn } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
-import { useToast } from '@/contexts/ToastContext'
+import { useToast } from '@/hooks/useToast'
 
 export function ProvidersPage() {
 	useDocumentTitle('Providers')

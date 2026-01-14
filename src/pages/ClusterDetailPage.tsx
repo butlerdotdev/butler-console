@@ -102,6 +102,7 @@ export function ClusterDetailPage() {
 			const data = await clustersApi.getEvents(namespace, name)
 			setEvents(data.events || [])
 		} catch {
+			// Silently handle error
 		}
 	}, [namespace, name])
 

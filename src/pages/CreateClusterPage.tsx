@@ -6,12 +6,14 @@ import { useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { clustersApi, providersApi, type Provider, type ImageInfo, type NetworkInfo } from '@/api'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
-import { useToast } from '@/contexts/ToastContext'
+import { useToast } from '@/hooks/useToast'
+import { useTeamContext } from '@/hooks/useTeamContext'
 
 export function CreateClusterPage() {
 	useDocumentTitle('Create Cluster')
 	const navigate = useNavigate()
 	const { success, error: showError } = useToast()
+	const { currentTeam, currentTeamNamespace, currentTeamDisplayName, buildPath } = useTeamContext()
 
 	// Providers
 	const [providers, setProviders] = useState<Provider[]>([])
@@ -26,10 +28,14 @@ export function CreateClusterPage() {
 	const [networks, setNetworks] = useState<NetworkInfo[]>([])
 	const [loadingNetworks, setLoadingNetworks] = useState(false)
 
+	// Determine namespace based on team context
+	// If in team context, use team namespace; otherwise default to butler-tenants
+	const defaultNamespace = currentTeamNamespace || 'butler-tenants'
+
 	// Form state
 	const [form, setForm] = useState({
 		name: '',
-		namespace: 'butler-tenants',
+		namespace: defaultNamespace,
 		kubernetesVersion: 'v1.30.2',
 		providerConfigRef: '',
 		workerReplicas: 1,
@@ -54,6 +60,14 @@ export function CreateClusterPage() {
 	})
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+
+	// Update namespace when team context changes
+	useEffect(() => {
+		setForm(prev => ({
+			...prev,
+			namespace: currentTeamNamespace || 'butler-tenants'
+		}))
+	}, [currentTeamNamespace])
 
 	const loadProviders = useCallback(async () => {
 		try {
@@ -216,6 +230,11 @@ export function CreateClusterPage() {
 				loadBalancerEnd: form.loadBalancerEnd,
 			}
 
+			// If in team context, include teamRef
+			if (currentTeam) {
+				payload.teamRef = currentTeam // currentTeam is the team name string
+			}
+
 			// Add provider-specific fields
 			if (providerType === 'harvester') {
 				payload.harvesterNamespace = form.harvesterNamespace
@@ -234,7 +253,7 @@ export function CreateClusterPage() {
 
 			await clustersApi.create(payload as unknown as Parameters<typeof clustersApi.create>[0])
 			success('Cluster Created', `${form.name} is being provisioned`)
-			navigate(`/clusters/${form.namespace}/${form.name}`)
+			navigate(buildPath(`/clusters/${form.namespace}/${form.name}`))
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to create cluster'
 			setError(message)
@@ -249,7 +268,12 @@ export function CreateClusterPage() {
 			<div className="max-w-2xl mx-auto">
 				<div className="mb-6">
 					<h1 className="text-2xl font-semibold text-neutral-50">Create Cluster</h1>
-					<p className="text-neutral-400 mt-1">Deploy a new tenant Kubernetes cluster</p>
+					<p className="text-neutral-400 mt-1">
+						Deploy a new tenant Kubernetes cluster
+						{currentTeam && (
+							<span className="text-green-500"> for {currentTeamDisplayName || currentTeam}</span>
+						)}
+					</p>
 				</div>
 
 				<form onSubmit={handleSubmit}>
@@ -274,13 +298,16 @@ export function CreateClusterPage() {
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
 										Namespace
+										{currentTeam && <span className="text-xs text-neutral-500 ml-1">(from team)</span>}
 									</label>
 									<input
 										type="text"
 										name="namespace"
 										value={form.namespace}
 										onChange={handleChange}
-										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+										disabled={!!currentTeam} // Disable if in team context
+										className={`w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 ${currentTeam ? 'opacity-60 cursor-not-allowed' : ''
+											}`}
 									/>
 								</div>
 								<div>
@@ -310,7 +337,7 @@ export function CreateClusterPage() {
 									) : providers.length === 0 ? (
 										<div className="text-sm text-red-400">
 											No providers configured.{' '}
-											<a href="/providers/create" className="underline">Add one</a>
+											<a href="/admin/providers/create" className="underline">Add one</a>
 										</div>
 									) : (
 										<select
@@ -473,7 +500,7 @@ export function CreateClusterPage() {
 
 						{/* Actions */}
 						<div className="flex justify-end gap-3 pt-4 border-t border-neutral-800">
-							<Button type="button" variant="secondary" onClick={() => navigate('/clusters')}>
+							<Button type="button" variant="secondary" onClick={() => navigate(buildPath('/clusters'))}>
 								Cancel
 							</Button>
 							<Button type="submit" disabled={loading || providers.length === 0}>

@@ -118,15 +118,15 @@ export function ManagementPage() {
 				{/* Header */}
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-4">
-						<div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
-							<svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<div className="w-12 h-12 rounded-lg bg-violet-500/10 flex items-center justify-center">
+							<svg className="w-6 h-6 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
 							</svg>
 						</div>
 						<div>
 							<div className="flex items-center gap-3">
 								<h1 className="text-2xl font-semibold text-neutral-50">Management Cluster</h1>
-								<span className="px-2 py-1 text-xs font-medium bg-blue-500/10 text-blue-400 rounded">
+								<span className="px-2 py-1 text-xs font-medium bg-violet-500/10 text-violet-400 rounded">
 									Management
 								</span>
 								<StatusBadge status={info.phase} />
@@ -166,7 +166,7 @@ export function ManagementPage() {
 								key={tab}
 								onClick={() => setActiveTab(tab)}
 								className={`pb-3 text-sm font-medium transition-colors capitalize ${activeTab === tab
-									? 'text-blue-500 border-b-2 border-blue-500'
+									? 'text-violet-500 border-b-2 border-violet-500'
 									: 'text-neutral-400 hover:text-neutral-200'
 									}`}
 							>
@@ -341,7 +341,7 @@ function PodsTab({ pods, namespaces, selectedNamespace, onNamespaceChange }: Pod
 				<select
 					value={selectedNamespace}
 					onChange={(e) => onNamespaceChange(e.target.value)}
-					className="px-3 py-1.5 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+					className="px-3 py-1.5 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
 				>
 					{namespaces.map((ns) => (
 						<option key={ns.namespace} value={ns.namespace}>

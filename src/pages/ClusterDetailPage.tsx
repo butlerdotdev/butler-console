@@ -4,13 +4,21 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import { clustersApi, type Cluster, type Node, type Addon, type ClusterEvent } from '@/api'
 import { Card, Spinner, StatusBadge, Button, FadeIn } from '@/components/ui'
 import { ClusterTerminal } from '@/components/terminal'
 import { DeleteClusterModal } from '@/components/clusters/DeleteClusterModal'
-import { useToast } from '@/contexts/ToastContext'
+import { useToast } from '@/hooks/useToast'
 import { AddonsTab } from '@/components/clusters'
+import { AccessDenied } from '@/components/AccessDenied'
 
+// Error type for API responses
+interface ApiError {
+	status?: number
+	response?: { status?: number }
+	message?: string
+}
 
 const TABS = ['overview', 'nodes', 'addons', 'events', 'terminal'] as const
 type TabType = typeof TABS[number]
@@ -23,6 +31,7 @@ export function ClusterDetailPage() {
 	const { namespace, name } = useParams<{ namespace: string; name: string }>()
 	const navigate = useNavigate()
 	const { success, error: showError } = useToast()
+	const { buildPath } = useTeamContext()
 
 	// URL-based tab persistence
 	const [searchParams, setSearchParams] = useSearchParams()
@@ -41,16 +50,27 @@ export function ClusterDetailPage() {
 	const [events, setEvents] = useState<ClusterEvent[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
+	const [accessDenied, setAccessDenied] = useState(false)
+	const [accessDeniedMessage, setAccessDeniedMessage] = useState<string>('')
 	const [showDeleteModal, setShowDeleteModal] = useState(false)
 
 	const loadCluster = useCallback(async () => {
 		if (!namespace || !name) return
 		try {
 			setLoading(true)
+			setAccessDenied(false)
 			const data = await clustersApi.get(namespace, name)
 			setCluster(data)
-		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Failed to load cluster')
+		} catch (err: unknown) {
+			const apiErr = err as ApiError
+			// Check for 403 Forbidden response
+			if (apiErr?.status === 403 || apiErr?.response?.status === 403 ||
+				(apiErr?.message && apiErr.message.includes('forbidden'))) {
+				setAccessDenied(true)
+				setAccessDeniedMessage(apiErr?.message || 'You do not have access to this cluster')
+			} else {
+				setError(err instanceof Error ? err.message : 'Failed to load cluster')
+			}
 		} finally {
 			setLoading(false)
 		}
@@ -82,7 +102,6 @@ export function ClusterDetailPage() {
 			const data = await clustersApi.getEvents(namespace, name)
 			setEvents(data.events || [])
 		} catch {
-			// Silently handle error - events will remain empty
 		}
 	}, [namespace, name])
 
@@ -104,9 +123,18 @@ export function ClusterDetailPage() {
 
 	const handleDelete = async () => {
 		if (!namespace || !name) return
-		await clustersApi.delete(namespace, name)
-		success('Cluster Deleted', `Cluster ${name} has been deleted`)
-		navigate('/clusters')
+		try {
+			await clustersApi.delete(namespace, name)
+			success('Cluster Deleted', `Cluster ${name} has been deleted`)
+			navigate(buildPath('/clusters'))
+		} catch (err: unknown) {
+			const apiErr = err as ApiError
+			if (apiErr?.status === 403 || apiErr?.response?.status === 403) {
+				showError('Permission Denied', 'You do not have permission to delete this cluster')
+			} else {
+				showError('Delete Failed', err instanceof Error ? err.message : 'Failed to delete cluster')
+			}
+		}
 	}
 
 	const handleDownloadKubeconfig = async () => {
@@ -121,8 +149,13 @@ export function ClusterDetailPage() {
 			a.click()
 			URL.revokeObjectURL(url)
 			success('Downloaded', `Kubeconfig saved as ${name}-kubeconfig.yaml`)
-		} catch (err) {
-			showError('Download Failed', err instanceof Error ? err.message : 'Failed to download kubeconfig')
+		} catch (err: unknown) {
+			const apiErr = err as ApiError
+			if (apiErr?.status === 403 || apiErr?.response?.status === 403) {
+				showError('Permission Denied', 'You do not have permission to download this kubeconfig')
+			} else {
+				showError('Download Failed', err instanceof Error ? err.message : 'Failed to download kubeconfig')
+			}
 		}
 	}
 
@@ -134,15 +167,27 @@ export function ClusterDetailPage() {
 		)
 	}
 
+	// Show access denied page for 403 responses
+	if (accessDenied) {
+		return (
+			<AccessDenied
+				message={accessDeniedMessage}
+				resourceType="cluster"
+				resourceName={name}
+				teamName={namespace}
+			/>
+		)
+	}
+
 	if (error || !cluster) {
 		return (
 			<div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
 				<p className="text-red-400">{error || 'Cluster not found'}</p>
 				<button
-					onClick={() => navigate('/clusters')}
+					onClick={() => navigate(-1)}
 					className="mt-2 text-sm text-red-400 hover:text-red-300 underline"
 				>
-					Back to clusters
+					Go back
 				</button>
 			</div>
 		)
@@ -160,7 +205,7 @@ export function ClusterDetailPage() {
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-4">
 						<button
-							onClick={() => navigate('/clusters')}
+							onClick={() => navigate(-1)}
 							className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
 						>
 							<svg className="w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

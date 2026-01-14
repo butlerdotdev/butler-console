@@ -4,7 +4,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, Button, Spinner } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
-import { useToast } from '@/contexts/ToastContext'
+import { useToast } from '@/hooks/useToast'
 import {
 	addonsApi,
 	// type InstalledAddon,
@@ -12,7 +12,6 @@ import {
 	type CategoryInfo,
 } from '@/api/addons'
 
-// Types
 
 interface SchemaField {
 	path: string

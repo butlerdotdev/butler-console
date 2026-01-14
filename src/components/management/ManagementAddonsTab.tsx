@@ -4,14 +4,13 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Card, Button, Spinner } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
-import { useToast } from '@/contexts/ToastContext'
+import { useToast } from '@/hooks/useToast'
 import {
 	addonsApi,
 	type AddonDefinition,
 	type CategoryInfo,
 } from '@/api/addons'
 
-// Types
 
 interface ManagementAddon {
 	name: string
@@ -213,13 +212,13 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 
 	return (
 		<div className="space-y-8">
-			{/* Info Banner */}
-			<div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+			{/* Info Banner - Violet to match Admin theme */}
+			<div className="p-4 bg-violet-500/10 border border-violet-500/20 rounded-lg">
 				<div className="flex items-center gap-3">
 					<span className="text-xl">ℹ️</span>
 					<div>
-						<p className="font-medium text-blue-300">Management Cluster Addons</p>
-						<p className="text-sm text-blue-400/70">
+						<p className="font-medium text-violet-300">Management Cluster Addons</p>
+						<p className="text-sm text-violet-400/70">
 							These addons are installed directly on the management cluster to provide observability,
 							backup, and other platform-level capabilities.
 						</p>
@@ -275,7 +274,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 			<div>
 				<div className="flex items-center gap-2 mb-4">
 					<h3 className="text-lg font-medium text-neutral-50">Available Addons</h3>
-					<span className="px-2 py-0.5 text-xs bg-purple-500/10 text-purple-400 rounded">
+					<span className="px-2 py-0.5 text-xs bg-violet-500/10 text-violet-400 rounded">
 						{availableCatalog.length} Available
 					</span>
 				</div>
@@ -291,7 +290,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 							placeholder="Search addons..."
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
-							className="w-full pl-10 pr-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+							className="w-full pl-10 pr-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
 						/>
 					</div>
 
@@ -299,7 +298,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 						<button
 							onClick={() => setSelectedCategory('all')}
 							className={`px-3 py-2 text-sm rounded-lg transition-colors ${selectedCategory === 'all'
-								? 'bg-green-500/20 text-green-400 border border-green-500'
+								? 'bg-violet-500/20 text-violet-400 border border-violet-500'
 								: 'bg-neutral-800 text-neutral-400 border border-neutral-700 hover:border-neutral-600'
 								}`}
 						>
@@ -310,7 +309,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 								key={cat.name}
 								onClick={() => setSelectedCategory(cat.name)}
 								className={`px-3 py-2 text-sm rounded-lg transition-colors ${selectedCategory === cat.name
-									? 'bg-green-500/20 text-green-400 border border-green-500'
+									? 'bg-violet-500/20 text-violet-400 border border-violet-500'
 									: 'bg-neutral-800 text-neutral-400 border border-neutral-700 hover:border-neutral-600'
 									}`}
 							>
@@ -553,7 +552,7 @@ function AvailableAddonCard({
 		<Card className="p-4 hover:border-neutral-600 transition-colors">
 			<div className="flex items-start justify-between mb-3">
 				<div className="flex items-center gap-3">
-					<div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+					<div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
 						<span className="text-xl">{catalog.icon || '📦'}</span>
 					</div>
 					<div>
@@ -694,7 +693,7 @@ function ConfigureModal({ addon, isOpen, onClose, onInstall, installing }: Confi
 					<textarea
 						value={yamlContent}
 						onChange={(e) => setYamlContent(e.target.value)}
-						className="w-full h-64 font-mono text-sm bg-neutral-900 border border-neutral-700 rounded-lg p-4 text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+						className="w-full h-64 font-mono text-sm bg-neutral-900 border border-neutral-700 rounded-lg p-4 text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
 						placeholder="# Enter Helm values in YAML format"
 					/>
 					{addon.links?.documentation && (
@@ -704,7 +703,7 @@ function ConfigureModal({ addon, isOpen, onClose, onInstall, installing }: Confi
 								href={addon.links.documentation}
 								target="_blank"
 								rel="noopener noreferrer"
-								className="text-green-400 hover:underline"
+								className="text-violet-400 hover:underline"
 							>
 								documentation
 							</a>
@@ -765,7 +764,7 @@ function GitOpsExportModal({ addon, isOpen, onClose, onExport }: GitOpsExportMod
 							value={config.repository}
 							onChange={(e) => setConfig({ ...config, repository: e.target.value })}
 							placeholder="https://github.com/org/repo"
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
 						/>
 					</div>
 
@@ -775,7 +774,7 @@ function GitOpsExportModal({ addon, isOpen, onClose, onExport }: GitOpsExportMod
 							type="text"
 							value={config.branch}
 							onChange={(e) => setConfig({ ...config, branch: e.target.value })}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
 						/>
 					</div>
 
@@ -785,7 +784,7 @@ function GitOpsExportModal({ addon, isOpen, onClose, onExport }: GitOpsExportMod
 							type="text"
 							value={config.path}
 							onChange={(e) => setConfig({ ...config, path: e.target.value })}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
 						/>
 					</div>
 
@@ -794,7 +793,7 @@ function GitOpsExportModal({ addon, isOpen, onClose, onExport }: GitOpsExportMod
 							type="checkbox"
 							checked={config.createPR}
 							onChange={(e) => setConfig({ ...config, createPR: e.target.checked })}
-							className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500"
+							className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-violet-500 focus:ring-violet-500"
 						/>
 						<span className="text-sm text-neutral-200">Create Pull Request</span>
 					</label>
@@ -858,7 +857,7 @@ function MigrateToGitOpsModal({ addon, isOpen, onClose, onMigrate }: MigrateToGi
 							value={config.repository}
 							onChange={(e) => setConfig({ ...config, repository: e.target.value })}
 							placeholder="https://github.com/org/repo"
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
 						/>
 					</div>
 
@@ -868,7 +867,7 @@ function MigrateToGitOpsModal({ addon, isOpen, onClose, onMigrate }: MigrateToGi
 							type="text"
 							value={config.branch}
 							onChange={(e) => setConfig({ ...config, branch: e.target.value })}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
 						/>
 					</div>
 
@@ -878,7 +877,7 @@ function MigrateToGitOpsModal({ addon, isOpen, onClose, onMigrate }: MigrateToGi
 							type="text"
 							value={config.path}
 							onChange={(e) => setConfig({ ...config, path: e.target.value })}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
 						/>
 					</div>
 
@@ -887,7 +886,7 @@ function MigrateToGitOpsModal({ addon, isOpen, onClose, onMigrate }: MigrateToGi
 							type="checkbox"
 							checked={config.createPR}
 							onChange={(e) => setConfig({ ...config, createPR: e.target.checked })}
-							className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500"
+							className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-violet-500 focus:ring-violet-500"
 						/>
 						<span className="text-sm text-neutral-200">Create Pull Request</span>
 					</label>

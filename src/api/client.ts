@@ -3,6 +3,19 @@
 
 const API_BASE = '/api'
 
+/**
+ * Custom error class that includes HTTP status code
+ */
+export class ApiError extends Error {
+	status: number
+
+	constructor(message: string, status: number) {
+		super(message)
+		this.name = 'ApiError'
+		this.status = status
+	}
+}
+
 class ApiClient {
 	private async request<T>(
 		method: string,
@@ -26,7 +39,8 @@ class ApiClient {
 
 		if (!response.ok) {
 			const error = await response.json().catch(() => ({ error: 'Request failed' }))
-			throw new Error(error.error || `HTTP ${response.status}`)
+			// Include status code in error for proper handling
+			throw new ApiError(error.error || `HTTP ${response.status}`, response.status)
 		}
 
 		return response.json()

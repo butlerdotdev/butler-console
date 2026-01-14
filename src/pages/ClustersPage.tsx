@@ -1,39 +1,57 @@
-// Copyright 2025 The Butler Authors.
+// Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import { useDocumentTitle } from '@/hooks'
-import { clustersApi, type ManagementClusterInfo, type Cluster } from '@/api'
+import { clustersApi, type Cluster } from '@/api'
 import { Card, Spinner, StatusBadge, FadeIn, Button } from '@/components/ui'
 
+interface ManagementClusterInfo {
+	kubernetesVersion: string
+	phase: string
+	nodes: { ready: number; total: number }
+	tenantClusters: number
+}
+
 export function ClustersPage() {
-	useDocumentTitle('Clusters')
+	const { currentTeam, currentTeamDisplayName, buildPath, isAdminMode } = useTeamContext()
+	useDocumentTitle(currentTeamDisplayName ? `${currentTeamDisplayName} Clusters` : 'Clusters')
 
 	const [management, setManagement] = useState<ManagementClusterInfo | null>(null)
 	const [clusters, setClusters] = useState<Cluster[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
-	useEffect(() => {
-		loadClusters()
-	}, [])
-
-	const loadClusters = async () => {
+	const loadClusters = useCallback(async () => {
 		try {
 			setLoading(true)
+			setError(null)
+
+			// Fetch management cluster and tenant clusters
+			// Pass team to filter clusters when in team context
 			const [mgmt, tenantsResponse] = await Promise.all([
-				clustersApi.getManagement(),
-				clustersApi.list()
+				clustersApi.getManagement().catch(() => null),
+				clustersApi.list({ team: currentTeam ?? undefined })
 			])
+
 			setManagement(mgmt)
 			setClusters(tenantsResponse.clusters || [])
 		} catch (err) {
+			console.error('Failed to load clusters:', err)
 			setError(err instanceof Error ? err.message : 'Failed to load clusters')
 		} finally {
 			setLoading(false)
 		}
-	}
+	}, [currentTeam])
+
+	useEffect(() => {
+		loadClusters()
+	}, [loadClusters])
+
+	// Show management cluster only in admin mode
+	const showManagement = management && isAdminMode
 
 	if (loading) {
 		return (
@@ -45,7 +63,7 @@ export function ClustersPage() {
 
 	if (error) {
 		return (
-			<div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+			<Card className="p-4 border-red-500/20">
 				<p className="text-red-400">{error}</p>
 				<button
 					onClick={loadClusters}
@@ -53,7 +71,7 @@ export function ClustersPage() {
 				>
 					Retry
 				</button>
-			</div>
+			</Card>
 		)
 	}
 
@@ -65,7 +83,7 @@ export function ClustersPage() {
 						<h1 className="text-2xl font-semibold text-neutral-50">Clusters</h1>
 						<p className="text-neutral-400 mt-1">Manage your Kubernetes clusters</p>
 					</div>
-					<Link to="/clusters/create">
+					<Link to={buildPath('/clusters/new')}>
 						<Button>
 							<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -76,17 +94,37 @@ export function ClustersPage() {
 				</div>
 
 				<div className="grid gap-4">
-					{/* Management Cluster - Always First */}
-					{management && <ManagementClusterCard info={management} />}
+					{/* Management Cluster - Admin only */}
+					{showManagement && <ManagementClusterCard info={management} />}
 
 					{/* Tenant Clusters */}
 					{clusters.map((cluster) => (
-						<ClusterCard key={cluster.metadata.uid || cluster.metadata.name} cluster={cluster} />
+						<ClusterCard
+							key={cluster.metadata.uid || `${cluster.metadata.namespace}/${cluster.metadata.name}`}
+							cluster={cluster}
+							buildPath={buildPath}
+						/>
 					))}
 
-					{clusters.length === 0 && (
-						<Card className="p-6 text-center">
-							<p className="text-neutral-400">No tenant clusters yet</p>
+					{clusters.length === 0 && !showManagement && (
+						<Card className="p-8 text-center">
+							<svg
+								className="mx-auto h-12 w-12 text-neutral-600 mb-4"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={1.5}
+									d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"
+								/>
+							</svg>
+							<p className="text-neutral-400 mb-4">No clusters yet</p>
+							<Link to={buildPath('/clusters/new')}>
+								<Button>Create Cluster</Button>
+							</Link>
 						</Card>
 					)}
 				</div>
@@ -98,18 +136,18 @@ export function ClustersPage() {
 function ManagementClusterCard({ info }: { info: ManagementClusterInfo }) {
 	return (
 		<Link to="/management">
-			<Card className="p-5 hover:bg-neutral-800/50 transition-colors cursor-pointer border-blue-500/20">
+			<Card className="p-5 hover:bg-neutral-800/50 transition-colors cursor-pointer border-violet-500/20">
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-4">
-						<div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-							<svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
+							<svg className="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
 							</svg>
 						</div>
 						<div>
 							<div className="flex items-center gap-2">
 								<p className="font-medium text-neutral-50">Management Cluster</p>
-								<span className="px-2 py-0.5 text-xs font-medium bg-blue-500/10 text-blue-400 rounded">
+								<span className="px-2 py-0.5 text-xs font-medium bg-violet-500/10 text-violet-400 rounded">
 									Management
 								</span>
 							</div>
@@ -138,7 +176,13 @@ function ManagementClusterCard({ info }: { info: ManagementClusterInfo }) {
 	)
 }
 
-function ClusterCard({ cluster }: { cluster: Cluster }) {
+function ClusterCard({
+	cluster,
+	buildPath
+}: {
+	cluster: Cluster
+	buildPath: (path: string) => string
+}) {
 	const name = cluster.metadata.name
 	const namespace = cluster.metadata.namespace
 	const phase = cluster.status?.phase || 'Unknown'
@@ -161,8 +205,9 @@ function ClusterCard({ cluster }: { cluster: Cluster }) {
 		else age = `${diffMins}m ago`
 	}
 
+	// Link to cluster detail - include namespace in path
 	return (
-		<Link to={`/clusters/${namespace}/${name}`}>
+		<Link to={buildPath(`/clusters/${namespace}/${name}`)}>
 			<Card className="p-5 hover:bg-neutral-800/50 transition-colors cursor-pointer">
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-4">

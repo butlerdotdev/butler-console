@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { providersApi, type CreateProviderRequest } from '@/api/providers'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
-import { useToast } from '@/contexts/ToastContext'
+import { useToast } from '@/hooks/useToast'
 
 type ProviderType = 'harvester' | 'nutanix' | 'proxmox'
 
@@ -203,8 +203,8 @@ export function CreateProviderPage() {
 											setTestResult(null)
 										}}
 										className={`p-4 rounded-lg border-2 transition-colors ${providerType === type
-												? 'border-green-500 bg-green-500/10'
-												: 'border-neutral-700 hover:border-neutral-600'
+											? 'border-green-500 bg-green-500/10'
+											: 'border-neutral-700 hover:border-neutral-600'
 											}`}
 									>
 										<div className="text-center">
@@ -311,8 +311,8 @@ export function CreateProviderPage() {
 							</div>
 							{testResult && (
 								<div className={`mt-3 p-3 rounded-lg ${testResult.valid
-										? 'bg-green-500/10 border border-green-500/20'
-										: 'bg-red-500/10 border border-red-500/20'
+									? 'bg-green-500/10 border border-green-500/20'
+									: 'bg-red-500/10 border border-red-500/20'
 									}`}>
 									<div className="flex items-center gap-2">
 										{testResult.valid ? (
@@ -557,8 +557,8 @@ function ProxmoxCredentials({
 							type="button"
 							onClick={() => setAuthType('password')}
 							className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${authType === 'password'
-									? 'bg-green-500/20 text-green-400 border border-green-500'
-									: 'bg-neutral-800 text-neutral-400 border border-neutral-700 hover:border-neutral-600'
+								? 'bg-green-500/20 text-green-400 border border-green-500'
+								: 'bg-neutral-800 text-neutral-400 border border-neutral-700 hover:border-neutral-600'
 								}`}
 						>
 							Username/Password
@@ -567,8 +567,8 @@ function ProxmoxCredentials({
 							type="button"
 							onClick={() => setAuthType('token')}
 							className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${authType === 'token'
-									? 'bg-green-500/20 text-green-400 border border-green-500'
-									: 'bg-neutral-800 text-neutral-400 border border-neutral-700 hover:border-neutral-600'
+								? 'bg-green-500/20 text-green-400 border border-green-500'
+								: 'bg-neutral-800 text-neutral-400 border border-neutral-700 hover:border-neutral-600'
 								}`}
 						>
 							API Token

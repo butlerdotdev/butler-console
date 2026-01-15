@@ -33,8 +33,8 @@ export function UsersPage() {
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState('')
 
-	// Check if current user is admin in any team
-	const isAdmin = currentUser?.teams?.some(t => t.role === 'admin') ?? false
+	// Check if current user can manage users (platform admin OR team admin)
+	const isAdmin = currentUser?.isPlatformAdmin || currentUser?.teams?.some(t => t.role === 'admin') || false
 
 	// Create user modal
 	const [showCreateModal, setShowCreateModal] = useState(false)

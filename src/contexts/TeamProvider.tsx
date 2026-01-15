@@ -255,6 +255,17 @@ export function RequireTeamAccess({ children }: RouteGuardProps) {
 	// Normalize teams for checking
 	const normalizedTeams = normalizeTeams(user?.teams || [])
 
+	// Platform admins can access any team
+	const isPlatformAdmin =
+		user?.role === 'admin' ||
+		user?.isAdmin === true ||
+		user?.isPlatformAdmin === true ||
+		normalizedTeams.some((t) => t.name === 'platform-team' && t.role === 'admin')
+
+	if (isPlatformAdmin) {
+		return <>{children}</>
+	}
+
 	// Check if user has access to this team
 	const hasAccess = normalizedTeams.some((t) => t.name === team)
 
@@ -264,12 +275,8 @@ export function RequireTeamAccess({ children }: RouteGuardProps) {
 		return <Navigate to={`/t/${normalizedTeams[0].name}`} replace />
 	}
 
-	// If user has no teams at all and is not admin, go to overview
+	// If user has no teams at all, go to overview
 	if (normalizedTeams.length === 0) {
-		const isAdmin = user?.role === 'admin' || user?.isAdmin
-		if (isAdmin) {
-			return <Navigate to="/admin" replace />
-		}
 		return <Navigate to="/overview" replace />
 	}
 

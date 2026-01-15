@@ -38,7 +38,7 @@ export function ProfileSettingsPage() {
 		setSaving(false)
 	}
 
-	const isAdmin = user?.role === 'admin' || user?.isAdmin
+	const isAdmin = user?.isPlatformAdmin || false
 	const teams = user?.teams || []
 
 	return (

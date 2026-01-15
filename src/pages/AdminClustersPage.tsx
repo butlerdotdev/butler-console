@@ -1,12 +1,13 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { useTeamContext } from '@/hooks/useTeamContext'
+import { useAuth } from '@/hooks/useAuth'
 import { clustersApi, type Cluster } from '@/api'
-import { Card, StatusBadge, Spinner, FadeIn } from '@/components/ui'
+import { Card, StatusBadge, Spinner, FadeIn, Modal, ModalHeader, ModalBody, ModalFooter, Button } from '@/components/ui'
 
 interface ManagementClusterInfo {
 	kubernetesVersion: string
@@ -15,15 +16,28 @@ interface ManagementClusterInfo {
 	tenantClusters: number
 }
 
+interface Team {
+	name: string
+	displayName: string
+	description?: string
+	phase: string
+	namespace?: string
+	clusterCount: number
+	memberCount: number
+}
+
 type SortField = 'name' | 'namespace' | 'phase' | 'workers' | 'createdAt'
 type SortDirection = 'asc' | 'desc'
 
 export function AdminClustersPage() {
 	useDocumentTitle('All Clusters')
 	const { buildPath } = useTeamContext()
+	const { user } = useAuth()
+	const navigate = useNavigate()
 
 	const [management, setManagement] = useState<ManagementClusterInfo | null>(null)
 	const [clusters, setClusters] = useState<Cluster[]>([])
+	const [teams, setTeams] = useState<Team[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [search, setSearch] = useState('')
@@ -33,8 +47,31 @@ export function AdminClustersPage() {
 	const [sortField] = useState<SortField>('createdAt')
 	const [sortDirection] = useState<SortDirection>('desc')
 
+	// Create cluster modal state
+	const [showCreateModal, setShowCreateModal] = useState(false)
+	const [selectedTeam, setSelectedTeam] = useState<string>('')
+
+	// Permission check - platform admin or team admin
+	const isAdmin = user?.isPlatformAdmin || user?.teams?.some(t => t.role === 'admin') || false
+
+	const fetchTeams = useCallback(async () => {
+		try {
+			const response = await fetch('/api/teams', {
+				credentials: 'include',
+			})
+			if (!response.ok) {
+				throw new Error('Failed to fetch teams')
+			}
+			const data = await response.json()
+			setTeams(data.teams || [])
+		} catch (err) {
+			console.error('Failed to fetch teams:', err)
+			// Don't set error state - teams are optional for the main view
+		}
+	}, [])
+
 	useEffect(() => {
-		async function fetchClusters() {
+		async function fetchData() {
 			try {
 				// Fetch management and all tenant clusters
 				const [mgmt, tenantsResponse] = await Promise.all([
@@ -52,10 +89,11 @@ export function AdminClustersPage() {
 			}
 		}
 
-		fetchClusters()
-	}, [])
+		fetchData()
+		fetchTeams()
+	}, [fetchTeams])
 
-	// Get unique namespaces for filter dropdown
+	// Get unique namespaces for filter dropdown (from clusters)
 	const namespaces = useMemo(() => {
 		const unique = [...new Set(clusters.map((c) => c.metadata.namespace))]
 		return unique.sort()
@@ -134,6 +172,16 @@ export function AdminClustersPage() {
 		return result
 	}, [clusters, search, teamFilter, statusFilter, sortField, sortDirection])
 
+	// Handle create cluster navigation
+	// Handle create cluster navigation
+	const handleCreateCluster = () => {
+		if (selectedTeam) {
+			navigate(`/t/${selectedTeam}/clusters/new`)
+			setShowCreateModal(false)
+			setSelectedTeam('')
+		}
+	}
+
 	// TODO: Wire up sorting UI
 	// When implementing column header sorting, use:
 	// - setSortField(field) to change sort column
@@ -161,11 +209,31 @@ export function AdminClustersPage() {
 		<FadeIn>
 			<div className="space-y-6">
 				{/* Header */}
-				<div>
-					<h1 className="text-2xl font-semibold text-neutral-50">All Clusters</h1>
-					<p className="text-neutral-400 mt-1">
-						View and manage clusters across all teams
-					</p>
+				<div className="flex items-center justify-between">
+					<div>
+						<h1 className="text-2xl font-semibold text-neutral-50">All Clusters</h1>
+						<p className="text-neutral-400 mt-1">
+							View and manage clusters across all teams
+						</p>
+					</div>
+					{isAdmin && (
+						<Button onClick={() => setShowCreateModal(true)}>
+							<svg
+								className="w-4 h-4 mr-2"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={2}
+									d="M12 4v16m8-8H4"
+								/>
+							</svg>
+							Create Cluster
+						</Button>
+					)}
 				</div>
 
 				{/* Filters */}
@@ -330,6 +398,70 @@ export function AdminClustersPage() {
 					)}
 				</div>
 			</div>
+
+			{/* Create Cluster Modal */}
+			<Modal isOpen={showCreateModal} onClose={() => {
+				setShowCreateModal(false)
+				setSelectedTeam('')
+			}}>
+				<ModalHeader>
+					<h2 className="text-lg font-semibold text-neutral-100">Create Cluster</h2>
+				</ModalHeader>
+				<ModalBody>
+					{teams.length === 0 ? (
+						<div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+							<p className="text-sm text-amber-400">
+								No teams exist yet. Please create a team first before creating a cluster.
+							</p>
+							<Link
+								to="/admin/teams"
+								className="inline-block mt-2 text-sm text-violet-400 hover:text-violet-300"
+								onClick={() => setShowCreateModal(false)}
+							>
+								Go to Teams →
+							</Link>
+						</div>
+					) : (
+						<div className="space-y-4">
+							<p className="text-sm text-neutral-400">
+								Select the team namespace where the cluster will be created:
+							</p>
+							<select
+								value={selectedTeam}
+								onChange={(e) => setSelectedTeam(e.target.value)}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+							>
+								<option value="">Select a team...</option>
+								{teams.map((team) => (
+									<option key={team.name} value={team.namespace || team.name}>
+										{team.displayName || team.name}
+										{team.namespace && team.namespace !== team.name ? ` (${team.namespace})` : ''}
+									</option>
+								))}
+							</select>
+						</div>
+					)}
+				</ModalBody>
+				{teams.length > 0 && (
+					<ModalFooter>
+						<Button
+							variant="secondary"
+							onClick={() => {
+								setShowCreateModal(false)
+								setSelectedTeam('')
+							}}
+						>
+							Cancel
+						</Button>
+						<Button
+							onClick={handleCreateCluster}
+							disabled={!selectedTeam}
+						>
+							Continue
+						</Button>
+					</ModalFooter>
+				)}
+			</Modal>
 		</FadeIn>
 	)
 }

@@ -6,6 +6,7 @@ export { authApi } from './auth'
 export { clustersApi } from './clusters'
 export { providersApi } from './providers'
 export { addonsApi } from './addons'
+export * from './certificates';
 
 export type { Provider, ProviderListResponse, CreateProviderRequest, ImageInfo, NetworkInfo } from './providers'
 export type {

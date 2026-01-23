@@ -239,7 +239,7 @@ export function CertificatesTab() {
 				<h3 className="text-neutral-200 font-medium">No certificates found</h3>
 				<p className="text-neutral-400 mt-1">
 					Certificate information is not available for this cluster. The cluster may still be
-					provisioning, or Kamaji may not be managing its certificates.
+					provisioning, or Steward may not be managing its certificates.
 				</p>
 			</div>
 		);

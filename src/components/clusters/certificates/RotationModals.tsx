@@ -167,7 +167,7 @@ export function CARotationModal({
 						<p className="text-neutral-200 font-medium mb-3">What will happen:</p>
 						<ol className="text-sm text-neutral-300 space-y-2 list-decimal list-inside">
 							<li>The CA certificate and all leaf certificates will be deleted</li>
-							<li>Kamaji will regenerate new CA and all certificates signed by it</li>
+							<li>Steward will regenerate new CA and all certificates signed by it</li>
 							<li>The control plane API server will restart with new certificates</li>
 							<li>
 								<span className="text-amber-300 font-medium">Worker nodes will go NotReady</span> until they receive the new CA trust bundle

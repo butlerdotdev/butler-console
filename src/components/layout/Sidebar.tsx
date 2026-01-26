@@ -28,9 +28,9 @@ export function Sidebar() {
 				<div className="h-14 px-4 flex items-center border-b border-neutral-800">
 					<NavLink to="/" className="flex items-center gap-3">
 						<img
-							src="/butlerlabs.svg"
+							src="/butlerlabs.png"
 							alt="Butler"
-							className="w-8 h-8 rounded-lg object-cover"
+							className="w-8 h-8 rounded-lg"
 						/>
 						<span className="text-lg font-semibold text-neutral-100">Butler</span>
 					</NavLink>
@@ -166,9 +166,9 @@ export function Sidebar() {
 			<div className="h-14 px-4 flex items-center border-b border-neutral-800">
 				<NavLink to={effectiveAdminMode ? '/admin' : '/overview'} className="flex items-center gap-3">
 					<img
-						src="/butlerlabs.svg"
+						src="/butlerlabs.png"
 						alt="Butler"
-						className="w-8 h-8 rounded-lg object-cover"
+						className="w-8 h-8 rounded-lg"
 					/>
 					<span className="text-lg font-semibold text-neutral-100">Butler</span>
 				</NavLink>

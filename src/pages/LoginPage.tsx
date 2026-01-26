@@ -119,9 +119,11 @@ export function LoginPage() {
 			<Card className="w-full max-w-sm p-6">
 				{/* Logo and Title */}
 				<div className="text-center mb-6">
-					<div className="w-12 h-12 rounded-xl bg-green-600 flex items-center justify-center mx-auto mb-3">
-						<span className="text-white font-bold text-xl">B</span>
-					</div>
+					<img
+						src="/butlerlabs.png"
+						alt="Butler Labs"
+						className="w-14 h-14 rounded-xl mx-auto mb-3"
+					/>
 					<h1 className="text-xl font-semibold text-neutral-100">Butler Console</h1>
 					<p className="text-sm text-neutral-400 mt-1">
 						Sign in with your identity provider

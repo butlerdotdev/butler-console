@@ -10,6 +10,8 @@ import {
 	type AddonDefinition,
 	type CategoryInfo,
 } from '@/api/addons'
+import { gitopsApi } from '@/api/gitops'
+import type { Repository, Branch, GitProviderConfig, GitOpsStatus } from '@/types/gitops'
 
 
 interface ManagementAddon {
@@ -26,13 +28,6 @@ interface ManagementAddon {
 interface ManagementAddonsTabProps {
 	addons: ManagementAddon[]
 	onRefresh?: () => void
-}
-
-interface GitOpsConfig {
-	repository: string
-	branch: string
-	path: string
-	createPR: boolean
 }
 
 // Main Component
@@ -53,6 +48,13 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 	const [gitopsExportAddon, setGitopsExportAddon] = useState<AddonDefinition | null>(null)
 	const [installingAddon, setInstallingAddon] = useState<string | null>(null)
 	const [migrateToGitOps, setMigrateToGitOps] = useState<ManagementAddon | null>(null)
+
+	// Git provider state
+	const [gitConfig, setGitConfig] = useState<GitProviderConfig | null>(null)
+	const [repositories, setRepositories] = useState<Repository[]>([])
+
+	// Management GitOps status (includes configured repository)
+	const [mgmtGitOpsStatus, setMgmtGitOpsStatus] = useState<GitOpsStatus | null>(null)
 
 	// Check if GitOps is enabled (Flux or ArgoCD installed)
 	const gitopsEnabled = useMemo(() => {
@@ -77,6 +79,37 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 			}
 		}
 		fetchCatalog()
+	}, [])
+
+	// Fetch git provider config and repositories
+	useEffect(() => {
+		const fetchGitConfig = async () => {
+			try {
+				const config = await gitopsApi.getConfig()
+				setGitConfig(config)
+
+				if (config.configured) {
+					const repos = await gitopsApi.listRepositories()
+					setRepositories(repos)
+				}
+			} catch (err) {
+				console.warn('Failed to load git config:', err)
+			}
+		}
+		fetchGitConfig()
+	}, [])
+
+	// Fetch management cluster GitOps status (includes configured repository)
+	useEffect(() => {
+		const fetchMgmtGitOpsStatus = async () => {
+			try {
+				const status = await gitopsApi.getManagementStatus()
+				setMgmtGitOpsStatus(status)
+			} catch (err) {
+				console.warn('Failed to load management GitOps status:', err)
+			}
+		}
+		fetchMgmtGitOpsStatus()
 	}, [])
 
 	// Filter to non-platform addons (management cluster addons)
@@ -161,10 +194,26 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 		}
 	}
 
-	const handleGitOpsExport = async (addon: AddonDefinition, gitConfig: GitOpsConfig) => {
+	const handleGitOpsExport = async (addon: AddonDefinition, gitConfig: { repository: string; branch: string; path: string; createPR: boolean }) => {
 		try {
-			// TODO: Implement actual GitOps export API call
-			success('Exported to GitOps', `${addon.displayName} manifests exported to ${gitConfig.repository}`)
+			const result = await gitopsApi.exportManagementAddon({
+				addonName: addon.name,
+				repository: gitConfig.repository,
+				branch: gitConfig.branch,
+				targetPath: gitConfig.path,
+				createPR: gitConfig.createPR,
+				prTitle: `Add ${addon.displayName} addon to management cluster`,
+			})
+
+			if (result.success) {
+				if (result.prUrl) {
+					success('Pull Request Created', `${addon.displayName} exported. View PR at ${result.prUrl}`)
+				} else {
+					success('Exported to GitOps', `${addon.displayName} manifests committed successfully`)
+				}
+			} else {
+				showError('Export Failed', result.message || 'Unknown error')
+			}
 			setGitopsExportAddon(null)
 		} catch (err) {
 			showError('Export Failed', err instanceof Error ? err.message : 'Failed to export to GitOps')
@@ -181,9 +230,33 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 		}
 	}
 
-	const handleMigrateToGitOps = async (addon: ManagementAddon, _gitConfig: GitOpsConfig) => {
+	const handleMigrateToGitOps = async (addon: ManagementAddon, gitConfig: { repository: string; branch: string; path: string; createPR: boolean; helmRepoUrl?: string }) => {
 		try {
-			success('Migrated to GitOps', `${addon.addon} is now managed by GitOps`)
+			// Find the namespace - management addons typically use addon name as namespace
+			const releaseNamespace = addon.addon.toLowerCase().includes('system')
+				? addon.addon
+				: `${addon.addon}-system`
+
+			const result = await gitopsApi.exportManagementRelease({
+				releaseName: addon.addon,
+				releaseNamespace: releaseNamespace,
+				repository: gitConfig.repository,
+				branch: gitConfig.branch,
+				path: gitConfig.path,
+				createPR: gitConfig.createPR,
+				prTitle: `Migrate ${addon.addon} to GitOps on management cluster`,
+				helmRepoUrl: gitConfig.helmRepoUrl,
+			})
+
+			if (result.success) {
+				if (result.prUrl) {
+					success('Pull Request Created', `${addon.addon} migration PR created`)
+				} else {
+					success('Migrated to GitOps', `${addon.addon} is now managed by GitOps`)
+				}
+			} else {
+				showError('Migration Failed', result.message || 'Unknown error')
+			}
 			setMigrateToGitOps(null)
 			onRefresh?.()
 		} catch (err) {
@@ -228,19 +301,14 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 
 			{/* GitOps Status Banner */}
 			{gitopsEnabled && (
-				<div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg flex items-center justify-between">
-					<div className="flex items-center gap-3">
-						<span className="text-xl">🔄</span>
-						<div>
-							<p className="font-medium text-purple-300">GitOps Enabled</p>
-							<p className="text-sm text-purple-400/70">
-								New addons can be managed via GitOps for full audit trail and declarative control.
-							</p>
-						</div>
+				<div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg flex items-center gap-3">
+					<span className="text-xl">🔄</span>
+					<div>
+						<p className="font-medium text-purple-300">GitOps Enabled</p>
+						<p className="text-sm text-purple-400/70">
+							Addons can be exported to Git via the GitOps tab or the Manage menu on each addon.
+						</p>
 					</div>
-					<Button variant="secondary" size="sm">
-						Migrate All to GitOps
-					</Button>
 				</div>
 			)}
 
@@ -377,6 +445,10 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 				<GitOpsExportModal
 					addon={gitopsExportAddon}
 					isOpen={!!gitopsExportAddon}
+					repositories={repositories}
+					configuredRepository={mgmtGitOpsStatus?.repository}
+					configuredBranch={mgmtGitOpsStatus?.branch}
+					gitConfigured={gitConfig?.configured ?? false}
 					onClose={() => setGitopsExportAddon(null)}
 					onExport={(config) => handleGitOpsExport(gitopsExportAddon, config)}
 				/>
@@ -387,6 +459,10 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 				<MigrateToGitOpsModal
 					addon={migrateToGitOps}
 					isOpen={!!migrateToGitOps}
+					repositories={repositories}
+					configuredRepository={mgmtGitOpsStatus?.repository}
+					configuredBranch={mgmtGitOpsStatus?.branch}
+					gitConfigured={gitConfig?.configured ?? false}
 					onClose={() => setMigrateToGitOps(null)}
 					onMigrate={(config) => handleMigrateToGitOps(migrateToGitOps, config)}
 				/>
@@ -727,17 +803,136 @@ function ConfigureModal({ addon, isOpen, onClose, onInstall, installing }: Confi
 interface GitOpsExportModalProps {
 	addon: AddonDefinition
 	isOpen: boolean
+	repositories: Repository[]
+	configuredRepository?: string
+	configuredBranch?: string
+	gitConfigured: boolean
 	onClose: () => void
-	onExport: (config: GitOpsConfig) => void
+	onExport: (config: { repository: string; branch: string; path: string; createPR: boolean }) => void
 }
 
-function GitOpsExportModal({ addon, isOpen, onClose, onExport }: GitOpsExportModalProps) {
-	const [config, setConfig] = useState<GitOpsConfig>({
-		repository: '',
-		branch: 'main',
-		path: `clusters/management/addons/${addon.name}`,
-		createPR: true,
-	})
+function GitOpsExportModal({ addon, isOpen, repositories, configuredRepository, configuredBranch, gitConfigured, onClose, onExport }: GitOpsExportModalProps) {
+	// Generate correct path based on addon.platform
+	const defaultPath = addon.platform
+		? `clusters/management/infrastructure/${addon.name}`
+		: `clusters/management/apps/${addon.name}`
+
+	const [repository, setRepository] = useState('')
+	const [branch, setBranch] = useState('main')
+	const [path, setPath] = useState(defaultPath)
+	const [createPR, setCreatePR] = useState(true)
+	const [branches, setBranches] = useState<Branch[]>([])
+	const [loadingBranches, setLoadingBranches] = useState(false)
+
+	// Preview state
+	const [preview, setPreview] = useState<Record<string, string> | null>(null)
+	const [loadingPreview, setLoadingPreview] = useState(false)
+
+	// Auto-select configured repository when available
+	useEffect(() => {
+		if (configuredRepository && !repository) {
+			setRepository(configuredRepository)
+		}
+	}, [configuredRepository, repository])
+
+	// Auto-select configured branch when available
+	useEffect(() => {
+		if (configuredBranch && branch === 'main') {
+			setBranch(configuredBranch)
+		}
+	}, [configuredBranch, branch])
+
+	// Update path when addon changes
+	useEffect(() => {
+		const newPath = addon.platform
+			? `clusters/management/infrastructure/${addon.name}`
+			: `clusters/management/apps/${addon.name}`
+		setPath(newPath)
+	}, [addon])
+
+	// Load branches when repository changes
+	useEffect(() => {
+		if (!repository) {
+			setBranches([])
+			return
+		}
+
+		const loadBranches = async () => {
+			setLoadingBranches(true)
+			try {
+				const [owner, repo] = repository.split('/')
+				if (owner && repo) {
+					const branchList = await gitopsApi.listBranches(owner, repo)
+					setBranches(branchList)
+
+					// Set default branch if available (but prefer configuredBranch)
+					if (!configuredBranch) {
+						const defaultBranch = repositories.find(r => r.fullName === repository)?.defaultBranch
+						if (defaultBranch) {
+							setBranch(defaultBranch)
+						}
+					}
+				}
+			} catch (err) {
+				console.warn('Failed to load branches:', err)
+			} finally {
+				setLoadingBranches(false)
+			}
+		}
+
+		loadBranches()
+	}, [repository, repositories, configuredBranch])
+
+	// Toggle preview
+	const togglePreview = async () => {
+		if (preview) {
+			setPreview(null)
+			return
+		}
+
+		if (!repository) return
+
+		setLoadingPreview(true)
+		try {
+			const result = await gitopsApi.previewManifests({
+				addonName: addon.name,
+				repository,
+				targetPath: path,
+			})
+			setPreview(result)
+		} catch (err) {
+			console.warn('Failed to load preview:', err)
+		} finally {
+			setLoadingPreview(false)
+		}
+	}
+
+	if (!gitConfigured) {
+		return (
+			<Modal isOpen={isOpen} onClose={onClose}>
+				<ModalHeader>
+					<div className="flex items-center gap-3">
+						<span className="text-2xl">📦</span>
+						<div>
+							<h2 className="text-lg font-semibold">Export to GitOps</h2>
+							<p className="text-sm text-neutral-400">{addon.displayName}</p>
+						</div>
+					</div>
+				</ModalHeader>
+				<ModalBody>
+					<div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+						<p className="text-yellow-300 font-medium mb-2">Git Provider Not Configured</p>
+						<p className="text-sm text-neutral-400">
+							Please configure a Git provider (GitHub/GitLab) in the GitOps tab before exporting addons.
+						</p>
+					</div>
+				</ModalBody>
+				<ModalFooter>
+					<Button variant="secondary" onClick={onClose}>Close</Button>
+				</ModalFooter>
+			</Modal>
+		)
+	}
 
 	return (
 		<Modal isOpen={isOpen} onClose={onClose}>
@@ -753,59 +948,158 @@ function GitOpsExportModal({ addon, isOpen, onClose, onExport }: GitOpsExportMod
 
 			<ModalBody>
 				<div className="space-y-4">
-					<p className="text-sm text-neutral-400 mb-4">
-						Generate Kubernetes manifests for {addon.displayName} to be managed by Flux or ArgoCD.
-					</p>
-
-					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Git Repository</label>
-						<input
-							type="text"
-							value={config.repository}
-							onChange={(e) => setConfig({ ...config, repository: e.target.value })}
-							placeholder="https://github.com/org/repo"
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-						/>
+					{/* Addon Info */}
+					<div className="p-3 rounded-lg bg-neutral-800/50 border border-neutral-700">
+						<div className="flex items-center justify-between">
+							<div>
+								<p className="text-neutral-200 font-medium">{addon.displayName}</p>
+								<p className="text-sm text-neutral-500">{addon.chartName}:{addon.defaultVersion}</p>
+							</div>
+							<span className="px-2 py-1 text-xs rounded bg-violet-500/10 text-violet-400">
+								From Catalog
+							</span>
+						</div>
 					</div>
 
+					{/* Repository Selection */}
 					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Branch</label>
-						<input
-							type="text"
-							value={config.branch}
-							onChange={(e) => setConfig({ ...config, branch: e.target.value })}
+						<label className="block text-sm font-medium text-neutral-300 mb-1">
+							Target Repository
+						</label>
+						<select
+							value={repository}
+							onChange={(e) => setRepository(e.target.value)}
 							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-						/>
+						>
+							<option value="">Select a repository...</option>
+							{repositories.map((repo) => (
+								<option key={repo.fullName} value={repo.fullName}>
+									{repo.fullName} {repo.private ? '(private)' : ''}
+								</option>
+							))}
+						</select>
 					</div>
 
-					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Path</label>
-						<input
-							type="text"
-							value={config.path}
-							onChange={(e) => setConfig({ ...config, path: e.target.value })}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-						/>
+					{/* Branch and Path */}
+					<div className="grid grid-cols-2 gap-4">
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">Branch</label>
+							<div className="relative">
+								<select
+									value={branch}
+									onChange={(e) => setBranch(e.target.value)}
+									disabled={loadingBranches || branches.length === 0}
+									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50"
+								>
+									{branches.length === 0 ? (
+										<option value={branch}>{branch}</option>
+									) : (
+										branches.map((b) => (
+											<option key={b.name} value={b.name}>{b.name}</option>
+										))
+									)}
+								</select>
+								{loadingBranches && (
+									<div className="absolute right-3 top-1/2 -translate-y-1/2">
+										<Spinner size="sm" />
+									</div>
+								)}
+							</div>
+						</div>
+
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">Path</label>
+							<input
+								type="text"
+								value={path}
+								onChange={(e) => setPath(e.target.value)}
+								placeholder="clusters/management"
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+							/>
+						</div>
 					</div>
 
+					{/* Create PR option */}
 					<label className="flex items-center gap-3 cursor-pointer">
 						<input
 							type="checkbox"
-							checked={config.createPR}
-							onChange={(e) => setConfig({ ...config, createPR: e.target.checked })}
+							checked={createPR}
+							onChange={(e) => setCreatePR(e.target.checked)}
 							className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-violet-500 focus:ring-violet-500"
 						/>
-						<span className="text-sm text-neutral-200">Create Pull Request</span>
+						<div>
+							<span className="text-neutral-200">Create Pull Request</span>
+							<p className="text-xs text-neutral-500">Create a PR for review instead of committing directly</p>
+						</div>
 					</label>
+
+					{/* Preview Button */}
+					{repository && (
+						<div className="pt-2">
+							<button
+								onClick={togglePreview}
+								disabled={loadingPreview}
+								className="text-sm text-violet-400 hover:text-violet-300 flex items-center gap-2"
+							>
+								{loadingPreview ? (
+									<>
+										<Spinner size="sm" />
+										Loading preview...
+									</>
+								) : preview ? (
+									<>
+										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+										</svg>
+										Hide generated manifests
+									</>
+								) : (
+									<>
+										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+										</svg>
+										Preview generated manifests
+									</>
+								)}
+							</button>
+						</div>
+					)}
+
+					{/* Preview Content */}
+					{preview && (
+						<div className="border border-neutral-700 rounded-lg overflow-hidden">
+							<div className="bg-neutral-800 px-3 py-2 text-sm text-neutral-400 border-b border-neutral-700">
+								Generated Files
+							</div>
+							<div className="max-h-64 overflow-y-auto">
+								{Object.entries(preview).map(([filename, content]) => (
+									<details key={filename} className="border-b border-neutral-800 last:border-0">
+										<summary className="px-3 py-2 text-sm text-neutral-300 cursor-pointer hover:bg-neutral-800/50 flex items-center gap-2">
+											<svg className="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+											</svg>
+											{filename}
+										</summary>
+										<pre className="px-3 py-2 bg-neutral-900 text-xs text-neutral-400 overflow-x-auto">
+											{content}
+										</pre>
+									</details>
+								))}
+							</div>
+						</div>
+					)}
 				</div>
 			</ModalBody>
 
 			<ModalFooter>
-				<Button variant="secondary" onClick={onClose}>
-					Cancel
-				</Button>
-				<Button variant="primary" onClick={() => onExport(config)} disabled={!config.repository}>
-					Export
+				<Button variant="secondary" onClick={onClose}>Cancel</Button>
+				<Button
+					variant="primary"
+					onClick={() => onExport({ repository, branch, path, createPR })}
+					disabled={!repository}
+				>
+					{createPR ? 'Create Pull Request' : 'Export'}
 				</Button>
 			</ModalFooter>
 		</Modal>
@@ -817,17 +1111,104 @@ function GitOpsExportModal({ addon, isOpen, onClose, onExport }: GitOpsExportMod
 interface MigrateToGitOpsModalProps {
 	addon: ManagementAddon
 	isOpen: boolean
+	repositories: Repository[]
+	configuredRepository?: string
+	configuredBranch?: string
+	gitConfigured: boolean
 	onClose: () => void
-	onMigrate: (config: GitOpsConfig) => void
+	onMigrate: (config: { repository: string; branch: string; path: string; createPR: boolean; helmRepoUrl?: string }) => void
 }
 
-function MigrateToGitOpsModal({ addon, isOpen, onClose, onMigrate }: MigrateToGitOpsModalProps) {
-	const [config, setConfig] = useState<GitOpsConfig>({
-		repository: '',
-		branch: 'main',
-		path: `clusters/management/addons/${addon.addon}`,
-		createPR: true,
-	})
+function MigrateToGitOpsModal({ addon, isOpen, repositories, configuredRepository, configuredBranch, gitConfigured, onClose, onMigrate }: MigrateToGitOpsModalProps) {
+	// For installed releases, default to apps/ path (most management addons are apps)
+	const defaultPath = `clusters/management/apps/${addon.addon}`
+
+	const [repository, setRepository] = useState('')
+	const [branch, setBranch] = useState('main')
+	const [path, setPath] = useState(defaultPath)
+	const [createPR, setCreatePR] = useState(true)
+	const [branches, setBranches] = useState<Branch[]>([])
+	const [loadingBranches, setLoadingBranches] = useState(false)
+	const [helmRepoUrl, setHelmRepoUrl] = useState('')
+
+	// Auto-select configured repository when available
+	useEffect(() => {
+		if (configuredRepository && !repository) {
+			setRepository(configuredRepository)
+		}
+	}, [configuredRepository, repository])
+
+	// Auto-select configured branch when available
+	useEffect(() => {
+		if (configuredBranch && branch === 'main') {
+			setBranch(configuredBranch)
+		}
+	}, [configuredBranch, branch])
+
+	// Update path when addon changes
+	useEffect(() => {
+		setPath(`clusters/management/apps/${addon.addon}`)
+	}, [addon])
+
+	// Load branches when repository changes
+	useEffect(() => {
+		if (!repository) {
+			setBranches([])
+			return
+		}
+
+		const loadBranches = async () => {
+			setLoadingBranches(true)
+			try {
+				const [owner, repo] = repository.split('/')
+				if (owner && repo) {
+					const branchList = await gitopsApi.listBranches(owner, repo)
+					setBranches(branchList)
+
+					// Set default branch if available (but prefer configuredBranch)
+					if (!configuredBranch) {
+						const defaultBranch = repositories.find(r => r.fullName === repository)?.defaultBranch
+						if (defaultBranch) {
+							setBranch(defaultBranch)
+						}
+					}
+				}
+			} catch (err) {
+				console.warn('Failed to load branches:', err)
+			} finally {
+				setLoadingBranches(false)
+			}
+		}
+
+		loadBranches()
+	}, [repository, repositories, configuredBranch])
+
+	if (!gitConfigured) {
+		return (
+			<Modal isOpen={isOpen} onClose={onClose}>
+				<ModalHeader>
+					<div className="flex items-center gap-3">
+						<span className="text-2xl">🔄</span>
+						<div>
+							<h2 className="text-lg font-semibold">Migrate to GitOps</h2>
+							<p className="text-sm text-neutral-400">{addon.addon}</p>
+						</div>
+					</div>
+				</ModalHeader>
+				<ModalBody>
+					<div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+						<p className="text-yellow-300 font-medium mb-2">Git Provider Not Configured</p>
+						<p className="text-sm text-neutral-400">
+							Please configure a Git provider (GitHub/GitLab) in the GitOps tab before migrating addons.
+						</p>
+					</div>
+				</ModalBody>
+				<ModalFooter>
+					<Button variant="secondary" onClick={onClose}>Close</Button>
+				</ModalFooter>
+			</Modal>
+		)
+	}
 
 	return (
 		<Modal isOpen={isOpen} onClose={onClose}>
@@ -842,63 +1223,115 @@ function MigrateToGitOpsModal({ addon, isOpen, onClose, onMigrate }: MigrateToGi
 			</ModalHeader>
 
 			<ModalBody>
-				<div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg mb-4">
-					<p className="text-sm text-yellow-300">
-						This will export the current configuration to Git and mark the addon as GitOps-managed.
-						Future changes should be made through your Git repository.
-					</p>
-				</div>
-
 				<div className="space-y-4">
-					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Git Repository</label>
-						<input
-							type="text"
-							value={config.repository}
-							onChange={(e) => setConfig({ ...config, repository: e.target.value })}
-							placeholder="https://github.com/org/repo"
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-						/>
+					{/* Warning Banner */}
+					<div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+						<p className="text-sm text-yellow-300">
+							This will export the current configuration to Git and mark the addon as GitOps-managed.
+							Future changes should be made through your Git repository.
+						</p>
 					</div>
 
+					{/* Repository Selection */}
 					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Branch</label>
-						<input
-							type="text"
-							value={config.branch}
-							onChange={(e) => setConfig({ ...config, branch: e.target.value })}
+						<label className="block text-sm font-medium text-neutral-300 mb-1">
+							Target Repository
+						</label>
+						<select
+							value={repository}
+							onChange={(e) => setRepository(e.target.value)}
 							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-						/>
+						>
+							<option value="">Select a repository...</option>
+							{repositories.map((repo) => (
+								<option key={repo.fullName} value={repo.fullName}>
+									{repo.fullName} {repo.private ? '(private)' : ''}
+								</option>
+							))}
+						</select>
 					</div>
 
-					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Path</label>
-						<input
-							type="text"
-							value={config.path}
-							onChange={(e) => setConfig({ ...config, path: e.target.value })}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-						/>
+					{/* Branch and Path */}
+					<div className="grid grid-cols-2 gap-4">
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">Branch</label>
+							<div className="relative">
+								<select
+									value={branch}
+									onChange={(e) => setBranch(e.target.value)}
+									disabled={loadingBranches || branches.length === 0}
+									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50"
+								>
+									{branches.length === 0 ? (
+										<option value={branch}>{branch}</option>
+									) : (
+										branches.map((b) => (
+											<option key={b.name} value={b.name}>{b.name}</option>
+										))
+									)}
+								</select>
+								{loadingBranches && (
+									<div className="absolute right-3 top-1/2 -translate-y-1/2">
+										<Spinner size="sm" />
+									</div>
+								)}
+							</div>
+						</div>
+
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">Path</label>
+							<input
+								type="text"
+								value={path}
+								onChange={(e) => setPath(e.target.value)}
+								placeholder="clusters/management"
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+							/>
+						</div>
 					</div>
 
+					{/* Helm Repo URL - optional for unmatched releases */}
+					<div>
+						<label className="block text-sm font-medium text-neutral-300 mb-1">
+							Helm Repository URL
+							<span className="text-neutral-500 ml-1">(optional)</span>
+						</label>
+						<input
+							type="url"
+							value={helmRepoUrl}
+							onChange={(e) => setHelmRepoUrl(e.target.value)}
+							placeholder="https://charts.example.com"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+						/>
+						<p className="text-xs text-neutral-500 mt-1">
+							Override the Helm repository URL if auto-detection fails
+						</p>
+					</div>
+
+					{/* Create PR option */}
 					<label className="flex items-center gap-3 cursor-pointer">
 						<input
 							type="checkbox"
-							checked={config.createPR}
-							onChange={(e) => setConfig({ ...config, createPR: e.target.checked })}
+							checked={createPR}
+							onChange={(e) => setCreatePR(e.target.checked)}
 							className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-violet-500 focus:ring-violet-500"
 						/>
-						<span className="text-sm text-neutral-200">Create Pull Request</span>
+						<div>
+							<span className="text-neutral-200">Create Pull Request</span>
+							<p className="text-xs text-neutral-500">Create a PR for review instead of committing directly</p>
+						</div>
 					</label>
 				</div>
 			</ModalBody>
 
 			<ModalFooter>
-				<Button variant="secondary" onClick={onClose}>
-					Cancel
-				</Button>
-				<Button variant="primary" onClick={() => onMigrate(config)} disabled={!config.repository}>
-					Migrate
+				<Button variant="secondary" onClick={onClose}>Cancel</Button>
+				<Button
+					variant="primary"
+					onClick={() => onMigrate({ repository, branch, path, createPR, helmRepoUrl: helmRepoUrl || undefined })}
+					disabled={!repository}
+				>
+					{createPR ? 'Create Pull Request' : 'Migrate'}
 				</Button>
 			</ModalFooter>
 		</Modal>
@@ -914,7 +1347,7 @@ function getAddonIcon(name: string): string {
 		tempo: '🔍',
 		jaeger: '🔎',
 		'victoria-metrics': '📊',
-		'victoria-logs': '📝',
+		'victoria-logs': '📋',
 		flux: '🔄',
 		argocd: '🐙',
 		grafana: '📊',

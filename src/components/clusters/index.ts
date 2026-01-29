@@ -3,3 +3,5 @@
 
 export { DeleteClusterModal } from './DeleteClusterModal'
 export { AddonsTab } from './AddonsTab'
+export { GitOpsTab } from './gitops';
+

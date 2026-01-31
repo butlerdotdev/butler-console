@@ -418,7 +418,7 @@ export function AdminClustersPage() {
 								className="inline-block mt-2 text-sm text-violet-400 hover:text-violet-300"
 								onClick={() => setShowCreateModal(false)}
 							>
-								Go to Teams →
+								Go to Teams â†’
 							</Link>
 						</div>
 					) : (

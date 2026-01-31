@@ -1,13 +1,10 @@
 // Copyright 2025 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
-
 // NOTE: This requires @types/node to be installed:
 // npm install -D @types/node
-
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
-
 export default defineConfig({
 	plugins: [react()],
 	resolve: {
@@ -21,6 +18,7 @@ export default defineConfig({
 			'/api': {
 				target: 'http://localhost:8080',
 				changeOrigin: true,
+				timeout: 120000,  // 2 minutes for long-running operations like Flux bootstrap
 			},
 			'/ws': {
 				target: 'ws://localhost:8080',

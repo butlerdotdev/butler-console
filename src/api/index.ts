@@ -9,6 +9,7 @@ export { addonsApi } from './addons'
 export { gitopsApi } from './gitops';
 export * from './gitops';
 
+export { identityProvidersApi, PROVIDER_PRESETS } from './identity-providers'
 export * from './certificates';
 
 export type { Provider, ProviderListResponse, CreateProviderRequest, ImageInfo, NetworkInfo } from './providers'
@@ -23,6 +24,15 @@ export type {
 	ManagementNode,
 	ManagementPod,
 } from './clusters'
+
+export type {
+	IdentityProvider,
+	IdentityProviderListResponse,
+	CreateIdentityProviderRequest,
+	TestDiscoveryResponse,
+	ProviderPresetKey,
+} from './identity-providers'
+
 export type { AddonDefinition, InstalledAddon, CatalogResponse } from './addons'
 
 // Backwards compatible aliases

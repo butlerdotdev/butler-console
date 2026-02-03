@@ -43,6 +43,7 @@ export interface AuthContextValue extends AuthState {
 	legacyLogin: (username: string, password: string) => Promise<void>
 	logout: () => Promise<void>
 	refreshUser: () => Promise<void>
+	refreshPermissions: () => Promise<{ success: boolean; message?: string }>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

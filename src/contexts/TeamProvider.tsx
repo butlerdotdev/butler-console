@@ -1,10 +1,11 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useMemo, useCallback, type ReactNode } from 'react'
+import { useMemo, useCallback, useEffect, type ReactNode } from 'react'
 import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { TeamContext, type TeamInfo } from './TeamContext'
+import { apiClient } from '@/api/client'
 
 // ----------------------------------------------------------------------------
 // Helper to normalize team data from various API shapes
@@ -83,6 +84,13 @@ export function TeamContextProvider({ children }: TeamContextProviderProps) {
 
 	// Current team from URL params (only valid in team mode)
 	const currentTeam = mode === 'team' ? (params.team ?? null) : null
+
+	// IMPORTANT: Sync team context to apiClient for backend authorization
+	// When in team mode, send team header so backend enforces team role
+	// When in admin mode or overview, clear team so platform admin gets full access
+	useEffect(() => {
+		apiClient.setTeam(currentTeam)
+	}, [currentTeam])
 
 	// Get current team info
 	const currentTeamInfo = useMemo(() => {

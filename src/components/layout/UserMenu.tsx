@@ -4,11 +4,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useToast } from '@/hooks/useToast'
 
 export function UserMenu() {
-	const { user, logout } = useAuth()
+	const { user, logout, refreshPermissions } = useAuth()
+	const toast = useToast()
 	const navigate = useNavigate()
 	const [isOpen, setIsOpen] = useState(false)
+	const [isRefreshing, setIsRefreshing] = useState(false)
 	const menuRef = useRef<HTMLDivElement>(null)
 
 	// Close menu when clicking outside
@@ -39,6 +42,23 @@ export function UserMenu() {
 		setIsOpen(false)
 		await logout()
 		navigate('/login')
+	}
+
+	const handleRefreshPermissions = async () => {
+		setIsRefreshing(true)
+		try {
+			const result = await refreshPermissions()
+			if (result.success) {
+				toast.success('Permissions Refreshed', 'Your permissions have been updated.')
+			} else {
+				toast.error('Refresh Failed', result.message || 'Failed to refresh permissions.')
+			}
+		} catch {
+			toast.error('Refresh Failed', 'An error occurred while refreshing permissions.')
+		} finally {
+			setIsRefreshing(false)
+			setIsOpen(false)
+		}
 	}
 
 	const initials = user?.name
@@ -113,6 +133,13 @@ export function UserMenu() {
 								navigate('/settings/preferences')
 							}}
 						/>
+						<MenuItem
+							icon={isRefreshing ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : <RefreshIcon className="w-4 h-4" />}
+							label={isRefreshing ? 'Refreshing...' : 'Refresh Permissions'}
+							description="Reload your team roles"
+							onClick={handleRefreshPermissions}
+							disabled={isRefreshing}
+						/>
 						{isAdmin && (
 							<MenuItem
 								icon={<ShieldIcon className="w-4 h-4" />}
@@ -169,13 +196,16 @@ interface MenuItemProps {
 	label: string
 	description?: string
 	onClick: () => void
+	disabled?: boolean
 }
 
-function MenuItem({ icon, label, description, onClick }: MenuItemProps) {
+function MenuItem({ icon, label, description, onClick, disabled }: MenuItemProps) {
 	return (
 		<button
 			onClick={onClick}
-			className="w-full flex items-center gap-3 px-4 py-2 hover:bg-neutral-800 transition-colors text-left"
+			disabled={disabled}
+			className={`w-full flex items-center gap-3 px-4 py-2 hover:bg-neutral-800 transition-colors text-left ${disabled ? 'opacity-50 cursor-not-allowed' : ''
+				}`}
 		>
 			<span className="text-neutral-400">{icon}</span>
 			<div className="flex-1 min-w-0">
@@ -225,6 +255,28 @@ function ShieldIcon({ className }: { className?: string }) {
 				strokeWidth={2}
 				d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
 			/>
+		</svg>
+	)
+}
+
+function RefreshIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<path
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth={2}
+				d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+			/>
+		</svg>
+	)
+}
+
+function SpinnerIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} fill="none" viewBox="0 0 24 24">
+			<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+			<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
 		</svg>
 	)
 }

@@ -34,6 +34,8 @@ import { OverviewPage } from '@/pages/OverviewPage'
 import { SetPasswordPage } from '@/pages/SetPasswordsPage'
 import { ProfileSettingsPage } from '@/pages/ProfileSettingsPage'
 import { PreferencesPage } from '@/pages/PreferencesPage'
+import { IdentityProvidersPage } from '@/pages/IdentityProvidersPage'
+import { CreateIdentityProviderPage } from '@/pages/CreateIdentityProviderPage'
 
 
 interface TeamRef {
@@ -130,6 +132,8 @@ export default function App() {
 					<Route path="admin/users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
 					<Route path="admin/providers" element={<RequireAdmin><ProvidersPage /></RequireAdmin>} />
 					<Route path="admin/providers/create" element={<RequireAdmin><CreateProviderPage /></RequireAdmin>} />
+					<Route path="admin/identity-providers" element={<RequireAdmin><IdentityProvidersPage /></RequireAdmin>} />
+					<Route path="admin/identity-providers/create" element={<RequireAdmin><CreateIdentityProviderPage /></RequireAdmin>} />
 					<Route path="admin/settings" element={<RequireAdmin><SettingsPage /></RequireAdmin>} />
 
 					{/* Legacy routes (backward compatibility) */}

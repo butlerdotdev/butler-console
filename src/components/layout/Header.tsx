@@ -5,14 +5,17 @@ import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useTeamContext } from '@/hooks/useTeamContext'
+import { useToast } from '@/hooks/useToast'
 import { TeamSwitcher } from './TeamSwitcher'
 
 export function Header() {
-	const { user, logout } = useAuth()
+	const { user, logout, refreshPermissions } = useAuth()
 	const { isConnected } = useWebSocket()
 	const { isAdminMode } = useTeamContext()
+	const toast = useToast()
 	const [showUserMenu, setShowUserMenu] = useState(false)
 	const [showHelpMenu, setShowHelpMenu] = useState(false)
+	const [isRefreshing, setIsRefreshing] = useState(false)
 	const menuRef = useRef<HTMLDivElement>(null)
 	const helpMenuRef = useRef<HTMLDivElement>(null)
 
@@ -33,6 +36,23 @@ export function Header() {
 	const handleLogout = async () => {
 		setShowUserMenu(false)
 		await logout()
+	}
+
+	const handleRefreshPermissions = async () => {
+		setIsRefreshing(true)
+		try {
+			const result = await refreshPermissions()
+			if (result.success) {
+				toast.success('Permissions Refreshed', 'Your permissions have been updated.')
+			} else {
+				toast.error('Refresh Failed', result.message || 'Failed to refresh permissions.')
+			}
+		} catch {
+			toast.error('Refresh Failed', 'An error occurred while refreshing permissions.')
+		} finally {
+			setIsRefreshing(false)
+			setShowUserMenu(false)
+		}
 	}
 
 	const initials = (user?.name || user?.email || 'U').charAt(0).toUpperCase()
@@ -323,6 +343,37 @@ export function Header() {
 									</svg>
 									Preferences
 								</a>
+								<button
+									onClick={handleRefreshPermissions}
+									disabled={isRefreshing}
+									className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:bg-neutral-700 rounded-lg transition-colors ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
+								>
+									{isRefreshing ? (
+										<svg
+											className="w-4 h-4 animate-spin"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+											<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+										</svg>
+									) : (
+										<svg
+											className="w-4 h-4"
+											fill="none"
+											viewBox="0 0 24 24"
+											stroke="currentColor"
+										>
+											<path
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth={2}
+												d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+											/>
+										</svg>
+									)}
+									{isRefreshing ? 'Refreshing...' : 'Refresh Permissions'}
+								</button>
 								<div className="border-t border-neutral-700 my-1" />
 								<button
 									onClick={handleLogout}

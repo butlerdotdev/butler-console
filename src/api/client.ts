@@ -17,17 +17,42 @@ export class ApiError extends Error {
 }
 
 class ApiClient {
+	private currentTeam: string | null = null
+
+	/**
+	 * Set the current team context for authorization.
+	 * When set, all requests will include X-Butler-Team header.
+	 * This allows the backend to enforce team-scoped permissions.
+	 */
+	setTeam(team: string | null) {
+		this.currentTeam = team
+	}
+
+	/**
+	 * Get the current team context.
+	 */
+	getTeam(): string | null {
+		return this.currentTeam
+	}
+
 	private async request<T>(
 		method: string,
 		path: string,
 		body?: unknown
 	): Promise<T> {
 		const url = `${API_BASE}${path}`
+		const headers: Record<string, string> = {
+			'Content-Type': 'application/json',
+		}
+
+		// Include team context header when a team is selected
+		if (this.currentTeam) {
+			headers['X-Butler-Team'] = this.currentTeam
+		}
+
 		const options: RequestInit = {
 			method,
-			headers: {
-				'Content-Type': 'application/json',
-			},
+			headers,
 			credentials: 'include',
 		}
 

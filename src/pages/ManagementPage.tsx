@@ -9,8 +9,9 @@ import { addonsApi, type ManagementAddon } from '@/api/addons'
 import { Card, Spinner, StatusBadge, FadeIn } from '@/components/ui'
 import { ClusterTerminal } from '@/components/terminal'
 import { ManagementAddonsTab } from '@/components/management/ManagementAddonsTab'
+import { ManagementGitOpsTab } from '@/components/management/ManagementGitOpsTab'
 
-const TABS = ['overview', 'nodes', 'pods', 'addons', 'terminal'] as const
+const TABS = ['overview', 'nodes', 'pods', 'addons', 'gitops', 'terminal'] as const
 type TabType = typeof TABS[number]
 
 function isValidTab(tab: string | null): tab is TabType {
@@ -199,6 +200,9 @@ export function ManagementPage() {
 						addons={managementAddons}
 						onRefresh={loadManagementAddons}
 					/>
+				)}
+				{activeTab === 'gitops' && (
+					<ManagementGitOpsTab />
 				)}
 				{activeTab === 'terminal' && (
 					<Card className="h-[500px] overflow-hidden">

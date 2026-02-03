@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/useToast'
 import { AddonsTab } from '@/components/clusters'
 import { AccessDenied } from '@/components/AccessDenied'
 import { CertificatesTab } from '@/components/clusters/certificates';
+import { GitOpsTab } from '@/components/clusters/gitops';
+
 
 // Error type for API responses
 interface ApiError {
@@ -21,7 +23,8 @@ interface ApiError {
 	message?: string
 }
 
-const TABS = ['overview', 'nodes', 'addons', 'events', 'certificates', 'terminal'] as const
+const TABS = ['overview', 'nodes', 'addons', 'gitops', 'events', 'certificates', 'terminal'] as const
+
 type TabType = typeof TABS[number]
 
 function isValidTab(tab: string | null): tab is TabType {
@@ -277,6 +280,7 @@ export function ClusterDetailPage() {
 						onRefresh={loadAddons}
 					/>
 				)}
+				{activeTab === 'gitops' && <GitOpsTab />}
 				{activeTab === 'events' && <EventsTab events={events} />}
 				{activeTab === 'certificates' && <CertificatesTab />}
 				{activeTab === 'terminal' && phase === 'Ready' && (

@@ -11,6 +11,8 @@ import {
 	type AddonDefinition,
 	type CategoryInfo,
 } from '@/api/addons'
+import { gitopsApi } from '@/api/gitops'
+import type { Repository, Branch, GitProviderConfig } from '@/types/gitops'
 
 
 interface SchemaField {
@@ -33,13 +35,6 @@ interface SchemaSection {
 interface ValuesSchema {
 	sections: SchemaSection[]
 	defaults: Record<string, unknown>
-}
-
-interface GitOpsConfig {
-	repository: string
-	branch: string
-	path: string
-	createPR: boolean
 }
 
 interface SimpleAddon {
@@ -76,6 +71,28 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 	const [installingAddon, setInstallingAddon] = useState<string | null>(null)
 	const [migrateToGitOps, setMigrateToGitOps] = useState<SimpleAddon | null>(null)
 
+	// GitOps warning modal state
+	const [gitopsWarning, setGitopsWarning] = useState<{
+		addon: SimpleAddon
+		catalogInfo?: AddonDefinition
+		action: 'configure' | 'uninstall'
+	} | null>(null)
+
+	// Git provider state
+	const [gitConfig, setGitConfig] = useState<GitProviderConfig | null>(null)
+	const [repositories, setRepositories] = useState<Repository[]>([])
+
+	// GitOps status (from discover endpoint)
+	const [gitopsInstalled, setGitopsInstalled] = useState(false)
+	const [discoveredReleases, setDiscoveredReleases] = useState<Array<{
+		name: string
+		namespace: string
+		repoUrl?: string
+		chart: string
+		version: string
+		values?: Record<string, unknown>
+	}>>([])
+
 	// Fetch catalog from API
 	useEffect(() => {
 		const fetchCatalog = async () => {
@@ -94,6 +111,50 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 		fetchCatalog()
 	}, [])
 
+	// Fetch git provider config and repositories
+	useEffect(() => {
+		const fetchGitConfig = async () => {
+			try {
+				const config = await gitopsApi.getConfig()
+				setGitConfig(config)
+
+				if (config.configured) {
+					const repos = await gitopsApi.listRepositories()
+					setRepositories(repos)
+				}
+			} catch (err) {
+				console.warn('Failed to load git config:', err)
+			}
+		}
+		fetchGitConfig()
+	}, [])
+
+	// Discover GitOps status on this cluster
+	useEffect(() => {
+		const discoverGitOps = async () => {
+			try {
+				const result = await gitopsApi.discover(clusterNamespace, clusterName)
+				setGitopsInstalled(result.gitopsEngine?.installed ?? false)
+
+				// Store discovered releases to get helm repo URLs
+				const allReleases = [
+					...(result.matched || []),
+					...(result.unmatched || []),
+				]
+				setDiscoveredReleases(allReleases.map(r => ({
+					name: r.name,
+					namespace: r.namespace,
+					repoUrl: r.repoUrl,
+					chart: r.chart,
+					version: r.chartVersion,
+				})))
+			} catch (err) {
+				console.warn('Failed to discover GitOps status:', err)
+			}
+		}
+		discoverGitOps()
+	}, [clusterNamespace, clusterName])
+
 	// Separate platform and optional addons from catalog
 	const platformAddonNames = useMemo(() => {
 		return catalog.filter(a => a.platform).map(a => a.name.toLowerCase())
@@ -109,8 +170,29 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 		return categories.filter(c => optionalCategoryNames.has(c.name))
 	}, [optionalCatalog, categories])
 
-	// Check if GitOps is enabled on this cluster
-	const gitopsEnabled = addons.some(a =>
+	// Helper to get discovered release info for an addon
+	// Helper to get discovered release info for an addon
+	const getDiscoveredRelease = useCallback((addonName: string) => {
+		const normalizedName = addonName.toLowerCase()
+			.replace(/^grafana[\s-]*/i, '')  // Remove "Grafana " prefix
+			.replace(/[\s-]+/g, '-')          // Normalize spaces to dashes
+
+		return discoveredReleases.find(r => {
+			const releaseName = r.name.toLowerCase()
+			const chartName = r.chart.toLowerCase().split(':')[0]  // Remove version from chart
+
+			return (
+				releaseName === normalizedName ||
+				chartName === normalizedName ||
+				releaseName.includes(normalizedName) ||
+				chartName.includes(normalizedName) ||
+				normalizedName.includes(releaseName)
+			)
+		})
+	}, [discoveredReleases])
+
+	// Check if GitOps is enabled on this cluster (from discover endpoint or addons)
+	const gitopsEnabled = gitopsInstalled || addons.some(a =>
 		a.name.toLowerCase() === 'flux' || a.name.toLowerCase() === 'argocd'
 	)
 
@@ -199,9 +281,26 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 		}
 	}
 
-	const handleGitOpsExport = async (addon: AddonDefinition, _gitConfig: GitOpsConfig) => {
+	const handleGitOpsExport = async (addon: AddonDefinition, gitConfig: { repository: string; branch: string; path: string; createPR: boolean }) => {
 		try {
-			success('Exported to GitOps', `${addon.displayName} manifests exported`)
+			const result = await gitopsApi.exportAddon(clusterNamespace, clusterName, {
+				addonName: addon.name,
+				repository: gitConfig.repository,
+				branch: gitConfig.branch,
+				targetPath: gitConfig.path,
+				createPR: gitConfig.createPR,
+				prTitle: `Add ${addon.displayName} addon`,
+			})
+
+			if (result.success) {
+				if (result.prUrl) {
+					success('Pull Request Created', `${addon.displayName} exported. View PR at ${result.prUrl}`)
+				} else {
+					success('Exported to GitOps', `${addon.displayName} manifests committed successfully`)
+				}
+			} else {
+				showError('Export Failed', result.message || 'Unknown error')
+			}
 			setGitopsExportAddon(null)
 			onRefresh?.()
 		} catch (err) {
@@ -209,11 +308,25 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 		}
 	}
 
-	const handleUninstall = async (addon: SimpleAddon) => {
+	// Handle configure request - check for GitOps management first
+	const handleConfigureRequest = (addon: SimpleAddon, catalogInfo?: AddonDefinition) => {
 		if (addon.managedBy === 'gitops') {
-			showError('GitOps Managed', 'This addon is managed by GitOps. Remove it from your Git repository.')
-			return
+			setGitopsWarning({ addon, catalogInfo, action: 'configure' })
+		} else if (catalogInfo) {
+			setConfigureAddon(catalogInfo)
 		}
+	}
+
+	// Handle uninstall request - check for GitOps management first
+	const handleUninstallRequest = (addon: SimpleAddon) => {
+		if (addon.managedBy === 'gitops') {
+			setGitopsWarning({ addon, action: 'uninstall' })
+		} else {
+			handleUninstall(addon)
+		}
+	}
+
+	const handleUninstall = async (addon: SimpleAddon) => {
 		try {
 			await addonsApi.uninstall(clusterNamespace, clusterName, addon.name)
 			success('Addon Removed', `${addon.name} has been uninstalled`)
@@ -223,9 +336,47 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 		}
 	}
 
-	const handleMigrateToGitOps = async (addon: SimpleAddon, _gitConfig: GitOpsConfig) => {
+	// Proceed with action after GitOps warning acknowledged
+	const handleGitOpsWarningProceed = () => {
+		if (!gitopsWarning) return
+
+		if (gitopsWarning.action === 'configure' && gitopsWarning.catalogInfo) {
+			setConfigureAddon(gitopsWarning.catalogInfo)
+		} else if (gitopsWarning.action === 'uninstall') {
+			handleUninstall(gitopsWarning.addon)
+		}
+		setGitopsWarning(null)
+	}
+
+	const handleMigrateToGitOps = async (addon: SimpleAddon, gitConfig: { repository: string; branch: string; path: string; createPR: boolean; helmRepoUrl?: string }) => {
 		try {
-			success('Migrated to GitOps', `${addon.name} is now managed by GitOps`)
+			// Get the actual release info from discovery
+			const discoveredRelease = getDiscoveredRelease(addon.name)
+
+			// Use discovered namespace/name, or fall back to addon info
+			const releaseName = discoveredRelease?.name || addon.name.toLowerCase()
+			const releaseNamespace = discoveredRelease?.namespace || `${addon.name.toLowerCase()}-system`
+
+			const result = await gitopsApi.exportRelease(clusterNamespace, clusterName, {
+				releaseName: releaseName,
+				releaseNamespace: releaseNamespace,
+				repository: gitConfig.repository,
+				branch: gitConfig.branch,
+				path: gitConfig.path,
+				createPR: gitConfig.createPR,
+				prTitle: `Migrate ${addon.displayName || addon.name} to GitOps`,
+				helmRepoUrl: gitConfig.helmRepoUrl,
+			})
+
+			if (result.success) {
+				if (result.prUrl) {
+					success('Pull Request Created', `${addon.name} migration PR created`)
+				} else {
+					success('Migrated to GitOps', `${addon.name} is now managed by GitOps`)
+				}
+			} else {
+				showError('Migration Failed', result.message || 'Unknown error')
+			}
 			setMigrateToGitOps(null)
 			onRefresh?.()
 		} catch (err) {
@@ -260,19 +411,14 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 		<div className="space-y-8">
 			{/* GitOps Status Banner */}
 			{gitopsEnabled && (
-				<div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg flex items-center justify-between">
-					<div className="flex items-center gap-3">
-						<span className="text-xl">🔄</span>
-						<div>
-							<p className="font-medium text-purple-300">GitOps Enabled</p>
-							<p className="text-sm text-purple-400/70">
-								New addons can be managed via GitOps for full audit trail and declarative control.
-							</p>
-						</div>
+				<div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg flex items-center gap-3">
+					<span className="text-xl">🔄</span>
+					<div>
+						<p className="font-medium text-purple-300">GitOps Enabled</p>
+						<p className="text-sm text-purple-400/70">
+							Addons can be exported to Git via the GitOps tab or the Manage menu on each addon.
+						</p>
 					</div>
-					<Button variant="secondary" size="sm">
-						Migrate All to GitOps
-					</Button>
 				</div>
 			)}
 
@@ -319,8 +465,8 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 								addon={addon}
 								catalogInfo={catalogInfo}
 								gitopsEnabled={gitopsEnabled}
-								onConfigure={() => catalogInfo && setConfigureAddon(catalogInfo)}
-								onUninstall={() => handleUninstall(addon)}
+								onConfigure={() => handleConfigureRequest(addon, catalogInfo)}
+								onUninstall={() => handleUninstallRequest(addon)}
 								onMigrateToGitOps={() => setMigrateToGitOps(addon)}
 							/>
 						))}
@@ -430,6 +576,16 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 				)}
 			</div>
 
+			{/* GitOps Edit Warning Modal */}
+			{gitopsWarning && (
+				<GitOpsEditWarningModal
+					addon={gitopsWarning.addon}
+					action={gitopsWarning.action}
+					onClose={() => setGitopsWarning(null)}
+					onProceed={handleGitOpsWarningProceed}
+				/>
+			)}
+
 			{/* Configure & Install Modal */}
 			{configureAddon && (
 				<ConfigureAddonModal
@@ -446,6 +602,9 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 				<GitOpsExportModal
 					addon={gitopsExportAddon}
 					isOpen={!!gitopsExportAddon}
+					repositories={repositories}
+					clusterName={clusterName}
+					gitConfigured={gitConfig?.configured ?? false}
 					onClose={() => setGitopsExportAddon(null)}
 					onExport={(config) => handleGitOpsExport(gitopsExportAddon, config)}
 				/>
@@ -456,10 +615,109 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 				<MigrateToGitOpsModal
 					addon={migrateToGitOps}
 					isOpen={!!migrateToGitOps}
+					repositories={repositories}
+					clusterName={clusterName}
+					gitConfigured={gitConfig?.configured ?? false}
+					discoveredRelease={getDiscoveredRelease(migrateToGitOps.name)}
 					onClose={() => setMigrateToGitOps(null)}
 					onMigrate={(config) => handleMigrateToGitOps(migrateToGitOps, config)}
 				/>
 			)}
+		</div>
+	)
+}
+
+// GitOps Edit Warning Modal
+
+interface GitOpsEditWarningModalProps {
+	addon: SimpleAddon
+	action: 'configure' | 'uninstall'
+	onClose: () => void
+	onProceed: () => void
+}
+
+function GitOpsEditWarningModal({ addon, action, onClose, onProceed }: GitOpsEditWarningModalProps) {
+	const actionTitle = action === 'configure' ? 'Configure' : 'Uninstall'
+
+	return (
+		<div className="fixed inset-0 z-50 flex items-center justify-center">
+			{/* Backdrop */}
+			<div
+				className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+				onClick={onClose}
+			/>
+
+			{/* Modal */}
+			<div className="relative bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl max-w-md w-full mx-4">
+				<div className="p-6">
+					{/* Warning Icon */}
+					<div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-yellow-500/10">
+						<svg className="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+						</svg>
+					</div>
+
+					<h3 className="text-lg font-semibold text-neutral-100 text-center mb-2">
+						GitOps-Managed Addon
+					</h3>
+
+					<p className="text-neutral-400 text-center mb-4">
+						<span className="text-neutral-200 font-medium">{addon.displayName || addon.name}</span> is managed by GitOps.
+					</p>
+
+					{/* Warning Box */}
+					<div className="p-4 rounded-lg bg-yellow-900/20 border border-yellow-500/30 mb-4">
+						{action === 'configure' ? (
+							<div className="space-y-2">
+								<p className="text-sm text-yellow-200 font-medium">
+									⚠️ Changes may be overwritten
+								</p>
+								<p className="text-sm text-yellow-300/70">
+									Any configuration changes made here will be overwritten the next time GitOps reconciles from your Git repository.
+								</p>
+							</div>
+						) : (
+							<div className="space-y-2">
+								<p className="text-sm text-yellow-200 font-medium">
+									⚠️ Addon will be re-created
+								</p>
+								<p className="text-sm text-yellow-300/70">
+									If you uninstall this addon, GitOps will automatically re-create it from your Git repository. To permanently remove it, delete it from Git first.
+								</p>
+							</div>
+						)}
+					</div>
+
+					{/* Recommendation */}
+					<div className="p-3 rounded-lg bg-neutral-800 border border-neutral-700 mb-4">
+						<p className="text-sm text-neutral-300">
+							<span className="font-medium">Recommended:</span>{' '}
+							{action === 'configure'
+								? 'Make changes in your Git repository instead for a proper audit trail.'
+								: 'Remove the addon from your Git repository to permanently uninstall it.'
+							}
+						</p>
+					</div>
+
+					{/* Actions */}
+					<div className="flex gap-3">
+						<Button
+							variant="secondary"
+							className="flex-1"
+							onClick={onClose}
+						>
+							Cancel
+						</Button>
+						<Button
+							variant={action === 'uninstall' ? 'danger' : 'primary'}
+							className="flex-1"
+							onClick={onProceed}
+						>
+							{actionTitle} Anyway
+						</Button>
+					</div>
+				</div>
+			</div>
 		</div>
 	)
 }
@@ -525,12 +783,13 @@ function InstalledAddonCard({
 	const statusColor = getStatusColor(addon.status)
 	const statusBg = getStatusBgColor(addon.status)
 	const icon = catalogInfo?.icon || getOptionalAddonIcon(addon.name)
+	const isGitOpsManaged = addon.managedBy === 'gitops'
 
 	return (
-		<Card className="p-4 hover:border-neutral-600 transition-colors border-green-500/20">
+		<Card className={`p-4 hover:border-neutral-600 transition-colors ${isGitOpsManaged ? 'border-purple-500/30' : 'border-green-500/20'}`}>
 			<div className="flex items-start justify-between mb-3">
 				<div className="flex items-center gap-3">
-					<div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+					<div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isGitOpsManaged ? 'bg-purple-500/10' : 'bg-green-500/10'}`}>
 						<span className="text-xl">{icon}</span>
 					</div>
 					<div>
@@ -545,8 +804,8 @@ function InstalledAddonCard({
 					<span className={`px-2 py-1 text-xs rounded-full ${statusBg} ${statusColor}`}>
 						{addon.status}
 					</span>
-					{addon.managedBy === 'gitops' && (
-						<span className="px-2 py-1 text-xs rounded-full bg-purple-500/10 text-purple-400">
+					{isGitOpsManaged && (
+						<span className="px-2 py-1 text-xs rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30">
 							GitOps
 						</span>
 					)}
@@ -577,14 +836,15 @@ function InstalledAddonCard({
 							<DropdownOption
 								icon="⚙️"
 								label="Configure"
-								description="Update Helm values"
+								description={isGitOpsManaged ? "Update values (GitOps warning)" : "Update Helm values"}
 								onClick={() => {
 									setMenuOpen(false)
 									onConfigure()
 								}}
+								warning={isGitOpsManaged}
 							/>
 						)}
-						{gitopsEnabled && addon.managedBy !== 'gitops' && (
+						{gitopsEnabled && !isGitOpsManaged && (
 							<DropdownOption
 								icon="🔄"
 								label="Migrate to GitOps"
@@ -598,12 +858,13 @@ function InstalledAddonCard({
 						<DropdownOption
 							icon="🗑️"
 							label="Uninstall"
-							description="Remove this addon"
+							description={isGitOpsManaged ? "Remove addon (GitOps warning)" : "Remove this addon"}
 							onClick={() => {
 								setMenuOpen(false)
 								onUninstall()
 							}}
 							destructive
+							warning={isGitOpsManaged}
 						/>
 					</div>
 				)}
@@ -773,12 +1034,14 @@ function DropdownOption({
 	description,
 	onClick,
 	destructive = false,
+	warning = false,
 }: {
 	icon: string
 	label: string
 	description: string
 	onClick: () => void
 	destructive?: boolean
+	warning?: boolean
 }) {
 	return (
 		<button
@@ -788,8 +1051,15 @@ function DropdownOption({
 		>
 			<div className="flex items-center gap-3">
 				<span className="text-lg">{icon}</span>
-				<div>
-					<p className={`text-sm font-medium ${destructive ? 'text-red-400' : 'text-neutral-200'}`}>{label}</p>
+				<div className="flex-1">
+					<div className="flex items-center gap-2">
+						<p className={`text-sm font-medium ${destructive ? 'text-red-400' : 'text-neutral-200'}`}>{label}</p>
+						{warning && (
+							<svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+							</svg>
+						)}
+					</div>
 					<p className="text-xs text-neutral-500">{description}</p>
 				</div>
 			</div>
@@ -1073,17 +1343,125 @@ function FormField({
 interface GitOpsExportModalProps {
 	addon: AddonDefinition
 	isOpen: boolean
+	repositories: Repository[]
+	clusterName: string
+	gitConfigured: boolean
 	onClose: () => void
-	onExport: (config: GitOpsConfig) => void
+	onExport: (config: { repository: string; branch: string; path: string; createPR: boolean }) => void
 }
 
-function GitOpsExportModal({ addon, isOpen, onClose, onExport }: GitOpsExportModalProps) {
-	const [config, setConfig] = useState<GitOpsConfig>({
-		repository: '',
-		branch: 'main',
-		path: `clusters/addons/${addon.name}`,
-		createPR: true,
-	})
+function GitOpsExportModal({ addon, isOpen, repositories, clusterName, gitConfigured, onClose, onExport }: GitOpsExportModalProps) {
+	// Generate correct path based on addon.platform
+	const defaultPath = addon.platform
+		? `clusters/${clusterName}/infrastructure/${addon.name}`
+		: `clusters/${clusterName}/apps/${addon.name}`
+
+	const [repository, setRepository] = useState('')
+	const [branch, setBranch] = useState('main')
+	const [path, setPath] = useState(defaultPath)
+	const [createPR, setCreatePR] = useState(true)
+	const [branches, setBranches] = useState<Branch[]>([])
+	const [loadingBranches, setLoadingBranches] = useState(false)
+	const [preview, setPreview] = useState<Record<string, string> | null>(null)
+	const [loadingPreview, setLoadingPreview] = useState(false)
+
+	// Update path when addon changes
+	useEffect(() => {
+		const newPath = addon.platform
+			? `clusters/${clusterName}/infrastructure/${addon.name}`
+			: `clusters/${clusterName}/apps/${addon.name}`
+		setPath(newPath)
+	}, [addon, clusterName])
+
+	// Auto-select first repository when available
+	useEffect(() => {
+		if (repositories.length > 0 && !repository) {
+			setRepository(repositories[0].fullName)
+		}
+	}, [repositories, repository])
+
+	// Load branches when repository changes
+	useEffect(() => {
+		if (!repository) {
+			setBranches([])
+			return
+		}
+
+		const loadBranches = async () => {
+			setLoadingBranches(true)
+			try {
+				const [owner, repo] = repository.split('/')
+				if (owner && repo) {
+					const branchList = await gitopsApi.listBranches(owner, repo)
+					setBranches(branchList)
+
+					// Set default branch if available
+					const defaultBranch = repositories.find(r => r.fullName === repository)?.defaultBranch
+					if (defaultBranch) {
+						setBranch(defaultBranch)
+					}
+				}
+			} catch (err) {
+				console.warn('Failed to load branches:', err)
+			} finally {
+				setLoadingBranches(false)
+			}
+		}
+
+		loadBranches()
+	}, [repository, repositories])
+
+	// Toggle preview manifests
+	const togglePreview = async () => {
+		// If preview is shown, hide it
+		if (preview) {
+			setPreview(null)
+			return
+		}
+
+		if (!repository) return
+
+		setLoadingPreview(true)
+		try {
+			const result = await gitopsApi.previewManifests({
+				addonName: addon.name,
+				repository,
+				targetPath: path,
+			})
+			setPreview(result)
+		} catch (err) {
+			console.warn('Failed to load preview:', err)
+		} finally {
+			setLoadingPreview(false)
+		}
+	}
+
+	if (!gitConfigured) {
+		return (
+			<Modal isOpen={isOpen} onClose={onClose}>
+				<ModalHeader>
+					<div className="flex items-center gap-3">
+						<span className="text-2xl">📦</span>
+						<div>
+							<h2 className="text-lg font-semibold">Export to GitOps</h2>
+							<p className="text-sm text-neutral-400">{addon.displayName}</p>
+						</div>
+					</div>
+				</ModalHeader>
+				<ModalBody>
+					<div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+						<p className="text-yellow-300 font-medium mb-2">Git Provider Not Configured</p>
+						<p className="text-sm text-neutral-400">
+							Please configure a Git provider (GitHub/GitLab) in the GitOps tab before exporting addons.
+						</p>
+					</div>
+				</ModalBody>
+				<ModalFooter>
+					<Button variant="secondary" onClick={onClose}>Close</Button>
+				</ModalFooter>
+			</Modal>
+		)
+	}
 
 	return (
 		<Modal isOpen={isOpen} onClose={onClose}>
@@ -1099,55 +1477,158 @@ function GitOpsExportModal({ addon, isOpen, onClose, onExport }: GitOpsExportMod
 
 			<ModalBody>
 				<div className="space-y-4">
-					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Git Repository</label>
-						<input
-							type="text"
-							value={config.repository}
-							onChange={(e) => setConfig({ ...config, repository: e.target.value })}
-							placeholder="https://github.com/org/repo"
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-						/>
+					{/* Addon Info */}
+					<div className="p-3 rounded-lg bg-neutral-800/50 border border-neutral-700">
+						<div className="flex items-center justify-between">
+							<div>
+								<p className="text-neutral-200 font-medium">{addon.displayName}</p>
+								<p className="text-sm text-neutral-500">{addon.chartName}:{addon.defaultVersion}</p>
+							</div>
+							<span className="px-2 py-1 text-xs rounded bg-blue-500/10 text-blue-400">
+								From Catalog
+							</span>
+						</div>
 					</div>
 
+					{/* Repository Selection */}
 					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Branch</label>
-						<input
-							type="text"
-							value={config.branch}
-							onChange={(e) => setConfig({ ...config, branch: e.target.value })}
+						<label className="block text-sm font-medium text-neutral-300 mb-1">
+							Target Repository
+						</label>
+						<select
+							value={repository}
+							onChange={(e) => setRepository(e.target.value)}
 							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-						/>
+						>
+							<option value="">Select a repository...</option>
+							{repositories.map((repo) => (
+								<option key={repo.fullName} value={repo.fullName}>
+									{repo.fullName} {repo.private ? '(private)' : ''}
+								</option>
+							))}
+						</select>
 					</div>
 
-					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Path</label>
-						<input
-							type="text"
-							value={config.path}
-							onChange={(e) => setConfig({ ...config, path: e.target.value })}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-						/>
+					{/* Branch and Path */}
+					<div className="grid grid-cols-2 gap-4">
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">Branch</label>
+							<div className="relative">
+								<select
+									value={branch}
+									onChange={(e) => setBranch(e.target.value)}
+									disabled={loadingBranches || branches.length === 0}
+									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+								>
+									{branches.length === 0 ? (
+										<option value={branch}>{branch}</option>
+									) : (
+										branches.map((b) => (
+											<option key={b.name} value={b.name}>{b.name}</option>
+										))
+									)}
+								</select>
+								{loadingBranches && (
+									<div className="absolute right-3 top-1/2 -translate-y-1/2">
+										<Spinner size="sm" />
+									</div>
+								)}
+							</div>
+						</div>
+
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">Path</label>
+							<input
+								type="text"
+								value={path}
+								onChange={(e) => setPath(e.target.value)}
+								placeholder="clusters/my-cluster"
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							/>
+						</div>
 					</div>
 
+					{/* Create PR option */}
 					<label className="flex items-center gap-3 cursor-pointer">
 						<input
 							type="checkbox"
-							checked={config.createPR}
-							onChange={(e) => setConfig({ ...config, createPR: e.target.checked })}
+							checked={createPR}
+							onChange={(e) => setCreatePR(e.target.checked)}
 							className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500"
 						/>
-						<span className="text-sm text-neutral-200">Create Pull Request</span>
+						<div>
+							<span className="text-neutral-200">Create Pull Request</span>
+							<p className="text-xs text-neutral-500">Create a PR for review instead of committing directly</p>
+						</div>
 					</label>
+
+					{/* Preview Button */}
+					{repository && (
+						<div className="pt-2">
+							<button
+								onClick={togglePreview}
+								disabled={loadingPreview}
+								className="text-sm text-green-400 hover:text-green-300 flex items-center gap-2"
+							>
+								{loadingPreview ? (
+									<>
+										<Spinner size="sm" />
+										Loading preview...
+									</>
+								) : preview ? (
+									<>
+										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+										</svg>
+										Hide generated manifests
+									</>
+								) : (
+									<>
+										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+										</svg>
+										Preview generated manifests
+									</>
+								)}
+							</button>
+						</div>
+					)}
+
+					{/* Preview Content */}
+					{preview && (
+						<div className="border border-neutral-700 rounded-lg overflow-hidden">
+							<div className="bg-neutral-800 px-3 py-2 text-sm text-neutral-400 border-b border-neutral-700">
+								Generated Files
+							</div>
+							<div className="max-h-64 overflow-y-auto">
+								{Object.entries(preview).map(([filename, content]) => (
+									<details key={filename} className="border-b border-neutral-800 last:border-0">
+										<summary className="px-3 py-2 text-sm text-neutral-300 cursor-pointer hover:bg-neutral-800/50 flex items-center gap-2">
+											<svg className="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+											</svg>
+											{filename}
+										</summary>
+										<pre className="px-3 py-2 bg-neutral-900 text-xs text-neutral-400 overflow-x-auto">
+											{content}
+										</pre>
+									</details>
+								))}
+							</div>
+						</div>
+					)}
 				</div>
 			</ModalBody>
 
 			<ModalFooter>
-				<Button variant="secondary" onClick={onClose}>
-					Cancel
-				</Button>
-				<Button variant="primary" onClick={() => onExport(config)}>
-					Export
+				<Button variant="secondary" onClick={onClose}>Cancel</Button>
+				<Button
+					variant="primary"
+					onClick={() => onExport({ repository, branch, path, createPR })}
+					disabled={!repository}
+				>
+					{createPR ? 'Create Pull Request' : 'Export'}
 				</Button>
 			</ModalFooter>
 		</Modal>
@@ -1159,17 +1640,132 @@ function GitOpsExportModal({ addon, isOpen, onClose, onExport }: GitOpsExportMod
 interface MigrateToGitOpsModalProps {
 	addon: SimpleAddon
 	isOpen: boolean
+	repositories: Repository[]
+	clusterName: string
+	gitConfigured: boolean
+	discoveredRelease?: {
+		name: string
+		namespace: string
+		repoUrl?: string
+		chart: string
+		version: string
+	}
 	onClose: () => void
-	onMigrate: (config: GitOpsConfig) => void
+	onMigrate: (config: { repository: string; branch: string; path: string; createPR: boolean; helmRepoUrl?: string }) => void
 }
 
-function MigrateToGitOpsModal({ addon, isOpen, onClose, onMigrate }: MigrateToGitOpsModalProps) {
-	const [config, setConfig] = useState<GitOpsConfig>({
-		repository: '',
-		branch: 'main',
-		path: `clusters/addons/${addon.name}`,
-		createPR: true,
-	})
+function MigrateToGitOpsModal({ addon, isOpen, repositories, clusterName, gitConfigured, discoveredRelease, onClose, onMigrate }: MigrateToGitOpsModalProps) {
+	const [repository, setRepository] = useState('')
+	const [branch, setBranch] = useState('main')
+	const [path, setPath] = useState(`clusters/${clusterName}/apps/${addon.name}`)
+	const [createPR, setCreatePR] = useState(true)
+	const [branches, setBranches] = useState<Branch[]>([])
+	const [loadingBranches, setLoadingBranches] = useState(false)
+	const [helmRepoUrl, setHelmRepoUrl] = useState(discoveredRelease?.repoUrl || '')
+	const [preview, setPreview] = useState<Record<string, string> | null>(null)
+	const [loadingPreview, setLoadingPreview] = useState(false)
+
+	// Update helmRepoUrl when discoveredRelease changes
+	useEffect(() => {
+		if (discoveredRelease?.repoUrl) {
+			setHelmRepoUrl(discoveredRelease.repoUrl)
+		}
+	}, [discoveredRelease])
+
+	// Update path when addon changes
+	useEffect(() => {
+		setPath(`clusters/${clusterName}/apps/${addon.name}`)
+	}, [addon, clusterName])
+
+	// Auto-select first repository when available
+	useEffect(() => {
+		if (repositories.length > 0 && !repository) {
+			setRepository(repositories[0].fullName)
+		}
+	}, [repositories, repository])
+
+	// Load branches when repository changes
+	useEffect(() => {
+		if (!repository) {
+			setBranches([])
+			return
+		}
+
+		const loadBranches = async () => {
+			setLoadingBranches(true)
+			try {
+				const [owner, repo] = repository.split('/')
+				if (owner && repo) {
+					const branchList = await gitopsApi.listBranches(owner, repo)
+					setBranches(branchList)
+
+					// Set default branch if available
+					const defaultBranch = repositories.find(r => r.fullName === repository)?.defaultBranch
+					if (defaultBranch) {
+						setBranch(defaultBranch)
+					}
+				}
+			} catch (err) {
+				console.warn('Failed to load branches:', err)
+			} finally {
+				setLoadingBranches(false)
+			}
+		}
+
+		loadBranches()
+	}, [repository, repositories])
+
+	// Toggle preview manifests
+	const togglePreview = async () => {
+		// If preview is shown, hide it
+		if (preview) {
+			setPreview(null)
+			return
+		}
+
+		if (!repository) return
+
+		setLoadingPreview(true)
+		try {
+			const result = await gitopsApi.previewManifests({
+				addonName: addon.name,
+				repository,
+				targetPath: path,
+			})
+			setPreview(result)
+		} catch (err) {
+			console.warn('Failed to load preview:', err)
+		} finally {
+			setLoadingPreview(false)
+		}
+	}
+
+	if (!gitConfigured) {
+		return (
+			<Modal isOpen={isOpen} onClose={onClose}>
+				<ModalHeader>
+					<div className="flex items-center gap-3">
+						<span className="text-2xl">🔄</span>
+						<div>
+							<h2 className="text-lg font-semibold">Migrate to GitOps</h2>
+							<p className="text-sm text-neutral-400">{addon.displayName || addon.name}</p>
+						</div>
+					</div>
+				</ModalHeader>
+				<ModalBody>
+					<div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+						<p className="text-yellow-300 font-medium mb-2">Git Provider Not Configured</p>
+						<p className="text-sm text-neutral-400">
+							Please configure a Git provider (GitHub/GitLab) in the GitOps tab before migrating addons.
+						</p>
+					</div>
+				</ModalBody>
+				<ModalFooter>
+					<Button variant="secondary" onClick={onClose}>Close</Button>
+				</ModalFooter>
+			</Modal>
+		)
+	}
 
 	return (
 		<Modal isOpen={isOpen} onClose={onClose}>
@@ -1184,63 +1780,172 @@ function MigrateToGitOpsModal({ addon, isOpen, onClose, onMigrate }: MigrateToGi
 			</ModalHeader>
 
 			<ModalBody>
-				<div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg mb-4">
-					<p className="text-sm text-yellow-300">
-						This will export the current configuration to Git and mark the addon as GitOps-managed.
-						Future changes should be made through your Git repository.
-					</p>
-				</div>
-
 				<div className="space-y-4">
-					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Git Repository</label>
-						<input
-							type="text"
-							value={config.repository}
-							onChange={(e) => setConfig({ ...config, repository: e.target.value })}
-							placeholder="https://github.com/org/repo"
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-						/>
+					{/* Warning Banner */}
+					<div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+						<p className="text-sm text-yellow-300">
+							This will export the current configuration to Git and mark the addon as GitOps-managed.
+							Future changes should be made through your Git repository.
+						</p>
 					</div>
 
+					{/* Repository Selection */}
 					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Branch</label>
-						<input
-							type="text"
-							value={config.branch}
-							onChange={(e) => setConfig({ ...config, branch: e.target.value })}
+						<label className="block text-sm font-medium text-neutral-300 mb-1">
+							Target Repository
+						</label>
+						<select
+							value={repository}
+							onChange={(e) => setRepository(e.target.value)}
 							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-						/>
+						>
+							<option value="">Select a repository...</option>
+							{repositories.map((repo) => (
+								<option key={repo.fullName} value={repo.fullName}>
+									{repo.fullName} {repo.private ? '(private)' : ''}
+								</option>
+							))}
+						</select>
 					</div>
 
-					<div>
-						<label className="block text-sm text-neutral-200 mb-1">Path</label>
-						<input
-							type="text"
-							value={config.path}
-							onChange={(e) => setConfig({ ...config, path: e.target.value })}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-						/>
+					{/* Branch and Path */}
+					<div className="grid grid-cols-2 gap-4">
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">Branch</label>
+							<div className="relative">
+								<select
+									value={branch}
+									onChange={(e) => setBranch(e.target.value)}
+									disabled={loadingBranches || branches.length === 0}
+									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+								>
+									{branches.length === 0 ? (
+										<option value={branch}>{branch}</option>
+									) : (
+										branches.map((b) => (
+											<option key={b.name} value={b.name}>{b.name}</option>
+										))
+									)}
+								</select>
+								{loadingBranches && (
+									<div className="absolute right-3 top-1/2 -translate-y-1/2">
+										<Spinner size="sm" />
+									</div>
+								)}
+							</div>
+						</div>
+
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">Path</label>
+							<input
+								type="text"
+								value={path}
+								onChange={(e) => setPath(e.target.value)}
+								placeholder="clusters/my-cluster"
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							/>
+						</div>
 					</div>
 
+					{/* Helm Repo URL - optional for unmatched releases */}
+					<div>
+						<label className="block text-sm font-medium text-neutral-300 mb-1">
+							Helm Repository URL
+							<span className="text-neutral-500 ml-1">(optional)</span>
+						</label>
+						<input
+							type="url"
+							value={helmRepoUrl}
+							onChange={(e) => setHelmRepoUrl(e.target.value)}
+							placeholder="https://charts.example.com"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+						/>
+						<p className="text-xs text-neutral-500 mt-1">
+							Override the Helm repository URL if auto-detection fails
+						</p>
+					</div>
+
+					{/* Create PR option */}
 					<label className="flex items-center gap-3 cursor-pointer">
 						<input
 							type="checkbox"
-							checked={config.createPR}
-							onChange={(e) => setConfig({ ...config, createPR: e.target.checked })}
+							checked={createPR}
+							onChange={(e) => setCreatePR(e.target.checked)}
 							className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500"
 						/>
-						<span className="text-sm text-neutral-200">Create Pull Request</span>
+						<div>
+							<span className="text-neutral-200">Create Pull Request</span>
+							<p className="text-xs text-neutral-500">Create a PR for review instead of committing directly</p>
+						</div>
 					</label>
+
+					{/* Preview Button */}
+					{repository && (
+						<div className="pt-2">
+							<button
+								onClick={togglePreview}
+								disabled={loadingPreview}
+								className="text-sm text-green-400 hover:text-green-300 flex items-center gap-2"
+							>
+								{loadingPreview ? (
+									<>
+										<Spinner size="sm" />
+										Loading preview...
+									</>
+								) : preview ? (
+									<>
+										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+										</svg>
+										Hide generated manifests
+									</>
+								) : (
+									<>
+										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+										</svg>
+										Preview generated manifests
+									</>
+								)}
+							</button>
+						</div>
+					)}
+
+					{/* Preview Content */}
+					{preview && (
+						<div className="border border-neutral-700 rounded-lg overflow-hidden">
+							<div className="bg-neutral-800 px-3 py-2 text-sm text-neutral-400 border-b border-neutral-700">
+								Generated Files
+							</div>
+							<div className="max-h-64 overflow-y-auto">
+								{Object.entries(preview).map(([filename, content]) => (
+									<details key={filename} className="border-b border-neutral-800 last:border-0">
+										<summary className="px-3 py-2 text-sm text-neutral-300 cursor-pointer hover:bg-neutral-800/50 flex items-center gap-2">
+											<svg className="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+											</svg>
+											{filename}
+										</summary>
+										<pre className="px-3 py-2 bg-neutral-900 text-xs text-neutral-400 overflow-x-auto">
+											{content}
+										</pre>
+									</details>
+								))}
+							</div>
+						</div>
+					)}
 				</div>
 			</ModalBody>
 
 			<ModalFooter>
-				<Button variant="secondary" onClick={onClose}>
-					Cancel
-				</Button>
-				<Button variant="primary" onClick={() => onMigrate(config)}>
-					Migrate
+				<Button variant="secondary" onClick={onClose}>Cancel</Button>
+				<Button
+					variant="primary"
+					onClick={() => onMigrate({ repository, branch, path, createPR, helmRepoUrl: helmRepoUrl || undefined })}
+					disabled={!repository}
+				>
+					{createPR ? 'Create Pull Request' : 'Migrate'}
 				</Button>
 			</ModalFooter>
 		</Modal>
@@ -1283,11 +1988,12 @@ function getStatusBgColor(status: string): string {
 	}
 }
 
+
 function getPlatformAddonIcon(name: string): string {
 	const icons: Record<string, string> = {
 		cilium: '🌐',
 		metallb: '⚖️',
-		'cert-manager': '🔐',
+		'cert-manager': '🔒',
 		longhorn: '💾',
 		traefik: '🚪',
 		'metrics-server': '📈',
@@ -1302,12 +2008,13 @@ function getOptionalAddonIcon(name: string): string {
 		tempo: '🔍',
 		jaeger: '🔎',
 		'victoria-metrics': '📊',
-		'victoria-logs': '📝',
+		'victoria-logs': '📋',
 		flux: '🔄',
 		argocd: '🐙',
 	}
 	return icons[name.toLowerCase()] || '📦'
 }
+
 
 function getMockValuesSchema(addonName: string): ValuesSchema {
 	const schemas: Record<string, ValuesSchema> = {

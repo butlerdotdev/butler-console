@@ -125,9 +125,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		}
 	}, [])
 
-	// Refresh user data
+	// Refresh user data (just re-fetches current session state)
 	const refreshUser = useCallback(async () => {
 		await checkAuth()
+	}, [checkAuth])
+
+	// Refresh permissions - re-resolves team memberships on the server and updates session
+	const refreshPermissions = useCallback(async (): Promise<{ success: boolean; message?: string }> => {
+		try {
+			const response = await fetch('/api/auth/refresh-permissions', {
+				method: 'POST',
+				credentials: 'include',
+			})
+
+			if (!response.ok) {
+				const data = await response.json()
+				return { success: false, message: data.error || 'Failed to refresh permissions' }
+			}
+
+			// Re-fetch user data to update local state with new permissions
+			await checkAuth()
+
+			return { success: true, message: 'Permissions refreshed successfully' }
+		} catch {
+			return { success: false, message: 'Failed to refresh permissions' }
+		}
 	}, [checkAuth])
 
 	return (
@@ -138,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				legacyLogin,
 				logout,
 				refreshUser,
+				refreshPermissions,
 			}}
 		>
 			{children}

@@ -16,6 +16,7 @@ interface Team {
 	namespace?: string
 	clusterCount: number
 	memberCount: number
+	groupCount: number
 }
 
 export function AdminTeamsPage() {
@@ -91,6 +92,20 @@ export function AdminTeamsPage() {
 		} finally {
 			setCreating(false)
 		}
+	}
+
+	// Format member/group count for display
+	function formatMemberCount(memberCount: number, groupCount: number): string {
+		if (memberCount === 0 && groupCount === 0) {
+			return '0 members'
+		}
+		if (groupCount === 0) {
+			return `${memberCount} member${memberCount !== 1 ? 's' : ''}`
+		}
+		if (memberCount === 0) {
+			return `${groupCount} group${groupCount !== 1 ? 's' : ''}`
+		}
+		return `${memberCount} member${memberCount !== 1 ? 's' : ''} + ${groupCount} group${groupCount !== 1 ? 's' : ''}`
 	}
 
 	if (loading) {
@@ -189,7 +204,7 @@ export function AdminTeamsPage() {
 											<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
 											</svg>
-											{team.memberCount || 0} members
+											{formatMemberCount(team.memberCount || 0, team.groupCount || 0)}
 										</span>
 										<span className="flex items-center gap-1">
 											<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

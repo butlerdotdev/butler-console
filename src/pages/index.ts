@@ -24,3 +24,6 @@ export { TeamMembersPage } from './TeamMembersPage'
 export { TeamSettingsPage } from './TeamSettingsPage'
 export { OverviewPage } from './OverviewPage'
 export { AdminTeamDetailPage } from './AdminTeamDetailPage'
+
+export { IdentityProvidersPage } from './IdentityProvidersPage'
+export { CreateIdentityProviderPage } from './CreateIdentityProviderPage'

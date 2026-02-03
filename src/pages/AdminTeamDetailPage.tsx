@@ -4,7 +4,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
+import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
+import { usePermissionWarning } from '@/hooks/usePermissionWarning'
 import { clustersApi, type Cluster } from '@/api'
 import {
 	Button,
@@ -21,7 +23,25 @@ import {
 
 interface TeamMember {
 	email: string
+	name?: string
 	role: 'admin' | 'operator' | 'viewer'
+	source: 'direct' | 'group' | 'elevated'
+	groupName?: string
+	groupRole?: string
+	directRole?: string
+	canRemove?: boolean
+	removeNote?: string
+}
+
+interface GroupSync {
+	name: string
+	role: 'admin' | 'operator' | 'viewer'
+	identityProvider?: string
+}
+
+interface IdentityProviderSummary {
+	name: string
+	displayName?: string
 }
 
 interface TeamDetails {
@@ -40,11 +60,17 @@ export function AdminTeamDetailPage() {
 	useDocumentTitle(teamName ? `${teamName} - Team` : 'Team')
 
 	const toast = useToast()
+	const { user } = useAuth()
+	const { checkAndWarn } = usePermissionWarning()
 	const [team, setTeam] = useState<TeamDetails | null>(null)
 	const [members, setMembers] = useState<TeamMember[]>([])
 	const [clusters, setClusters] = useState<Cluster[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
+
+	// Group sync state
+	const [groupSyncs, setGroupSyncs] = useState<GroupSync[]>([])
+	const [identityProviders, setIdentityProviders] = useState<IdentityProviderSummary[]>([])
 
 	// Add member modal
 	const [showAddMemberModal, setShowAddMemberModal] = useState(false)
@@ -52,9 +78,20 @@ export function AdminTeamDetailPage() {
 	const [newMemberRole, setNewMemberRole] = useState<'admin' | 'operator' | 'viewer'>('viewer')
 	const [addingMember, setAddingMember] = useState(false)
 
+	// Add group sync modal
+	const [showAddGroupSyncModal, setShowAddGroupSyncModal] = useState(false)
+	const [newGroupName, setNewGroupName] = useState('')
+	const [newGroupRole, setNewGroupRole] = useState<'admin' | 'operator' | 'viewer'>('viewer')
+	const [newGroupIdP, setNewGroupIdP] = useState('')
+	const [addingGroupSync, setAddingGroupSync] = useState(false)
+
 	// Delete confirmation
-	const [memberToRemove, setMemberToRemove] = useState<string | null>(null)
+	const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null)
 	const [removing, setRemoving] = useState(false)
+
+	// Group sync to remove
+	const [groupSyncToRemove, setGroupSyncToRemove] = useState<GroupSync | null>(null)
+	const [removingGroupSync, setRemovingGroupSync] = useState(false)
 
 	const fetchTeam = useCallback(async () => {
 		if (!teamName) return
@@ -83,6 +120,30 @@ export function AdminTeamDetailPage() {
 			if (membersResponse.ok) {
 				const membersData = await membersResponse.json()
 				setMembers(membersData.members || [])
+			}
+
+			// Fetch group syncs
+			const groupsResponse = await fetch(`/api/teams/${teamName}/groups`, {
+				credentials: 'include',
+			})
+
+			if (groupsResponse.ok) {
+				const groupsData = await groupsResponse.json()
+				setGroupSyncs(groupsData.groups || [])
+			}
+
+			// Fetch identity providers for the dropdown
+			const idpsResponse = await fetch('/api/admin/identity-providers', {
+				credentials: 'include',
+			})
+
+			if (idpsResponse.ok) {
+				const idpsData = await idpsResponse.json()
+				const idpList = (idpsData.identityProviders || []).map((idp: { metadata: { name: string }; spec?: { displayName?: string } }) => ({
+					name: idp.metadata.name,
+					displayName: idp.spec?.displayName || idp.metadata.name,
+				}))
+				setIdentityProviders(idpList)
 			}
 
 			// Fetch clusters for this team
@@ -116,13 +177,20 @@ export function AdminTeamDetailPage() {
 				}),
 			})
 
+			const data = await response.json()
+
 			if (!response.ok) {
-				const data = await response.json()
 				toast.error('Failed to add member', data.error || 'Unknown error')
 				return
 			}
 
-			toast.success('Member Added', `${newMemberEmail} has been added to ${team?.displayName || teamName}`)
+			if (data.elevated) {
+				toast.success('Member Elevated', `${newMemberEmail} elevated from ${data.groupRole} to ${data.role}`)
+			} else {
+				toast.success('Member Added', `${newMemberEmail} has been added to ${team?.displayName || teamName}`)
+			}
+			// Check if we modified our own permissions
+			checkAndWarn(newMemberEmail)
 			setShowAddMemberModal(false)
 			setNewMemberEmail('')
 			setNewMemberRole('viewer')
@@ -141,20 +209,27 @@ export function AdminTeamDetailPage() {
 
 		try {
 			const response = await fetch(
-				`/api/admin/teams/${teamName}/members/${encodeURIComponent(memberToRemove)}`,
+				`/api/admin/teams/${teamName}/members/${encodeURIComponent(memberToRemove.email)}`,
 				{
 					method: 'DELETE',
 					credentials: 'include',
 				}
 			)
 
+			const data = await response.json()
+
 			if (!response.ok) {
-				const data = await response.json()
 				toast.error('Failed to remove member', data.error || 'Unknown error')
 				return
 			}
 
-			toast.success('Member Removed', `${memberToRemove} has been removed from the team`)
+			if (data.retainsAccess) {
+				toast.success('Elevation Removed', `${memberToRemove.email} now has ${data.groupRole} access via ${data.groupName}`)
+			} else {
+				toast.success('Member Removed', `${memberToRemove.email} has been removed from the team`)
+			}
+			// Check if we modified our own permissions
+			checkAndWarn(memberToRemove.email)
 			setMemberToRemove(null)
 			fetchTeam()
 		} catch {
@@ -164,12 +239,18 @@ export function AdminTeamDetailPage() {
 		}
 	}
 
-	const handleChangeRole = async (memberEmail: string, newRole: string) => {
+	const handleChangeRole = async (member: TeamMember, newRole: string) => {
 		if (!teamName) return
+
+		// Only direct and elevated members can have their role changed
+		if (member.source === 'group') {
+			toast.error('Cannot change role', 'This user\'s role is determined by their group membership')
+			return
+		}
 
 		try {
 			const response = await fetch(
-				`/api/admin/teams/${teamName}/members/${encodeURIComponent(memberEmail)}`,
+				`/api/admin/teams/${teamName}/members/${encodeURIComponent(member.email)}`,
 				{
 					method: 'PATCH',
 					headers: { 'Content-Type': 'application/json' },
@@ -184,7 +265,122 @@ export function AdminTeamDetailPage() {
 				return
 			}
 
-			toast.success('Role Updated', `${memberEmail} is now ${newRole}`)
+			toast.success('Role Updated', `${member.email} is now ${newRole}`)
+			// Check if we modified our own permissions
+			checkAndWarn(member.email)
+			fetchTeam()
+		} catch {
+			toast.error('Error', 'An error occurred while changing the role')
+		}
+	}
+
+	// Group sync handlers
+	const handleAddGroupSync = async (e: React.FormEvent) => {
+		e.preventDefault()
+		if (!teamName) return
+
+		setAddingGroupSync(true)
+
+		try {
+			const response = await fetch(`/api/admin/teams/${teamName}/groups`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify({
+					name: newGroupName,
+					role: newGroupRole,
+					identityProvider: newGroupIdP || undefined,
+				}),
+			})
+
+			if (!response.ok) {
+				const data = await response.json()
+				toast.error('Failed to add group sync', data.error || 'Unknown error')
+				return
+			}
+
+			toast.success('Group Sync Added', `Members of "${newGroupName}" will now have ${newGroupRole} access`)
+			// Warn current user since they might be in this group
+			if (user?.email) {
+				checkAndWarn(user.email)
+			}
+			setShowAddGroupSyncModal(false)
+			setNewGroupName('')
+			setNewGroupRole('viewer')
+			setNewGroupIdP('')
+			fetchTeam()
+		} catch {
+			toast.error('Error', 'An error occurred while adding the group sync')
+		} finally {
+			setAddingGroupSync(false)
+		}
+	}
+
+	const handleRemoveGroupSync = async () => {
+		if (!teamName || !groupSyncToRemove) return
+
+		setRemovingGroupSync(true)
+
+		try {
+			const params = new URLSearchParams()
+			if (groupSyncToRemove.identityProvider) {
+				params.set('idp', groupSyncToRemove.identityProvider)
+			}
+			const url = `/api/admin/teams/${teamName}/groups/${encodeURIComponent(groupSyncToRemove.name)}${params.toString() ? '?' + params.toString() : ''}`
+
+			const response = await fetch(url, {
+				method: 'DELETE',
+				credentials: 'include',
+			})
+
+			if (!response.ok) {
+				const data = await response.json()
+				toast.error('Failed to remove group sync', data.error || 'Unknown error')
+				return
+			}
+
+			toast.success('Group Sync Removed', `"${groupSyncToRemove.name}" has been removed`)
+			// Warn current user since they might be in this group
+			if (user?.email) {
+				checkAndWarn(user.email)
+			}
+			setGroupSyncToRemove(null)
+			fetchTeam()
+		} catch {
+			toast.error('Error', 'An error occurred while removing the group sync')
+		} finally {
+			setRemovingGroupSync(false)
+		}
+	}
+
+	const handleChangeGroupRole = async (group: GroupSync, newRole: string) => {
+		if (!teamName) return
+
+		try {
+			const params = new URLSearchParams()
+			if (group.identityProvider) {
+				params.set('idp', group.identityProvider)
+			}
+			const url = `/api/admin/teams/${teamName}/groups/${encodeURIComponent(group.name)}${params.toString() ? '?' + params.toString() : ''}`
+
+			const response = await fetch(url, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify({ role: newRole }),
+			})
+
+			if (!response.ok) {
+				const data = await response.json()
+				toast.error('Failed to change role', data.error || 'Unknown error')
+				return
+			}
+
+			toast.success('Role Updated', `Group "${group.name}" role changed to ${newRole}`)
+			// Warn current user since they might be in this group
+			if (user?.email) {
+				checkAndWarn(user.email)
+			}
 			fetchTeam()
 		} catch {
 			toast.error('Error', 'An error occurred while changing the role')
@@ -413,12 +609,156 @@ export function AdminTeamDetailPage() {
 								{members.map((member) => (
 									<tr key={member.email} className="hover:bg-neutral-800/30">
 										<td className="px-5 py-4">
-											<span className="text-neutral-200">{member.email}</span>
+											<div className="flex items-center gap-2">
+												<span className="text-neutral-200">{member.email}</span>
+												{member.source === 'elevated' && (
+													<span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/20 text-amber-400 rounded">
+														ELEVATED
+													</span>
+												)}
+											</div>
+										</td>
+										<td className="px-5 py-4">
+											{member.source === 'group' ? (
+												<div className="flex items-center gap-2">
+													<span className={`px-2 py-1 text-xs rounded ${member.role === 'admin' ? 'bg-violet-500/20 text-violet-400' :
+														member.role === 'operator' ? 'bg-green-500/20 text-green-400' :
+															'bg-neutral-700 text-neutral-300'
+														}`}>
+														{member.role}
+													</span>
+													<span className="text-xs text-blue-400 flex items-center gap-1" title={`Role from ${member.groupName}`}>
+														<svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+															<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+														</svg>
+														via group
+													</span>
+												</div>
+											) : member.source === 'elevated' ? (
+												<div className="flex items-center gap-2">
+													<select
+														value={member.role}
+														onChange={(e) => handleChangeRole(member, e.target.value)}
+														className="text-sm px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+													>
+														<option value="viewer">Viewer</option>
+														<option value="operator">Operator</option>
+														<option value="admin">Admin</option>
+													</select>
+													<span className="text-xs text-amber-400" title={`Elevated from ${member.groupRole} via ${member.groupName}`}>
+														↑ from {member.groupRole}
+													</span>
+												</div>
+											) : (
+												<select
+													value={member.role}
+													onChange={(e) => handleChangeRole(member, e.target.value)}
+													className="text-sm px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+												>
+													<option value="viewer">Viewer</option>
+													<option value="operator">Operator</option>
+													<option value="admin">Admin</option>
+												</select>
+											)}
+										</td>
+										<td className="px-5 py-4 text-right">
+											{member.source === 'group' ? (
+												<span className="text-xs text-neutral-500" title="Manage via group membership">
+													via group
+												</span>
+											) : member.source === 'elevated' ? (
+												<button
+													onClick={() => setMemberToRemove(member)}
+													className="text-sm text-amber-400 hover:text-amber-300"
+													title={member.removeNote}
+												>
+													Remove Elevation
+												</button>
+											) : (
+												<button
+													onClick={() => setMemberToRemove(member)}
+													className="text-sm text-red-400 hover:text-red-300"
+												>
+													Remove
+												</button>
+											)}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					)}
+				</Card>
+
+				{/* Group Sync Section */}
+				<Card className="overflow-hidden">
+					<div className="px-5 py-4 border-b border-neutral-800 flex items-center justify-between">
+						<div>
+							<h2 className="text-lg font-medium text-neutral-100">Group Sync</h2>
+							<p className="text-xs text-neutral-500 mt-0.5">
+								Automatically grant access to users based on their IdP groups
+							</p>
+						</div>
+						<Button size="sm" onClick={() => setShowAddGroupSyncModal(true)}>
+							<svg
+								className="w-4 h-4 mr-1"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={2}
+									d="M12 4v16m8-8H4"
+								/>
+							</svg>
+							Add Group
+						</Button>
+					</div>
+
+					{groupSyncs.length === 0 ? (
+						<div className="px-5 py-8 text-center">
+							<div className="text-neutral-500 mb-2">No group syncs configured</div>
+							<p className="text-xs text-neutral-600">
+								Map IdP groups to automatically grant team access to their members
+							</p>
+						</div>
+					) : (
+						<table className="w-full">
+							<thead className="bg-neutral-800/50">
+								<tr>
+									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase">
+										Group
+									</th>
+									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase">
+										Identity Provider
+									</th>
+									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase">
+										Role
+									</th>
+									<th className="px-5 py-3 text-right text-xs font-medium text-neutral-400 uppercase">
+										Actions
+									</th>
+								</tr>
+							</thead>
+							<tbody className="divide-y divide-neutral-800">
+								{groupSyncs.map((group, index) => (
+									<tr key={`${group.name}-${group.identityProvider || index}`} className="hover:bg-neutral-800/30">
+										<td className="px-5 py-4">
+											<span className="text-neutral-200 font-mono text-sm">{group.name}</span>
+										</td>
+										<td className="px-5 py-4">
+											{group.identityProvider ? (
+												<span className="text-neutral-300">{group.identityProvider}</span>
+											) : (
+												<span className="text-neutral-500 italic">Any</span>
+											)}
 										</td>
 										<td className="px-5 py-4">
 											<select
-												value={member.role}
-												onChange={(e) => handleChangeRole(member.email, e.target.value)}
+												value={group.role}
+												onChange={(e) => handleChangeGroupRole(group, e.target.value)}
 												className="text-sm px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
 											>
 												<option value="viewer">Viewer</option>
@@ -428,7 +768,7 @@ export function AdminTeamDetailPage() {
 										</td>
 										<td className="px-5 py-4 text-right">
 											<button
-												onClick={() => setMemberToRemove(member.email)}
+												onClick={() => setGroupSyncToRemove(group)}
 												className="text-sm text-red-400 hover:text-red-300"
 											>
 												Remove
@@ -519,6 +859,14 @@ export function AdminTeamDetailPage() {
 				</ModalHeader>
 				<form onSubmit={handleAddMember}>
 					<ModalBody className="space-y-4">
+						{groupSyncs.length > 0 && (
+							<div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+								<p className="text-sm text-blue-200">
+									If this user already has access via a group, you can only add them with a higher role to elevate their permissions.
+								</p>
+							</div>
+						)}
+
 						<Input
 							id="memberEmail"
 							label="User Email"
@@ -564,21 +912,137 @@ export function AdminTeamDetailPage() {
 			{/* Remove Member Confirmation */}
 			<Modal isOpen={!!memberToRemove} onClose={() => setMemberToRemove(null)}>
 				<ModalHeader>
-					<h2 className="text-lg font-semibold text-neutral-100">Remove Member</h2>
+					<h2 className="text-lg font-semibold text-neutral-100">
+						{memberToRemove?.source === 'elevated' ? 'Remove Elevation' : 'Remove Member'}
+					</h2>
 				</ModalHeader>
 				<ModalBody>
-					<p className="text-neutral-400">
-						Are you sure you want to remove{' '}
-						<strong className="text-neutral-200">{memberToRemove}</strong> from{' '}
-						<strong className="text-neutral-200">{team.displayName || team.name}</strong>?
-					</p>
+					{memberToRemove?.source === 'elevated' ? (
+						<>
+							<p className="text-neutral-400">
+								Remove elevated access for{' '}
+								<strong className="text-neutral-200">{memberToRemove?.email}</strong>?
+							</p>
+							<p className="text-sm text-amber-400/80 mt-2">
+								They will revert to {memberToRemove?.groupRole} access via {memberToRemove?.groupName}.
+							</p>
+						</>
+					) : (
+						<p className="text-neutral-400">
+							Are you sure you want to remove{' '}
+							<strong className="text-neutral-200">{memberToRemove?.email}</strong> from{' '}
+							<strong className="text-neutral-200">{team.displayName || team.name}</strong>?
+						</p>
+					)}
 				</ModalBody>
 				<ModalFooter>
 					<Button variant="secondary" onClick={() => setMemberToRemove(null)}>
 						Cancel
 					</Button>
 					<Button variant="danger" onClick={handleRemoveMember} disabled={removing}>
-						{removing ? 'Removing...' : 'Remove Member'}
+						{removing ? 'Removing...' : memberToRemove?.source === 'elevated' ? 'Remove Elevation' : 'Remove Member'}
+					</Button>
+				</ModalFooter>
+			</Modal>
+
+			{/* Add Group Sync Modal */}
+			<Modal isOpen={showAddGroupSyncModal} onClose={() => setShowAddGroupSyncModal(false)}>
+				<ModalHeader>
+					<h2 className="text-lg font-semibold text-neutral-100">Add Group Sync</h2>
+				</ModalHeader>
+				<form onSubmit={handleAddGroupSync}>
+					<ModalBody className="space-y-4">
+						<Input
+							id="groupName"
+							label="Group Name"
+							value={newGroupName}
+							onChange={(e) => setNewGroupName(e.target.value)}
+							placeholder="engineering-platform"
+							required
+						/>
+						<p className="text-xs text-neutral-500 -mt-2">
+							The group name as it appears in your identity provider (e.g., AD group name, Google group, Okta group)
+						</p>
+
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">
+								Identity Provider (Optional)
+							</label>
+							<select
+								value={newGroupIdP}
+								onChange={(e) => setNewGroupIdP(e.target.value)}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+							>
+								<option value="">Any identity provider</option>
+								{identityProviders.map((idp) => (
+									<option key={idp.name} value={idp.name}>
+										{idp.displayName || idp.name}
+									</option>
+								))}
+							</select>
+							<p className="text-xs text-neutral-500 mt-1">
+								Restrict this mapping to a specific IdP, or leave as "Any" to match groups from any provider
+							</p>
+						</div>
+
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">
+								Role
+							</label>
+							<select
+								value={newGroupRole}
+								onChange={(e) =>
+									setNewGroupRole(e.target.value as 'admin' | 'operator' | 'viewer')
+								}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+							>
+								<option value="viewer">Viewer - Can view resources</option>
+								<option value="operator">Operator - Can manage clusters</option>
+								<option value="admin">Admin - Full team access</option>
+							</select>
+						</div>
+					</ModalBody>
+					<ModalFooter>
+						<Button
+							type="button"
+							variant="secondary"
+							onClick={() => setShowAddGroupSyncModal(false)}
+						>
+							Cancel
+						</Button>
+						<Button type="submit" disabled={addingGroupSync}>
+							{addingGroupSync ? 'Adding...' : 'Add Group Sync'}
+						</Button>
+					</ModalFooter>
+				</form>
+			</Modal>
+
+			{/* Remove Group Sync Confirmation */}
+			<Modal isOpen={!!groupSyncToRemove} onClose={() => setGroupSyncToRemove(null)}>
+				<ModalHeader>
+					<h2 className="text-lg font-semibold text-neutral-100">Remove Group Sync</h2>
+				</ModalHeader>
+				<ModalBody>
+					<p className="text-neutral-400">
+						Are you sure you want to remove the group sync for{' '}
+						<strong className="text-neutral-200 font-mono">{groupSyncToRemove?.name}</strong>
+						{groupSyncToRemove?.identityProvider && (
+							<>
+								{' '}from <strong className="text-neutral-200">{groupSyncToRemove.identityProvider}</strong>
+							</>
+						)}
+						?
+					</p>
+					<p className="text-sm text-neutral-500 mt-2">
+						Users from this group will lose access unless they have direct membership or match another group sync.
+					</p>
+				</ModalBody>
+				<ModalFooter>
+					<Button variant="secondary" onClick={() => setGroupSyncToRemove(null)}>
+						Cancel
+					</Button>
+					<Button variant="danger" onClick={handleRemoveGroupSync} disabled={removingGroupSync}>
+						{removingGroupSync ? 'Removing...' : 'Remove Group Sync'}
 					</Button>
 				</ModalFooter>
 			</Modal>

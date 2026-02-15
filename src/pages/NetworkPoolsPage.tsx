@@ -173,16 +173,9 @@ function PoolCard({ pool, onDelete }: PoolCardProps) {
 	const allocationCount = status?.allocationCount || 0
 	const pct = totalIPs > 0 ? Math.round((allocatedIPs / totalIPs) * 100) : 0
 
-	const age = (() => {
-		if (!creationTimestamp) return 'Unknown'
-		const created = new Date(creationTimestamp)
-		const diffMs = Date.now() - created.getTime()
-		const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-		if (diffDays > 0) return `${diffDays}d ago`
-		const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-		if (diffHours > 0) return `${diffHours}h ago`
-		return 'Just now'
-	})()
+	const age = creationTimestamp
+		? new Date(creationTimestamp).toLocaleDateString()
+		: 'Unknown'
 
 	return (
 		<Link to={`/admin/networks/${namespace}/${name}`}>

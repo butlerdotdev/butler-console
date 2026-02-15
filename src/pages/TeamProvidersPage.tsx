@@ -21,15 +21,6 @@ const PROVIDER_LABELS: Record<string, string> = {
 	proxmox: 'Proxmox',
 }
 
-const PROVIDER_SHORT: Record<string, string> = {
-	aws: 'AWS',
-	azure: 'Azure',
-	gcp: 'GCP',
-	harvester: 'Harvester',
-	nutanix: 'Nutanix',
-	proxmox: 'Proxmox',
-}
-
 export function TeamProvidersPage() {
 	const { currentTeam, currentTeamDisplayName, isTeamAdmin } = useTeamContext()
 	useDocumentTitle(currentTeamDisplayName ? `${currentTeamDisplayName} Providers` : 'Providers')

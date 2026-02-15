@@ -110,12 +110,14 @@ export function Sidebar() {
 			{ to: '/admin/teams', label: 'Teams', icon: TeamsIcon },
 			{ to: '/admin/users', label: 'Users', icon: UsersIcon },
 			{ to: '/admin/providers', label: 'Providers', icon: ProvidersIcon },
+		{ to: '/admin/networks', label: 'Network Pools', icon: NetworkPoolsIcon },
 			{ to: '/admin/identity-providers', label: 'Identity Providers', icon: IdentityProvidersIcon },
 		]
 	} else if (mode === 'team' && currentTeam) {
 		navItems = [
 			{ to: buildPath(''), label: 'Dashboard', icon: DashboardIcon, end: true },
 			{ to: buildPath('/clusters'), label: 'Clusters', icon: ClustersIcon },
+			{ to: buildPath('/providers'), label: 'Providers', icon: ProvidersIcon },
 			{ to: buildPath('/members'), label: 'Members', icon: UsersIcon },
 		]
 		showTeamLabel = true
@@ -130,6 +132,7 @@ export function Sidebar() {
 			{ to: '/admin/teams', label: 'Teams', icon: TeamsIcon },
 			{ to: '/admin/users', label: 'Users', icon: UsersIcon },
 			{ to: '/admin/providers', label: 'Providers', icon: ProvidersIcon },
+		{ to: '/admin/networks', label: 'Network Pools', icon: NetworkPoolsIcon },
 			{ to: '/admin/identity-providers', label: 'Identity Providers', icon: IdentityProvidersIcon },
 		]
 	} else {
@@ -332,6 +335,19 @@ function ArrowLeftIcon({ className }: { className?: string }) {
 				strokeLinejoin="round"
 				strokeWidth={2}
 				d="M10 19l-7-7m0 0l7-7m-7 7h18"
+			/>
+		</svg>
+	)
+}
+
+function NetworkPoolsIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<path
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth={2}
+				d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
 			/>
 		</svg>
 	)

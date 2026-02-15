@@ -22,6 +22,9 @@ export default {
 					950: '#052e16',
 				},
 			},
+			gridTemplateColumns: {
+				'16': 'repeat(16, minmax(0, 1fr))',
+			},
 			fontFamily: {
 				sans: ['Inter', 'system-ui', 'sans-serif'],
 				mono: ['JetBrains Mono', 'monospace'],

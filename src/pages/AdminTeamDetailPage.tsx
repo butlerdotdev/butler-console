@@ -19,6 +19,7 @@ import {
 	ModalHeader,
 	ModalBody,
 	ModalFooter,
+	ResourceUsageBar,
 } from '@/components/ui'
 
 interface TeamMember {
@@ -44,6 +45,27 @@ interface IdentityProviderSummary {
 	displayName?: string
 }
 
+interface TeamResourceLimits {
+	maxClusters?: number
+	maxTotalNodes?: number
+	maxNodesPerCluster?: number
+	maxCPUCores?: string
+	maxMemory?: string
+	maxStorage?: string
+}
+
+interface TeamResourceUsage {
+	clusters: number
+	totalNodes: number
+	totalCPU?: string
+	totalMemory?: string
+	totalStorage?: string
+	clusterUtilization?: number
+	nodeUtilization?: number
+	cpuUtilization?: number
+	memoryUtilization?: number
+}
+
 interface TeamDetails {
 	name: string
 	displayName: string
@@ -52,6 +74,8 @@ interface TeamDetails {
 	namespace?: string
 	clusterCount: number
 	memberCount: number
+	resourceLimits?: TeamResourceLimits
+	resourceUsage?: TeamResourceUsage
 }
 
 export function AdminTeamDetailPage() {
@@ -563,6 +587,58 @@ export function AdminTeamDetailPage() {
 						</div>
 					</Card>
 				</div>
+
+				{/* Resource Usage Section */}
+				<Card className="p-5">
+					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">
+						Resource Usage
+					</h3>
+					{team.resourceUsage ? (
+						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+							<ResourceUsageBar
+								label="Clusters"
+								used={team.resourceUsage.clusters}
+								limit={team.resourceLimits?.maxClusters}
+							/>
+							<ResourceUsageBar
+								label="Total Nodes"
+								used={team.resourceUsage.totalNodes}
+								limit={team.resourceLimits?.maxTotalNodes}
+							/>
+							<ResourceUsageBar
+								label="CPU Cores"
+								used={team.resourceUsage.totalCPU || '0'}
+								limit={team.resourceLimits?.maxCPUCores}
+								unit="cores"
+							/>
+							<ResourceUsageBar
+								label="Memory"
+								used={team.resourceUsage.totalMemory || '0'}
+								limit={team.resourceLimits?.maxMemory}
+							/>
+							<ResourceUsageBar
+								label="Storage"
+								used={team.resourceUsage.totalStorage || '0'}
+								limit={team.resourceLimits?.maxStorage}
+							/>
+							{team.resourceLimits?.maxNodesPerCluster != null && (
+								<div className="space-y-1.5">
+									<div className="flex justify-between items-baseline">
+										<span className="text-sm text-neutral-300">Max Nodes per Cluster</span>
+										<span className="text-sm font-mono text-neutral-400">
+											{team.resourceLimits.maxNodesPerCluster}
+										</span>
+									</div>
+									<div className="h-2" />
+								</div>
+							)}
+						</div>
+					) : (
+						<div className="text-sm text-neutral-500">
+							Resource usage data is not yet available. The controller has not populated usage metrics for this team.
+						</div>
+					)}
+				</Card>
 
 				{/* Members Section */}
 				<Card className="overflow-hidden">

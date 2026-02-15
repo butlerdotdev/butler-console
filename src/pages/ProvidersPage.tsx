@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { providersApi, type Provider, type ValidateResponse } from '@/api/providers'
+import { providersApi, type Provider, type ValidateResponse, type NetworkInfo } from '@/api/providers'
 import { Card, Spinner, Button, FadeIn } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { useToast } from '@/hooks/useToast'
@@ -274,6 +274,26 @@ function ProviderCard({ provider, onValidate, onDelete, onClick, isValidating, v
 							<span className="px-2 py-0.5 text-xs font-medium bg-purple-500/10 text-purple-400 rounded capitalize">
 								{type}
 							</span>
+							{provider.spec.scope?.type && (
+								<span className={`px-2 py-0.5 text-xs font-medium rounded ${
+									provider.spec.scope.type === 'platform'
+										? 'bg-blue-500/10 text-blue-400'
+										: 'bg-amber-500/10 text-amber-400'
+								}`}>
+									{provider.spec.scope.type === 'platform'
+										? 'Platform'
+										: `Team: ${provider.spec.scope.teamRef?.name || 'unknown'}`}
+								</span>
+							)}
+							{provider.spec.network?.mode && (
+								<span className={`px-2 py-0.5 text-xs font-medium rounded ${
+									provider.spec.network.mode === 'ipam'
+										? 'bg-green-500/10 text-green-400'
+										: 'bg-blue-500/10 text-blue-400'
+								}`}>
+									{provider.spec.network.mode === 'ipam' ? 'IPAM' : 'Cloud'}
+								</span>
+							)}
 						</div>
 						<p className="text-sm text-neutral-400">{namespace}</p>
 					</div>
@@ -294,6 +314,18 @@ function ProviderCard({ provider, onValidate, onDelete, onClick, isValidating, v
 							<p className={`text-sm ${validationResult.valid ? 'text-green-400' : 'text-red-400'}`}>
 								{validationResult.valid ? 'Valid' : 'Invalid'}
 							</p>
+						</div>
+					)}
+					{provider.status?.capacity?.availableIPs !== undefined && (
+						<div className="text-right hidden lg:block">
+							<p className="text-xs text-neutral-500 uppercase tracking-wide">Available IPs</p>
+							<p className="text-sm text-neutral-200">{provider.status.capacity.availableIPs}</p>
+						</div>
+					)}
+					{provider.status?.capacity?.estimatedTenants !== undefined && (
+						<div className="text-right hidden lg:block">
+							<p className="text-xs text-neutral-500 uppercase tracking-wide">Est. Tenants</p>
+							<p className="text-sm text-neutral-200">{provider.status.capacity.estimatedTenants}</p>
 						</div>
 					)}
 					<div className="flex items-center gap-2">
@@ -328,6 +360,33 @@ function ProviderDetail({
 	isValidating: boolean
 }) {
 	const type = provider.spec.provider
+	const [networks, setNetworks] = useState<NetworkInfo[]>([])
+	const [networksLoading, setNetworksLoading] = useState(false)
+	const [networksError, setNetworksError] = useState<string | null>(null)
+
+	useEffect(() => {
+		const loadNetworks = async () => {
+			setNetworksLoading(true)
+			setNetworksError(null)
+			try {
+				const response = await providersApi.listNetworks(
+					provider.metadata.namespace,
+					provider.metadata.name
+				)
+				setNetworks(response.networks || [])
+			} catch (err) {
+				setNetworksError(err instanceof Error ? err.message : 'Failed to load networks')
+			} finally {
+				setNetworksLoading(false)
+			}
+		}
+		loadNetworks()
+	}, [provider.metadata.namespace, provider.metadata.name])
+
+	const hasNetwork = !!provider.spec.network
+	const hasScope = !!provider.spec.scope?.type
+	const hasLimits = !!(provider.spec.limits?.maxClustersPerTeam !== undefined || provider.spec.limits?.maxNodesPerTeam !== undefined)
+	const hasCapacity = !!(provider.status?.capacity?.availableIPs !== undefined || provider.status?.capacity?.estimatedTenants !== undefined)
 
 	return (
 		<div className="space-y-6">
@@ -389,6 +448,125 @@ function ProviderDetail({
 					<p className="text-sm text-neutral-500">Connection via kubeconfig</p>
 				</div>
 			)}
+
+			{/* Network Configuration */}
+			{hasNetwork && (
+				<div>
+					<h4 className="text-sm font-medium text-neutral-400 mb-3">Network Configuration</h4>
+					<div className="grid grid-cols-2 gap-4">
+						<InfoRow label="Mode" value={provider.spec.network!.mode === 'ipam' ? 'IPAM' : 'Cloud'} />
+						{provider.spec.network!.mode === 'ipam' && (
+							<>
+								{provider.spec.network!.subnet && (
+									<InfoRow label="Subnet" value={provider.spec.network!.subnet} />
+								)}
+								{provider.spec.network!.gateway && (
+									<InfoRow label="Gateway" value={provider.spec.network!.gateway} />
+								)}
+								{provider.spec.network!.dnsServers && provider.spec.network!.dnsServers.length > 0 && (
+									<InfoRow label="DNS Servers" value={provider.spec.network!.dnsServers.join(', ')} />
+								)}
+								{provider.spec.network!.loadBalancer?.defaultPoolSize !== undefined && (
+									<InfoRow label="LB Default Pool Size" value={String(provider.spec.network!.loadBalancer.defaultPoolSize)} />
+								)}
+								{provider.spec.network!.quotaPerTenant?.maxNodeIPs !== undefined && (
+									<InfoRow label="Quota: Max Node IPs" value={String(provider.spec.network!.quotaPerTenant.maxNodeIPs)} />
+								)}
+								{provider.spec.network!.quotaPerTenant?.maxLoadBalancerIPs !== undefined && (
+									<InfoRow label="Quota: Max LB IPs" value={String(provider.spec.network!.quotaPerTenant.maxLoadBalancerIPs)} />
+								)}
+							</>
+						)}
+					</div>
+					{provider.spec.network!.mode === 'ipam' && provider.spec.network!.poolRefs && provider.spec.network!.poolRefs.length > 0 && (
+						<div className="mt-4">
+							<p className="text-xs text-neutral-500 mb-2">Pool References</p>
+							<div className="space-y-1">
+								{provider.spec.network!.poolRefs.map((pool) => (
+									<div key={pool.name} className="flex items-center gap-2 text-sm text-neutral-200 font-mono">
+										<span>{pool.name}</span>
+										{pool.priority !== undefined && (
+											<span className="text-xs text-neutral-500">(priority: {pool.priority})</span>
+										)}
+									</div>
+								))}
+							</div>
+						</div>
+					)}
+				</div>
+			)}
+
+			{/* Scope & Limits */}
+			{(hasScope || hasLimits) && (
+				<div>
+					<h4 className="text-sm font-medium text-neutral-400 mb-3">Scope & Limits</h4>
+					<div className="grid grid-cols-2 gap-4">
+						{hasScope && (
+							<InfoRow label="Scope Type" value={provider.spec.scope!.type === 'platform' ? 'Platform' : 'Team'} />
+						)}
+						{provider.spec.scope?.type === 'team' && provider.spec.scope.teamRef?.name && (
+							<InfoRow label="Team Ref" value={provider.spec.scope.teamRef.name} />
+						)}
+						{provider.spec.limits?.maxClustersPerTeam !== undefined && (
+							<InfoRow label="Max Clusters per Team" value={String(provider.spec.limits.maxClustersPerTeam)} />
+						)}
+						{provider.spec.limits?.maxNodesPerTeam !== undefined && (
+							<InfoRow label="Max Nodes per Team" value={String(provider.spec.limits.maxNodesPerTeam)} />
+						)}
+					</div>
+				</div>
+			)}
+
+			{/* Capacity */}
+			{hasCapacity && (
+				<div>
+					<h4 className="text-sm font-medium text-neutral-400 mb-3">Capacity</h4>
+					<div className="grid grid-cols-2 gap-4">
+						{provider.status?.capacity?.availableIPs !== undefined && (
+							<InfoRow label="Available IPs" value={String(provider.status.capacity.availableIPs)} />
+						)}
+						{provider.status?.capacity?.estimatedTenants !== undefined && (
+							<InfoRow label="Estimated Tenants" value={String(provider.status.capacity.estimatedTenants)} />
+						)}
+					</div>
+				</div>
+			)}
+
+			{/* Provider Networks (legacy) */}
+			<div>
+				<h4 className="text-sm font-medium text-neutral-400 mb-3">Provider Networks</h4>
+				{networksLoading ? (
+					<div className="flex items-center gap-2 text-sm text-neutral-500">
+						<Spinner size="sm" />
+						<span>Loading networks...</span>
+					</div>
+				) : networksError ? (
+					<p className="text-sm text-neutral-500">{networksError}</p>
+				) : networks.length === 0 ? (
+					<p className="text-sm text-neutral-500">No networks found</p>
+				) : (
+					<div className="space-y-2">
+						{networks.map((network) => (
+							<div
+								key={network.id || network.name}
+								className="flex items-center justify-between p-3 bg-neutral-800/50 border border-neutral-700 rounded-lg"
+							>
+								<div>
+									<p className="text-sm text-neutral-200 font-mono">{network.name}</p>
+									{network.description && (
+										<p className="text-xs text-neutral-500">{network.description}</p>
+									)}
+								</div>
+								{network.vlan !== undefined && (
+									<span className="px-2 py-0.5 text-xs font-medium bg-neutral-700 text-neutral-300 rounded">
+										VLAN {network.vlan}
+									</span>
+								)}
+							</div>
+						))}
+					</div>
+				)}
+			</div>
 		</div>
 	)
 }

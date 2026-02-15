@@ -10,9 +10,11 @@ export { gitopsApi } from './gitops';
 export * from './gitops';
 
 export { identityProvidersApi, PROVIDER_PRESETS } from './identity-providers'
+export { networksApi } from './networks'
 export * from './certificates';
 
-export type { Provider, ProviderListResponse, CreateProviderRequest, ImageInfo, NetworkInfo } from './providers'
+export type { Provider, ProviderListResponse, CreateProviderRequest, ValidateResponse, ImageInfo, NetworkInfo, CloudProviderType, OnPremProviderType } from './providers'
+export { isCloudProvider, getProviderRegion, getProviderNetwork } from './providers'
 export type {
 	Cluster,
 	ClusterListResponse,
@@ -34,6 +36,14 @@ export type {
 } from './identity-providers'
 
 export type { AddonDefinition, InstalledAddon, CatalogResponse } from './addons'
+
+export type {
+	NetworkPool,
+	NetworkPoolListResponse,
+	IPAllocation,
+	IPAllocationListResponse,
+	CreateNetworkPoolRequest,
+} from '@/types/networks'
 
 // Backwards compatible aliases
 export type { ManagementCluster as ManagementClusterInfo } from './clusters'

@@ -36,6 +36,9 @@ import { ProfileSettingsPage } from '@/pages/ProfileSettingsPage'
 import { PreferencesPage } from '@/pages/PreferencesPage'
 import { IdentityProvidersPage } from '@/pages/IdentityProvidersPage'
 import { CreateIdentityProviderPage } from '@/pages/CreateIdentityProviderPage'
+import { NetworkPoolsPage } from '@/pages/NetworkPoolsPage'
+import { NetworkPoolDetailPage } from '@/pages/NetworkPoolDetailPage'
+import { TeamProvidersPage } from '@/pages/TeamProvidersPage'
 
 
 interface TeamRef {
@@ -119,6 +122,7 @@ export default function App() {
 					<Route path="t/:team/clusters" element={<RequireTeamAccess><ClustersPage /></RequireTeamAccess>} />
 					<Route path="t/:team/clusters/new" element={<RequireTeamAccess><CreateClusterPage /></RequireTeamAccess>} />
 					<Route path="t/:team/clusters/:namespace/:name" element={<RequireTeamAccess><ClusterDetailPage /></RequireTeamAccess>} />
+					<Route path="t/:team/providers" element={<RequireTeamAccess><TeamProvidersPage /></RequireTeamAccess>} />
 					<Route path="t/:team/members" element={<RequireTeamAccess><TeamMembersPage /></RequireTeamAccess>} />
 					<Route path="t/:team/settings" element={<RequireTeamAccess><TeamSettingsPage /></RequireTeamAccess>} />
 
@@ -132,6 +136,8 @@ export default function App() {
 					<Route path="admin/users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
 					<Route path="admin/providers" element={<RequireAdmin><ProvidersPage /></RequireAdmin>} />
 					<Route path="admin/providers/create" element={<RequireAdmin><CreateProviderPage /></RequireAdmin>} />
+					<Route path="admin/networks" element={<RequireAdmin><NetworkPoolsPage /></RequireAdmin>} />
+					<Route path="admin/networks/:namespace/:name" element={<RequireAdmin><NetworkPoolDetailPage /></RequireAdmin>} />
 					<Route path="admin/identity-providers" element={<RequireAdmin><IdentityProvidersPage /></RequireAdmin>} />
 					<Route path="admin/identity-providers/create" element={<RequireAdmin><CreateIdentityProviderPage /></RequireAdmin>} />
 					<Route path="admin/settings" element={<RequireAdmin><SettingsPage /></RequireAdmin>} />

@@ -14,6 +14,7 @@ import { AddonsTab } from '@/components/clusters'
 import { AccessDenied } from '@/components/AccessDenied'
 import { CertificatesTab } from '@/components/clusters/certificates';
 import { GitOpsTab } from '@/components/clusters/gitops';
+import { NetworkAllocationsCard } from '@/components/clusters/NetworkAllocationsCard';
 
 
 // Error type for API responses
@@ -270,7 +271,7 @@ export function ClusterDetailPage() {
 				</div>
 
 				{/* Tab Content */}
-				{activeTab === 'overview' && <OverviewTab cluster={cluster} />}
+				{activeTab === 'overview' && <OverviewTab cluster={cluster} namespace={namespace!} name={name!} />}
 				{activeTab === 'nodes' && <NodesTab nodes={nodes} />}
 				{activeTab === 'addons' && (
 					<AddonsTab
@@ -307,53 +308,87 @@ export function ClusterDetailPage() {
 	)
 }
 
-function OverviewTab({ cluster }: { cluster: Cluster }) {
+function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace: string; name: string }) {
 	const spec = cluster.spec
 	const status = cluster.status
 	const provider = spec.providerConfigRef?.name || 'Default'
 	const isControlPlaneReady = status?.phase === 'Ready'
 
 	return (
-		<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			<Card className="p-5">
-				<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Specification</h3>
-				<dl className="space-y-3">
-					<div className="flex justify-between">
-						<dt className="text-neutral-400">Kubernetes Version</dt>
-						<dd className="text-neutral-50">{spec.kubernetesVersion || 'Unknown'}</dd>
-					</div>
-					<div className="flex justify-between">
-						<dt className="text-neutral-400">Provider</dt>
-						<dd className="text-neutral-50">
-							<Link to="/providers" className="text-purple-400 hover:text-purple-300">
-								{provider}
-							</Link>
-						</dd>
-					</div>
-					<div className="flex justify-between">
-						<dt className="text-neutral-400">Worker Replicas</dt>
-						<dd className="text-neutral-50">{spec.workers?.replicas || 0}</dd>
-					</div>
-				</dl>
-			</Card>
+		<div className="space-y-6">
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				<Card className="p-5">
+					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Specification</h3>
+					<dl className="space-y-3">
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">Kubernetes Version</dt>
+							<dd className="text-neutral-50">{spec.kubernetesVersion || 'Unknown'}</dd>
+						</div>
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">Provider</dt>
+							<dd className="text-neutral-50">
+								<Link to="/providers" className="text-purple-400 hover:text-purple-300">
+									{provider}
+								</Link>
+							</dd>
+						</div>
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">Worker Replicas</dt>
+							<dd className="text-neutral-50">{spec.workers?.replicas || 0}</dd>
+						</div>
+					</dl>
+				</Card>
 
-			<Card className="p-5">
-				<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Status</h3>
-				<dl className="space-y-3">
-					<div className="flex justify-between">
-						<dt className="text-neutral-400">Phase</dt>
-						<dd><StatusBadge status={status?.phase || 'Unknown'} /></dd>
-					</div>
-					<div className="flex justify-between">
-						<dt className="text-neutral-400">Tenant Namespace</dt>
-						<dd className="text-neutral-50">{status?.tenantNamespace || 'N/A'}</dd>
-					</div>
-					<div className="flex justify-between">
-						<dt className="text-neutral-400">Control Plane Ready</dt>
-						<dd className="text-neutral-50">{isControlPlaneReady ? 'Yes' : 'No'}</dd>
-					</div>
-				</dl>
-			</Card>
+				<Card className="p-5">
+					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Status</h3>
+					<dl className="space-y-3">
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">Phase</dt>
+							<dd><StatusBadge status={status?.phase || 'Unknown'} /></dd>
+						</div>
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">Tenant Namespace</dt>
+							<dd className="text-neutral-50">{status?.tenantNamespace || 'N/A'}</dd>
+						</div>
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">Control Plane Ready</dt>
+							<dd className="text-neutral-50">{isControlPlaneReady ? 'Yes' : 'No'}</dd>
+						</div>
+						{status?.conditions && (() => {
+							const networkReady = (status.conditions as Array<{type: string; status: string; reason?: string; message?: string}>)
+								.find((c) => c.type === 'NetworkReady')
+							if (!networkReady) return null
+							return (
+								<div className="flex justify-between">
+									<dt className="text-neutral-400">Network Ready</dt>
+									<dd>
+										<StatusBadge status={networkReady.status === 'True' ? 'Ready' : networkReady.status === 'False' ? 'Failed' : 'Pending'} />
+									</dd>
+								</div>
+							)
+						})()}
+					</dl>
+				</Card>
+			</div>
+
+			{/* Networking */}
+			{spec.networking?.loadBalancerPool && (
+				<Card className="p-5">
+					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Networking</h3>
+					<dl className="space-y-3">
+						{spec.networking.loadBalancerPool.start && spec.networking.loadBalancerPool.end && (
+							<div className="flex justify-between">
+								<dt className="text-neutral-400">Load Balancer IP Range</dt>
+								<dd className="text-neutral-50 font-mono">
+									{spec.networking.loadBalancerPool.start} - {spec.networking.loadBalancerPool.end}
+								</dd>
+							</div>
+						)}
+					</dl>
+				</Card>
+			)}
+
+			<NetworkAllocationsCard clusterName={name} clusterNamespace={namespace} />
 		</div>
 	)
 }

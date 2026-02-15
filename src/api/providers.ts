@@ -27,16 +27,58 @@ export interface Provider {
 			insecure?: boolean
 			nodes?: string[]
 		}
+		// Cloud providers
+		aws?: {
+			region?: string
+			vpcID?: string
+			subnetIDs?: string[]
+			securityGroupIDs?: string[]
+		}
+		azure?: {
+			subscriptionID?: string
+			resourceGroup?: string
+			location?: string
+			vnetName?: string
+			subnetName?: string
+		}
+		gcp?: {
+			projectID?: string
+			region?: string
+			network?: string
+			subnetwork?: string
+		}
+		network?: {
+			mode?: 'ipam' | 'cloud'
+			poolRefs?: Array<{ name: string; priority?: number }>
+			subnet?: string
+			gateway?: string
+			dnsServers?: string[]
+			loadBalancer?: { defaultPoolSize?: number }
+			quotaPerTenant?: { maxNodeIPs?: number; maxLoadBalancerIPs?: number }
+		}
+		scope?: {
+			type?: 'platform' | 'team'
+			teamRef?: { name: string }
+		}
+		limits?: {
+			maxClustersPerTeam?: number
+			maxNodesPerTeam?: number
+		}
 	}
 	status?: {
 		validated?: boolean
 		lastValidationTime?: string
+		ready?: boolean
 		conditions?: Array<{
 			type: string
 			status: string
 			reason: string
 			message: string
 		}>
+		capacity?: {
+			availableIPs?: number
+			estimatedTenants?: number
+		}
 	}
 }
 
@@ -52,7 +94,7 @@ export interface ValidateResponse {
 export interface CreateProviderRequest {
 	name: string
 	namespace?: string
-	provider: 'harvester' | 'nutanix' | 'proxmox'
+	provider: 'harvester' | 'nutanix' | 'proxmox' | 'aws' | 'azure' | 'gcp'
 	// Harvester
 	harvesterKubeconfig?: string
 	// Nutanix
@@ -68,6 +110,43 @@ export interface CreateProviderRequest {
 	proxmoxTokenId?: string
 	proxmoxTokenSecret?: string
 	proxmoxInsecure?: boolean
+	// Network configuration
+	networkMode?: 'ipam' | 'cloud'
+	networkSubnet?: string
+	networkGateway?: string
+	networkDnsServers?: string[]
+	poolRefs?: Array<{ name: string; priority?: number }>
+	lbDefaultPoolSize?: number
+	quotaMaxNodeIPs?: number
+	quotaMaxLoadBalancerIPs?: number
+	// AWS
+	awsRegion?: string
+	awsAccessKeyId?: string
+	awsSecretAccessKey?: string
+	awsVpcId?: string
+	awsSubnetIds?: string[]
+	awsSecurityGroupIds?: string[]
+	// Azure
+	azureSubscriptionId?: string
+	azureTenantId?: string
+	azureClientId?: string
+	azureClientSecret?: string
+	azureResourceGroup?: string
+	azureLocation?: string
+	azureVnetName?: string
+	azureSubnetName?: string
+	// GCP
+	gcpProjectId?: string
+	gcpRegion?: string
+	gcpServiceAccount?: string
+	gcpNetwork?: string
+	gcpSubnetwork?: string
+	// Scope
+	scopeType?: 'platform' | 'team'
+	scopeTeamRef?: string
+	// Limits
+	maxClustersPerTeam?: number
+	maxNodesPerTeam?: number
 }
 
 export interface ImageInfo {
@@ -124,4 +203,43 @@ export const providersApi = {
 	async listNetworks(namespace: string, name: string): Promise<NetworkListResponse> {
 		return apiClient.get<NetworkListResponse>(`/providers/${namespace}/${name}/networks`)
 	},
+
+	async listTeamProviders(teamName: string): Promise<ProviderListResponse> {
+		return apiClient.get<ProviderListResponse>(`/teams/${teamName}/providers`)
+	},
+
+	async createTeamProvider(teamName: string, data: CreateProviderRequest): Promise<Provider> {
+		return apiClient.post<Provider>(`/teams/${teamName}/providers`, data)
+	},
+
+	async deleteTeamProvider(teamName: string, namespace: string, name: string): Promise<void> {
+		return apiClient.delete(`/teams/${teamName}/providers/${namespace}/${name}`)
+	},
+
+	async testTeamConnection(teamName: string, data: CreateProviderRequest): Promise<ValidateResponse> {
+		return apiClient.post<ValidateResponse>(`/teams/${teamName}/providers/test`, data)
+	},
+}
+
+export type CloudProviderType = 'aws' | 'azure' | 'gcp'
+export type OnPremProviderType = 'harvester' | 'nutanix' | 'proxmox'
+
+export function isCloudProvider(provider: string): provider is CloudProviderType {
+	return ['aws', 'azure', 'gcp'].includes(provider)
+}
+
+export function getProviderRegion(provider: Provider): string | undefined {
+	const type = provider.spec.provider
+	if (type === 'aws') return provider.spec.aws?.region
+	if (type === 'azure') return provider.spec.azure?.location
+	if (type === 'gcp') return provider.spec.gcp?.region
+	return undefined
+}
+
+export function getProviderNetwork(provider: Provider): string | undefined {
+	const type = provider.spec.provider
+	if (type === 'aws') return provider.spec.aws?.vpcID
+	if (type === 'azure') return provider.spec.azure?.vnetName
+	if (type === 'gcp') return provider.spec.gcp?.network
+	return provider.spec.network?.subnet
 }

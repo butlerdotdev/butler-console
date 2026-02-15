@@ -5,9 +5,12 @@ import { useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { providersApi, type CreateProviderRequest } from '@/api/providers'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
+import { ProviderIcon } from '@/components/providers/ProviderIcon'
 import { useToast } from '@/hooks/useToast'
 
-type ProviderType = 'harvester' | 'nutanix' | 'proxmox'
+type ProviderType = 'harvester' | 'nutanix' | 'proxmox' | 'aws' | 'azure' | 'gcp'
+const CLOUD_TYPES: ProviderType[] = ['aws', 'azure', 'gcp']
+const ON_PREM_TYPES: ProviderType[] = ['harvester', 'nutanix', 'proxmox']
 
 export function CreateProviderPage() {
 	useDocumentTitle('Add Provider')
@@ -42,6 +45,49 @@ export function CreateProviderPage() {
 	const [proxmoxTokenSecret, setProxmoxTokenSecret] = useState('')
 	const [proxmoxAuthType, setProxmoxAuthType] = useState<'password' | 'token'>('password')
 	const [proxmoxInsecure, setProxmoxInsecure] = useState(false)
+
+	// AWS credentials
+	const [awsRegion, setAwsRegion] = useState('')
+	const [awsAccessKeyId, setAwsAccessKeyId] = useState('')
+	const [awsSecretAccessKey, setAwsSecretAccessKey] = useState('')
+	const [awsVpcId, setAwsVpcId] = useState('')
+	const [awsSubnetIds, setAwsSubnetIds] = useState<string[]>([''])
+	const [awsSecurityGroupIds, setAwsSecurityGroupIds] = useState<string[]>([''])
+
+	// Azure credentials
+	const [azureSubscriptionId, setAzureSubscriptionId] = useState('')
+	const [azureTenantId, setAzureTenantId] = useState('')
+	const [azureClientId, setAzureClientId] = useState('')
+	const [azureClientSecret, setAzureClientSecret] = useState('')
+	const [azureResourceGroup, setAzureResourceGroup] = useState('')
+	const [azureLocation, setAzureLocation] = useState('')
+	const [azureVnetName, setAzureVnetName] = useState('')
+	const [azureSubnetName, setAzureSubnetName] = useState('')
+
+	// GCP credentials
+	const [gcpProjectId, setGcpProjectId] = useState('')
+	const [gcpRegion, setGcpRegion] = useState('')
+	const [gcpServiceAccount, setGcpServiceAccount] = useState('')
+	const [gcpNetwork, setGcpNetwork] = useState('')
+	const [gcpSubnetwork, setGcpSubnetwork] = useState('')
+
+	// Network configuration
+	const [networkMode, setNetworkMode] = useState<'ipam' | 'cloud' | ''>('')
+	const [networkSubnet, setNetworkSubnet] = useState('')
+	const [networkGateway, setNetworkGateway] = useState('')
+	const [networkDnsServers, setNetworkDnsServers] = useState('')
+	const [poolRefs, setPoolRefs] = useState<Array<{ name: string; priority?: number }>>([])
+	const [lbDefaultPoolSize, setLbDefaultPoolSize] = useState<number | ''>('')
+	const [quotaMaxNodeIPs, setQuotaMaxNodeIPs] = useState<number | ''>('')
+	const [quotaMaxLoadBalancerIPs, setQuotaMaxLoadBalancerIPs] = useState<number | ''>('')
+
+	// Scope
+	const [scopeType, setScopeType] = useState<'platform' | 'team' | ''>('')
+	const [scopeTeamRef, setScopeTeamRef] = useState('')
+
+	// Limits
+	const [maxClustersPerTeam, setMaxClustersPerTeam] = useState<number | ''>('')
+	const [maxNodesPerTeam, setMaxNodesPerTeam] = useState<number | ''>('')
 
 	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0]
@@ -90,6 +136,18 @@ export function CreateProviderPage() {
 				return null
 			}
 		}
+		if (providerType === 'aws') {
+			if (!awsRegion) { setError('Region is required'); return null }
+			if (!awsAccessKeyId || !awsSecretAccessKey) { setError('AWS credentials are required'); return null }
+		}
+		if (providerType === 'azure') {
+			if (!azureSubscriptionId) { setError('Subscription ID is required'); return null }
+			if (!azureTenantId || !azureClientId || !azureClientSecret) { setError('Azure credentials are required'); return null }
+		}
+		if (providerType === 'gcp') {
+			if (!gcpProjectId || !gcpRegion) { setError('Project ID and region are required'); return null }
+			if (!gcpServiceAccount) { setError('Service account key is required'); return null }
+		}
 
 		const request: CreateProviderRequest = {
 			name,
@@ -115,7 +173,61 @@ export function CreateProviderPage() {
 				request.proxmoxTokenId = proxmoxTokenId
 				request.proxmoxTokenSecret = proxmoxTokenSecret
 			}
+		} else if (providerType === 'aws') {
+			request.awsRegion = awsRegion
+			request.awsAccessKeyId = awsAccessKeyId
+			request.awsSecretAccessKey = awsSecretAccessKey
+			if (awsVpcId) request.awsVpcId = awsVpcId
+			const subnets = awsSubnetIds.filter(s => s.trim())
+			if (subnets.length > 0) request.awsSubnetIds = subnets
+			const sgs = awsSecurityGroupIds.filter(s => s.trim())
+			if (sgs.length > 0) request.awsSecurityGroupIds = sgs
+		} else if (providerType === 'azure') {
+			request.azureSubscriptionId = azureSubscriptionId
+			request.azureTenantId = azureTenantId
+			request.azureClientId = azureClientId
+			request.azureClientSecret = azureClientSecret
+			if (azureResourceGroup) request.azureResourceGroup = azureResourceGroup
+			if (azureLocation) request.azureLocation = azureLocation
+			if (azureVnetName) request.azureVnetName = azureVnetName
+			if (azureSubnetName) request.azureSubnetName = azureSubnetName
+		} else if (providerType === 'gcp') {
+			request.gcpProjectId = gcpProjectId
+			request.gcpRegion = gcpRegion
+			request.gcpServiceAccount = gcpServiceAccount
+			if (gcpNetwork) request.gcpNetwork = gcpNetwork
+			if (gcpSubnetwork) request.gcpSubnetwork = gcpSubnetwork
 		}
+
+		// Network configuration
+		if (networkMode === 'ipam' || networkMode === 'cloud') {
+			request.networkMode = networkMode
+		}
+		if (networkMode === 'ipam') {
+			if (networkSubnet) request.networkSubnet = networkSubnet
+			if (networkGateway) request.networkGateway = networkGateway
+			if (networkDnsServers.trim()) {
+				request.networkDnsServers = networkDnsServers.split(',').map((s) => s.trim()).filter(Boolean)
+			}
+			if (poolRefs.length > 0) {
+				request.poolRefs = poolRefs.filter((p) => p.name.trim())
+			}
+			if (lbDefaultPoolSize !== '') request.lbDefaultPoolSize = lbDefaultPoolSize
+			if (quotaMaxNodeIPs !== '') request.quotaMaxNodeIPs = quotaMaxNodeIPs
+			if (quotaMaxLoadBalancerIPs !== '') request.quotaMaxLoadBalancerIPs = quotaMaxLoadBalancerIPs
+		}
+
+		// Scope
+		if (scopeType === 'platform' || scopeType === 'team') {
+			request.scopeType = scopeType
+		}
+		if (scopeType === 'team' && scopeTeamRef) {
+			request.scopeTeamRef = scopeTeamRef
+		}
+
+		// Limits
+		if (maxClustersPerTeam !== '') request.maxClustersPerTeam = maxClustersPerTeam
+		if (maxNodesPerTeam !== '') request.maxNodesPerTeam = maxNodesPerTeam
 
 		return request
 	}
@@ -175,6 +287,9 @@ export function CreateProviderPage() {
 			if (proxmoxAuthType === 'password') return !!(proxmoxUsername && proxmoxPassword)
 			return !!(proxmoxTokenId && proxmoxTokenSecret)
 		}
+		if (providerType === 'aws') return !!(awsRegion && awsAccessKeyId && awsSecretAccessKey)
+		if (providerType === 'azure') return !!(azureSubscriptionId && azureTenantId && azureClientId && azureClientSecret)
+		if (providerType === 'gcp') return !!(gcpProjectId && gcpRegion && gcpServiceAccount)
 		return false
 	}
 
@@ -190,17 +305,20 @@ export function CreateProviderPage() {
 					<Card className="p-6 space-y-6">
 						{/* Provider Type Selection */}
 						<div>
-							<label className="block text-sm font-medium text-neutral-400 mb-3">
-								Provider Type
+							<label className="block text-sm font-medium text-neutral-400 mb-2">
+								On-Premises
 							</label>
-							<div className="grid grid-cols-3 gap-3">
-								{(['harvester', 'nutanix', 'proxmox'] as ProviderType[]).map((type) => (
+							<div className="grid grid-cols-3 gap-3 mb-4">
+								{ON_PREM_TYPES.map((type) => (
 									<button
 										key={type}
 										type="button"
 										onClick={() => {
 											setProviderType(type)
 											setTestResult(null)
+											if (CLOUD_TYPES.includes(providerType as ProviderType)) {
+												setNetworkMode('')
+											}
 										}}
 										className={`p-4 rounded-lg border-2 transition-colors ${providerType === type
 											? 'border-green-500 bg-green-500/10'
@@ -210,6 +328,31 @@ export function CreateProviderPage() {
 										<div className="text-center">
 											<ProviderIcon type={type} className="w-8 h-8 mx-auto mb-2" />
 											<p className="text-sm font-medium text-neutral-200 capitalize">{type}</p>
+										</div>
+									</button>
+								))}
+							</div>
+							<label className="block text-sm font-medium text-neutral-400 mb-2">
+								Cloud
+							</label>
+							<div className="grid grid-cols-3 gap-3">
+								{CLOUD_TYPES.map((type) => (
+									<button
+										key={type}
+										type="button"
+										onClick={() => {
+											setProviderType(type)
+											setTestResult(null)
+											setNetworkMode('cloud')
+										}}
+										className={`p-4 rounded-lg border-2 transition-colors ${providerType === type
+											? 'border-green-500 bg-green-500/10'
+											: 'border-neutral-700 hover:border-neutral-600'
+											}`}
+									>
+										<div className="text-center">
+											<ProviderIcon type={type} className="w-8 h-8 mx-auto mb-2" />
+											<p className="text-sm font-medium text-neutral-200 uppercase">{type}</p>
 										</div>
 									</button>
 								))}
@@ -285,6 +428,76 @@ export function CreateProviderPage() {
 								setInsecure={setProxmoxInsecure}
 							/>
 						)}
+
+						{providerType === 'aws' && (
+							<AWSCredentials
+								region={awsRegion} setRegion={(v) => { setAwsRegion(v); setTestResult(null) }}
+								accessKeyId={awsAccessKeyId} setAccessKeyId={(v) => { setAwsAccessKeyId(v); setTestResult(null) }}
+								secretAccessKey={awsSecretAccessKey} setSecretAccessKey={(v) => { setAwsSecretAccessKey(v); setTestResult(null) }}
+								vpcId={awsVpcId} setVpcId={setAwsVpcId}
+								subnetIds={awsSubnetIds} setSubnetIds={setAwsSubnetIds}
+								securityGroupIds={awsSecurityGroupIds} setSecurityGroupIds={setAwsSecurityGroupIds}
+							/>
+						)}
+
+						{providerType === 'azure' && (
+							<AzureCredentials
+								subscriptionId={azureSubscriptionId} setSubscriptionId={(v) => { setAzureSubscriptionId(v); setTestResult(null) }}
+								tenantId={azureTenantId} setTenantId={(v) => { setAzureTenantId(v); setTestResult(null) }}
+								clientId={azureClientId} setClientId={(v) => { setAzureClientId(v); setTestResult(null) }}
+								clientSecret={azureClientSecret} setClientSecret={(v) => { setAzureClientSecret(v); setTestResult(null) }}
+								resourceGroup={azureResourceGroup} setResourceGroup={setAzureResourceGroup}
+								location={azureLocation} setLocation={setAzureLocation}
+								vnetName={azureVnetName} setVnetName={setAzureVnetName}
+								subnetName={azureSubnetName} setSubnetName={setAzureSubnetName}
+							/>
+						)}
+
+						{providerType === 'gcp' && (
+							<GCPCredentials
+								projectId={gcpProjectId} setProjectId={(v) => { setGcpProjectId(v); setTestResult(null) }}
+								region={gcpRegion} setRegion={(v) => { setGcpRegion(v); setTestResult(null) }}
+								serviceAccount={gcpServiceAccount} setServiceAccount={(v) => { setGcpServiceAccount(v); setTestResult(null) }}
+								network={gcpNetwork} setNetwork={setGcpNetwork}
+								subnetwork={gcpSubnetwork} setSubnetwork={setGcpSubnetwork}
+							/>
+						)}
+
+						{/* Network Configuration */}
+						<NetworkConfigurationSection
+							networkMode={networkMode}
+							setNetworkMode={setNetworkMode}
+							networkSubnet={networkSubnet}
+							setNetworkSubnet={setNetworkSubnet}
+							networkGateway={networkGateway}
+							setNetworkGateway={setNetworkGateway}
+							networkDnsServers={networkDnsServers}
+							setNetworkDnsServers={setNetworkDnsServers}
+							poolRefs={poolRefs}
+							setPoolRefs={setPoolRefs}
+							lbDefaultPoolSize={lbDefaultPoolSize}
+							setLbDefaultPoolSize={setLbDefaultPoolSize}
+							quotaMaxNodeIPs={quotaMaxNodeIPs}
+							setQuotaMaxNodeIPs={setQuotaMaxNodeIPs}
+							quotaMaxLoadBalancerIPs={quotaMaxLoadBalancerIPs}
+							setQuotaMaxLoadBalancerIPs={setQuotaMaxLoadBalancerIPs}
+						/>
+
+						{/* Scope */}
+						<ScopeSection
+							scopeType={scopeType}
+							setScopeType={setScopeType}
+							scopeTeamRef={scopeTeamRef}
+							setScopeTeamRef={setScopeTeamRef}
+						/>
+
+						{/* Limits */}
+						<LimitsSection
+							maxClustersPerTeam={maxClustersPerTeam}
+							setMaxClustersPerTeam={setMaxClustersPerTeam}
+							maxNodesPerTeam={maxNodesPerTeam}
+							setMaxNodesPerTeam={setMaxNodesPerTeam}
+						/>
 
 						{/* Test Connection */}
 						<div className="p-4 bg-neutral-800/50 border border-neutral-700 rounded-lg">
@@ -646,27 +859,624 @@ function ProxmoxCredentials({
 	)
 }
 
-function ProviderIcon({ type, className }: { type: string; className?: string }) {
+function NetworkConfigurationSection({
+	networkMode,
+	setNetworkMode,
+	networkSubnet,
+	setNetworkSubnet,
+	networkGateway,
+	setNetworkGateway,
+	networkDnsServers,
+	setNetworkDnsServers,
+	poolRefs,
+	setPoolRefs,
+	lbDefaultPoolSize,
+	setLbDefaultPoolSize,
+	quotaMaxNodeIPs,
+	setQuotaMaxNodeIPs,
+	quotaMaxLoadBalancerIPs,
+	setQuotaMaxLoadBalancerIPs,
+}: {
+	networkMode: 'ipam' | 'cloud' | ''
+	setNetworkMode: (v: 'ipam' | 'cloud' | '') => void
+	networkSubnet: string
+	setNetworkSubnet: (v: string) => void
+	networkGateway: string
+	setNetworkGateway: (v: string) => void
+	networkDnsServers: string
+	setNetworkDnsServers: (v: string) => void
+	poolRefs: Array<{ name: string; priority?: number }>
+	setPoolRefs: (v: Array<{ name: string; priority?: number }>) => void
+	lbDefaultPoolSize: number | ''
+	setLbDefaultPoolSize: (v: number | '') => void
+	quotaMaxNodeIPs: number | ''
+	setQuotaMaxNodeIPs: (v: number | '') => void
+	quotaMaxLoadBalancerIPs: number | ''
+	setQuotaMaxLoadBalancerIPs: (v: number | '') => void
+}) {
+	const [expanded, setExpanded] = useState(false)
+
+	const addPoolRef = () => {
+		setPoolRefs([...poolRefs, { name: '', priority: undefined }])
+	}
+
+	const removePoolRef = (index: number) => {
+		setPoolRefs(poolRefs.filter((_, i) => i !== index))
+	}
+
+	const updatePoolRef = (index: number, field: 'name' | 'priority', value: string | number) => {
+		const updated = [...poolRefs]
+		if (field === 'name') {
+			updated[index] = { ...updated[index], name: value as string }
+		} else {
+			updated[index] = { ...updated[index], priority: value === '' ? undefined : Number(value) }
+		}
+		setPoolRefs(updated)
+	}
+
 	return (
-		<div className={`flex items-center justify-center ${className}`}>
-			{type === 'harvester' && (
-				<svg viewBox="0 0 24 24" className="w-full h-full">
-					<rect x="2" y="4" width="20" height="16" rx="3" fill="#00875a" />
-					<path d="M5 8h14M5 12h14M5 16h14" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+		<div>
+			<button
+				type="button"
+				onClick={() => setExpanded(!expanded)}
+				className="flex items-center gap-2 w-full text-left"
+			>
+				<svg
+					className={`w-4 h-4 text-neutral-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
 				</svg>
-			)}
-			{type === 'nutanix' && (
-				<svg viewBox="0 0 24 24" className="w-full h-full">
-					<polygon points="12,2 22,7 22,17 12,22 2,17 2,7" fill="#024DA1" />
-					<polygon points="12,6 17,8.5 17,15.5 12,18 7,15.5 7,8.5" fill="#69BE28" />
-				</svg>
-			)}
-			{type === 'proxmox' && (
-				<svg viewBox="0 0 24 24" className="w-full h-full">
-					<rect x="2" y="2" width="20" height="20" rx="2" fill="#E57000" />
-					<path d="M7 12h10M12 7v10" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
-				</svg>
+				<h3 className="text-lg font-medium text-neutral-50">Network Configuration</h3>
+				<span className="text-xs text-neutral-500 ml-2">Optional</span>
+			</button>
+
+			{expanded && (
+				<div className="mt-4 space-y-4 pl-6">
+					{/* Network Mode */}
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-2">
+							Network Mode
+						</label>
+						<div className="flex gap-2">
+							{(['', 'ipam', 'cloud'] as const).map((mode) => (
+								<button
+									key={mode || 'none'}
+									type="button"
+									onClick={() => setNetworkMode(mode)}
+									className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${networkMode === mode
+										? 'bg-green-500/20 text-green-400 border border-green-500'
+										: 'bg-neutral-800 text-neutral-400 border border-neutral-700 hover:border-neutral-600'
+										}`}
+								>
+									{mode === '' ? 'Not Set' : mode === 'ipam' ? 'IPAM' : 'Cloud'}
+								</button>
+							))}
+						</div>
+						<p className="text-xs text-neutral-500 mt-1">
+							{networkMode === 'ipam'
+								? 'On-prem pool-based IP address management'
+								: networkMode === 'cloud'
+									? 'IPs managed by cloud provider'
+									: 'Select a network mode to configure IP management'}
+						</p>
+					</div>
+
+					{networkMode === 'ipam' && (
+						<div className="space-y-4">
+							{/* Pool References */}
+							<div>
+								<div className="flex items-center justify-between mb-2">
+									<label className="block text-sm font-medium text-neutral-400">
+										Pool References
+									</label>
+									<button
+										type="button"
+										onClick={addPoolRef}
+										className="text-xs text-green-400 hover:text-green-300 transition-colors"
+									>
+										+ Add Pool
+									</button>
+								</div>
+								{poolRefs.length === 0 && (
+									<p className="text-xs text-neutral-500">No pool references configured.</p>
+								)}
+								{poolRefs.map((pool, index) => (
+									<div key={index} className="flex gap-2 mb-2 items-center">
+										<input
+											type="text"
+											value={pool.name}
+											onChange={(e) => updatePoolRef(index, 'name', e.target.value)}
+											placeholder="Pool name"
+											className="flex-1 px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+										/>
+										<input
+											type="number"
+											value={pool.priority ?? ''}
+											onChange={(e) => updatePoolRef(index, 'priority', e.target.value)}
+											placeholder="Priority"
+											className="w-24 px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+										/>
+										<button
+											type="button"
+											onClick={() => removePoolRef(index)}
+											className="p-2 text-neutral-500 hover:text-red-400 transition-colors"
+											aria-label="Remove pool reference"
+										>
+											<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+								))}
+							</div>
+
+							{/* Subnet and Gateway */}
+							<div className="grid grid-cols-2 gap-4">
+								<div>
+									<label className="block text-sm font-medium text-neutral-400 mb-1">
+										Subnet
+									</label>
+									<input
+										type="text"
+										value={networkSubnet}
+										onChange={(e) => setNetworkSubnet(e.target.value)}
+										placeholder="10.40.0.0/16"
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+									/>
+								</div>
+								<div>
+									<label className="block text-sm font-medium text-neutral-400 mb-1">
+										Gateway
+									</label>
+									<input
+										type="text"
+										value={networkGateway}
+										onChange={(e) => setNetworkGateway(e.target.value)}
+										placeholder="10.40.0.1"
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+									/>
+								</div>
+							</div>
+
+							{/* DNS Servers */}
+							<div>
+								<label className="block text-sm font-medium text-neutral-400 mb-1">
+									DNS Servers
+								</label>
+								<input
+									type="text"
+									value={networkDnsServers}
+									onChange={(e) => setNetworkDnsServers(e.target.value)}
+									placeholder="8.8.8.8, 8.8.4.4"
+									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+								/>
+								<p className="text-xs text-neutral-500 mt-1">Comma-separated list of DNS server addresses</p>
+							</div>
+
+							{/* LB Default Pool Size */}
+							<div>
+								<label className="block text-sm font-medium text-neutral-400 mb-1">
+									LB Default Pool Size
+								</label>
+								<input
+									type="number"
+									value={lbDefaultPoolSize}
+									onChange={(e) => setLbDefaultPoolSize(e.target.value === '' ? '' : parseInt(e.target.value))}
+									placeholder="e.g. 8"
+									min={0}
+									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+								/>
+							</div>
+
+							{/* Quotas */}
+							<div className="grid grid-cols-2 gap-4">
+								<div>
+									<label className="block text-sm font-medium text-neutral-400 mb-1">
+										Quota: Max Node IPs
+									</label>
+									<input
+										type="number"
+										value={quotaMaxNodeIPs}
+										onChange={(e) => setQuotaMaxNodeIPs(e.target.value === '' ? '' : parseInt(e.target.value))}
+										placeholder="e.g. 50"
+										min={0}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+									/>
+								</div>
+								<div>
+									<label className="block text-sm font-medium text-neutral-400 mb-1">
+										Quota: Max LB IPs
+									</label>
+									<input
+										type="number"
+										value={quotaMaxLoadBalancerIPs}
+										onChange={(e) => setQuotaMaxLoadBalancerIPs(e.target.value === '' ? '' : parseInt(e.target.value))}
+										placeholder="e.g. 10"
+										min={0}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+									/>
+								</div>
+							</div>
+						</div>
+					)}
+
+					{networkMode === 'cloud' && (
+						<div className="p-3 bg-neutral-800/50 border border-neutral-700 rounded-lg">
+							<p className="text-sm text-neutral-400">
+								IPs managed by cloud provider. No additional network configuration is needed.
+							</p>
+						</div>
+					)}
+				</div>
 			)}
 		</div>
 	)
 }
+
+function ScopeSection({
+	scopeType,
+	setScopeType,
+	scopeTeamRef,
+	setScopeTeamRef,
+}: {
+	scopeType: 'platform' | 'team' | ''
+	setScopeType: (v: 'platform' | 'team' | '') => void
+	scopeTeamRef: string
+	setScopeTeamRef: (v: string) => void
+}) {
+	const [expanded, setExpanded] = useState(false)
+
+	return (
+		<div>
+			<button
+				type="button"
+				onClick={() => setExpanded(!expanded)}
+				className="flex items-center gap-2 w-full text-left"
+			>
+				<svg
+					className={`w-4 h-4 text-neutral-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+				</svg>
+				<h3 className="text-lg font-medium text-neutral-50">Scope</h3>
+				<span className="text-xs text-neutral-500 ml-2">Optional</span>
+			</button>
+
+			{expanded && (
+				<div className="mt-4 space-y-4 pl-6">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-2">
+							Scope Type
+						</label>
+						<div className="flex gap-2">
+							{(['', 'platform', 'team'] as const).map((type) => (
+								<button
+									key={type || 'none'}
+									type="button"
+									onClick={() => setScopeType(type)}
+									className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${scopeType === type
+										? 'bg-green-500/20 text-green-400 border border-green-500'
+										: 'bg-neutral-800 text-neutral-400 border border-neutral-700 hover:border-neutral-600'
+										}`}
+								>
+									{type === '' ? 'Not Set' : type === 'platform' ? 'Platform' : 'Team'}
+								</button>
+							))}
+						</div>
+						<p className="text-xs text-neutral-500 mt-1">
+							{scopeType === 'platform'
+								? 'Available to all teams on the platform'
+								: scopeType === 'team'
+									? 'Restricted to a specific team'
+									: 'Select a scope to control provider visibility'}
+						</p>
+					</div>
+
+					{scopeType === 'team' && (
+						<div>
+							<label className="block text-sm font-medium text-neutral-400 mb-1">
+								Team Name
+							</label>
+							<input
+								type="text"
+								value={scopeTeamRef}
+								onChange={(e) => setScopeTeamRef(e.target.value)}
+								placeholder="e.g. engineering"
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							/>
+						</div>
+					)}
+				</div>
+			)}
+		</div>
+	)
+}
+
+function LimitsSection({
+	maxClustersPerTeam,
+	setMaxClustersPerTeam,
+	maxNodesPerTeam,
+	setMaxNodesPerTeam,
+}: {
+	maxClustersPerTeam: number | ''
+	setMaxClustersPerTeam: (v: number | '') => void
+	maxNodesPerTeam: number | ''
+	setMaxNodesPerTeam: (v: number | '') => void
+}) {
+	const [expanded, setExpanded] = useState(false)
+
+	return (
+		<div>
+			<button
+				type="button"
+				onClick={() => setExpanded(!expanded)}
+				className="flex items-center gap-2 w-full text-left"
+			>
+				<svg
+					className={`w-4 h-4 text-neutral-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+				</svg>
+				<h3 className="text-lg font-medium text-neutral-50">Limits</h3>
+				<span className="text-xs text-neutral-500 ml-2">Optional</span>
+			</button>
+
+			{expanded && (
+				<div className="mt-4 space-y-4 pl-6">
+					<div className="grid grid-cols-2 gap-4">
+						<div>
+							<label className="block text-sm font-medium text-neutral-400 mb-1">
+								Max Clusters per Team
+							</label>
+							<input
+								type="number"
+								value={maxClustersPerTeam}
+								onChange={(e) => setMaxClustersPerTeam(e.target.value === '' ? '' : parseInt(e.target.value))}
+								placeholder="No limit"
+								min={0}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							/>
+						</div>
+						<div>
+							<label className="block text-sm font-medium text-neutral-400 mb-1">
+								Max Nodes per Team
+							</label>
+							<input
+								type="number"
+								value={maxNodesPerTeam}
+								onChange={(e) => setMaxNodesPerTeam(e.target.value === '' ? '' : parseInt(e.target.value))}
+								placeholder="No limit"
+								min={0}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							/>
+						</div>
+					</div>
+					<p className="text-xs text-neutral-500">
+						Limits the number of clusters and nodes each team can create using this provider.
+						Leave empty for no limit.
+					</p>
+				</div>
+			)}
+		</div>
+	)
+}
+
+function DynamicListField({ label, values, setValues, placeholder }: {
+	label: string
+	values: string[]
+	setValues: (v: string[]) => void
+	placeholder: string
+}) {
+	return (
+		<div>
+			<div className="flex items-center justify-between mb-1">
+				<label className="block text-sm font-medium text-neutral-400">{label}</label>
+				<button type="button" onClick={() => setValues([...values, ''])} className="text-xs text-green-400 hover:text-green-300">+ Add</button>
+			</div>
+			{values.map((val, i) => (
+				<div key={i} className="flex gap-2 mb-2">
+					<input
+						type="text"
+						value={val}
+						onChange={(e) => { const updated = [...values]; updated[i] = e.target.value; setValues(updated) }}
+						placeholder={placeholder}
+						className="flex-1 px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
+					/>
+					{values.length > 1 && (
+						<button type="button" onClick={() => setValues(values.filter((_, j) => j !== i))} className="p-2 text-neutral-500 hover:text-red-400">
+							<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+						</button>
+					)}
+				</div>
+			))}
+		</div>
+	)
+}
+
+function AWSCredentials({ region, setRegion, accessKeyId, setAccessKeyId, secretAccessKey, setSecretAccessKey, vpcId, setVpcId, subnetIds, setSubnetIds, securityGroupIds, setSecurityGroupIds }: {
+	region: string; setRegion: (v: string) => void
+	accessKeyId: string; setAccessKeyId: (v: string) => void
+	secretAccessKey: string; setSecretAccessKey: (v: string) => void
+	vpcId: string; setVpcId: (v: string) => void
+	subnetIds: string[]; setSubnetIds: (v: string[]) => void
+	securityGroupIds: string[]; setSecurityGroupIds: (v: string[]) => void
+}) {
+	return (
+		<div>
+			<h3 className="text-lg font-medium text-neutral-50 mb-4">AWS Configuration</h3>
+			<div className="space-y-4">
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Region *</label>
+						<input type="text" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="us-east-1"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">VPC ID</label>
+						<input type="text" value={vpcId} onChange={(e) => setVpcId(e.target.value)} placeholder="vpc-0123456789abcdef0"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 font-mono focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+				</div>
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Access Key ID *</label>
+						<input type="text" value={accessKeyId} onChange={(e) => setAccessKeyId(e.target.value)} placeholder="AKIA..."
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 font-mono focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Secret Access Key *</label>
+						<input type="password" value={secretAccessKey} onChange={(e) => setSecretAccessKey(e.target.value)} placeholder="••••••••"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+				</div>
+				<DynamicListField label="Subnet IDs" values={subnetIds} setValues={setSubnetIds} placeholder="subnet-0123456789abcdef0" />
+				<DynamicListField label="Security Group IDs" values={securityGroupIds} setValues={setSecurityGroupIds} placeholder="sg-0123456789abcdef0" />
+			</div>
+		</div>
+	)
+}
+
+function AzureCredentials({ subscriptionId, setSubscriptionId, tenantId, setTenantId, clientId, setClientId, clientSecret, setClientSecret, resourceGroup, setResourceGroup, location, setLocation, vnetName, setVnetName, subnetName, setSubnetName }: {
+	subscriptionId: string; setSubscriptionId: (v: string) => void
+	tenantId: string; setTenantId: (v: string) => void
+	clientId: string; setClientId: (v: string) => void
+	clientSecret: string; setClientSecret: (v: string) => void
+	resourceGroup: string; setResourceGroup: (v: string) => void
+	location: string; setLocation: (v: string) => void
+	vnetName: string; setVnetName: (v: string) => void
+	subnetName: string; setSubnetName: (v: string) => void
+}) {
+	return (
+		<div>
+			<h3 className="text-lg font-medium text-neutral-50 mb-4">Azure Configuration</h3>
+			<div className="space-y-4">
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Subscription ID *</label>
+						<input type="text" value={subscriptionId} onChange={(e) => setSubscriptionId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 font-mono focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Tenant ID *</label>
+						<input type="text" value={tenantId} onChange={(e) => setTenantId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 font-mono focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+				</div>
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Client ID *</label>
+						<input type="text" value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 font-mono focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Client Secret *</label>
+						<input type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} placeholder="••••••••"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+				</div>
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Resource Group</label>
+						<input type="text" value={resourceGroup} onChange={(e) => setResourceGroup(e.target.value)} placeholder="my-resource-group"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Location</label>
+						<input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="eastus"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+				</div>
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">VNet Name</label>
+						<input type="text" value={vnetName} onChange={(e) => setVnetName(e.target.value)} placeholder="my-vnet"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Subnet Name</label>
+						<input type="text" value={subnetName} onChange={(e) => setSubnetName(e.target.value)} placeholder="default"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+				</div>
+			</div>
+		</div>
+	)
+}
+
+function GCPCredentials({ projectId, setProjectId, region, setRegion, serviceAccount, setServiceAccount, network, setNetwork, subnetwork, setSubnetwork }: {
+	projectId: string; setProjectId: (v: string) => void
+	region: string; setRegion: (v: string) => void
+	serviceAccount: string; setServiceAccount: (v: string) => void
+	network: string; setNetwork: (v: string) => void
+	subnetwork: string; setSubnetwork: (v: string) => void
+}) {
+	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0]
+		if (file) {
+			const reader = new FileReader()
+			reader.onload = (event) => setServiceAccount(event.target?.result as string)
+			reader.readAsText(file)
+		}
+	}
+
+	return (
+		<div>
+			<h3 className="text-lg font-medium text-neutral-50 mb-4">GCP Configuration</h3>
+			<div className="space-y-4">
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Project ID *</label>
+						<input type="text" value={projectId} onChange={(e) => setProjectId(e.target.value)} placeholder="my-project-123"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Region *</label>
+						<input type="text" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="us-central1"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+				</div>
+				<div>
+					<label className="block text-sm font-medium text-neutral-400 mb-1">Service Account Key (JSON) *</label>
+					<div className="flex gap-2 mb-2">
+						<label className="flex-1">
+							<input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
+							<div className="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-neutral-200 cursor-pointer text-center transition-colors">
+								Upload JSON key file
+							</div>
+						</label>
+					</div>
+					<textarea
+						value={serviceAccount}
+						onChange={(e) => setServiceAccount(e.target.value)}
+						placeholder='{"type": "service_account", ...}'
+						rows={6}
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+					/>
+				</div>
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">VPC Network</label>
+						<input type="text" value={network} onChange={(e) => setNetwork(e.target.value)} placeholder="default"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Subnetwork</label>
+						<input type="text" value={subnetwork} onChange={(e) => setSubnetwork(e.target.value)} placeholder="default"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+				</div>
+			</div>
+		</div>
+	)
+}
+
+// ProviderIcon is imported from @/components/providers/ProviderIcon

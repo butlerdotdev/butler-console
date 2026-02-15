@@ -239,3 +239,4 @@ export interface ApiError {
 // ----------------------------------------------------------------------------
 
 export * from './gitops'
+export * from './networks'

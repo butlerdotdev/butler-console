@@ -1,13 +1,37 @@
 // Copyright 2025 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { clustersApi, providersApi, type Provider, type ImageInfo, type NetworkInfo } from '@/api'
+import { clustersApi, providersApi, type Provider, type ImageInfo, type NetworkInfo, isCloudProvider, getProviderRegion, getProviderNetwork } from '@/api'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
+import { parseQuantity } from '@/components/ui/ResourceUsageBar'
 import { useToast } from '@/hooks/useToast'
 import { useTeamContext } from '@/hooks/useTeamContext'
+
+interface TeamResourceLimits {
+	maxClusters?: number
+	maxTotalNodes?: number
+	maxNodesPerCluster?: number
+	maxCPUCores?: string
+	maxMemory?: string
+	maxStorage?: string
+}
+
+interface TeamResourceUsage {
+	clusters: number
+	totalNodes: number
+	totalCPU?: string
+	totalMemory?: string
+	totalStorage?: string
+}
+
+interface QuotaWarning {
+	resource: string
+	message: string
+	severity: 'warning' | 'error'
+}
 
 export function CreateClusterPage() {
 	useDocumentTitle('Create Cluster')
@@ -44,6 +68,7 @@ export function CreateClusterPage() {
 		workerDiskSize: '50Gi',
 		loadBalancerStart: '',
 		loadBalancerEnd: '',
+		lbPoolSize: '',
 		// Harvester-specific
 		harvesterNamespace: 'default',
 		harvesterNetworkName: '',
@@ -57,9 +82,175 @@ export function CreateClusterPage() {
 		proxmoxNode: '',
 		proxmoxStorage: '',
 		proxmoxTemplateID: '',
+		// Cloud-specific
+		awsSubnet: '',
 	})
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [useManualIPs, setUseManualIPs] = useState(false)
+
+	// Resource quota state
+	const [resourceUsage, setResourceUsage] = useState<TeamResourceUsage | null>(null)
+	const [resourceLimits, setResourceLimits] = useState<TeamResourceLimits | null>(null)
+
+	// Fetch team resource usage/limits
+	useEffect(() => {
+		if (!currentTeam) return
+		const fetchQuota = async () => {
+			try {
+				const response = await fetch(`/api/teams/${currentTeam}`, {
+					credentials: 'include',
+				})
+				if (response.ok) {
+					const data = await response.json()
+					const team = data.team || data
+					const usage = team.resourceUsage || team.status?.resourceUsage
+					const limits = team.resourceLimits || team.spec?.resourceLimits
+					if (usage) setResourceUsage(usage)
+					if (limits) setResourceLimits(limits)
+				}
+			} catch {
+				// Non-critical - quota warnings just won't show
+			}
+		}
+		fetchQuota()
+	}, [currentTeam])
+
+	// Compute quota warnings based on current form values and team limits
+	const quotaWarnings = useMemo<QuotaWarning[]>(() => {
+		if (!resourceLimits || !resourceUsage) return []
+		const warnings: QuotaWarning[] = []
+
+		// Cluster count check
+		if (resourceLimits.maxClusters != null) {
+			const afterCreate = resourceUsage.clusters + 1
+			if (afterCreate > resourceLimits.maxClusters) {
+				warnings.push({
+					resource: 'Clusters',
+					message: `Creating this cluster would exceed your limit of ${resourceLimits.maxClusters} clusters (currently using ${resourceUsage.clusters}).`,
+					severity: 'error',
+				})
+			} else {
+				const remaining = resourceLimits.maxClusters - afterCreate
+				if (remaining <= 1) {
+					warnings.push({
+						resource: 'Clusters',
+						message: `After creating this cluster, you will have ${remaining} cluster${remaining === 1 ? '' : 's'} remaining (limit: ${resourceLimits.maxClusters}).`,
+						severity: 'warning',
+					})
+				}
+			}
+		}
+
+		const requestedNodes = Number(form.workerReplicas) || 1
+
+		// Total nodes check
+		if (resourceLimits.maxTotalNodes != null) {
+			const afterCreate = resourceUsage.totalNodes + requestedNodes
+			if (afterCreate > resourceLimits.maxTotalNodes) {
+				warnings.push({
+					resource: 'Total Nodes',
+					message: `Adding ${requestedNodes} node${requestedNodes > 1 ? 's' : ''} would exceed your limit of ${resourceLimits.maxTotalNodes} total nodes (currently using ${resourceUsage.totalNodes}).`,
+					severity: 'error',
+				})
+			} else {
+				const remaining = resourceLimits.maxTotalNodes - afterCreate
+				if (remaining <= 2) {
+					warnings.push({
+						resource: 'Total Nodes',
+						message: `After this cluster, you can allocate ${remaining} more node${remaining === 1 ? '' : 's'} (limit: ${resourceLimits.maxTotalNodes}).`,
+						severity: 'warning',
+					})
+				}
+			}
+		}
+
+		// Nodes per cluster check
+		if (resourceLimits.maxNodesPerCluster != null && requestedNodes > resourceLimits.maxNodesPerCluster) {
+			warnings.push({
+				resource: 'Nodes per Cluster',
+				message: `Requesting ${requestedNodes} nodes exceeds the per-cluster limit of ${resourceLimits.maxNodesPerCluster}.`,
+				severity: 'error',
+			})
+		}
+
+		// CPU check
+		if (resourceLimits.maxCPUCores) {
+			const limitCPU = parseQuantity(resourceLimits.maxCPUCores)
+			const usedCPU = parseQuantity(resourceUsage.totalCPU || '0')
+			const requestedCPU = requestedNodes * (Number(form.workerCPU) || 4)
+			const afterCreate = usedCPU + requestedCPU
+			if (limitCPU > 0 && afterCreate > limitCPU) {
+				warnings.push({
+					resource: 'CPU',
+					message: `Adding ${requestedCPU} CPU cores would exceed your limit of ${resourceLimits.maxCPUCores} (currently using ${resourceUsage.totalCPU || '0'}).`,
+					severity: 'error',
+				})
+			} else if (limitCPU > 0) {
+				const remaining = limitCPU - afterCreate
+				const pct = Math.round((afterCreate / limitCPU) * 100)
+				if (pct >= 80) {
+					warnings.push({
+						resource: 'CPU',
+						message: `After this cluster, you can allocate ${Math.floor(remaining)} more CPU cores (${pct}% of limit used).`,
+						severity: 'warning',
+					})
+				}
+			}
+		}
+
+		// Memory check
+		if (resourceLimits.maxMemory) {
+			const limitMem = parseQuantity(resourceLimits.maxMemory)
+			const usedMem = parseQuantity(resourceUsage.totalMemory || '0')
+			const requestedMem = requestedNodes * parseQuantity(form.workerMemory || '8Gi')
+			const afterCreate = usedMem + requestedMem
+			if (limitMem > 0 && afterCreate > limitMem) {
+				warnings.push({
+					resource: 'Memory',
+					message: `Adding ${form.workerMemory} x ${requestedNodes} nodes would exceed your memory limit of ${resourceLimits.maxMemory} (currently using ${resourceUsage.totalMemory || '0'}).`,
+					severity: 'error',
+				})
+			} else if (limitMem > 0) {
+				const pct = Math.round((afterCreate / limitMem) * 100)
+				if (pct >= 80) {
+					warnings.push({
+						resource: 'Memory',
+						message: `This cluster would bring your memory usage to ${pct}% of the limit.`,
+						severity: 'warning',
+					})
+				}
+			}
+		}
+
+		// Storage check
+		if (resourceLimits.maxStorage) {
+			const limitStorage = parseQuantity(resourceLimits.maxStorage)
+			const usedStorage = parseQuantity(resourceUsage.totalStorage || '0')
+			const requestedStorage = requestedNodes * parseQuantity(form.workerDiskSize || '50Gi')
+			const afterCreate = usedStorage + requestedStorage
+			if (limitStorage > 0 && afterCreate > limitStorage) {
+				warnings.push({
+					resource: 'Storage',
+					message: `Adding ${form.workerDiskSize} x ${requestedNodes} nodes would exceed your storage limit of ${resourceLimits.maxStorage} (currently using ${resourceUsage.totalStorage || '0'}).`,
+					severity: 'error',
+				})
+			} else if (limitStorage > 0) {
+				const pct = Math.round((afterCreate / limitStorage) * 100)
+				if (pct >= 80) {
+					warnings.push({
+						resource: 'Storage',
+						message: `This cluster would bring your storage usage to ${pct}% of the limit.`,
+						severity: 'warning',
+					})
+				}
+			}
+		}
+
+		return warnings
+	}, [resourceUsage, resourceLimits, form.workerReplicas, form.workerCPU, form.workerMemory, form.workerDiskSize])
+
+	const hasQuotaErrors = quotaWarnings.some(w => w.severity === 'error')
 
 	// Update namespace when team context changes
 	useEffect(() => {
@@ -100,6 +291,9 @@ export function CreateClusterPage() {
 
 		const ns = selectedProvider.metadata.namespace || 'butler-system'
 		const providerType = selectedProvider.spec.provider
+
+		// Cloud providers don't need image/network listings from the provider
+		if (isCloudProvider(providerType)) return
 
 		// Fetch images
 		const fetchImages = async () => {
@@ -160,6 +354,7 @@ export function CreateClusterPage() {
 		const providerName = e.target.value
 		const provider = providers.find(p => p.metadata.name === providerName) || null
 		setSelectedProvider(provider)
+		setUseManualIPs(false)
 		setForm(prev => ({
 			...prev,
 			providerConfigRef: providerName,
@@ -168,10 +363,13 @@ export function CreateClusterPage() {
 			harvesterNetworkName: '',
 			nutanixImageUUID: '',
 			nutanixSubnetUUID: '',
+			awsSubnet: '',
 		}))
 	}
 
 	const providerType = selectedProvider?.spec.provider || ''
+	const isIpamMode = selectedProvider?.spec.network?.mode === 'ipam'
+	const isCloudMode = selectedProvider?.spec.network?.mode === 'cloud'
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
@@ -185,7 +383,9 @@ export function CreateClusterPage() {
 			setError('Provider is required')
 			return
 		}
-		if (!form.loadBalancerStart || !form.loadBalancerEnd) {
+		// Validate LB IPs based on networking mode
+		const needsManualIPs = !isCloudMode && (!isIpamMode || useManualIPs)
+		if (needsManualIPs && (!form.loadBalancerStart || !form.loadBalancerEnd)) {
 			setError('Load balancer IP range is required')
 			return
 		}
@@ -226,8 +426,17 @@ export function CreateClusterPage() {
 				workerCPU: Number(form.workerCPU),
 				workerMemory: form.workerMemory,
 				workerDiskSize: form.workerDiskSize,
-				loadBalancerStart: form.loadBalancerStart,
-				loadBalancerEnd: form.loadBalancerEnd,
+			}
+
+			// Include LB IPs for manual mode or IPAM with BYO override
+			if (!isCloudMode && (!isIpamMode || (useManualIPs && form.loadBalancerStart && form.loadBalancerEnd))) {
+				if (!isIpamMode || useManualIPs) {
+					payload.loadBalancerStart = form.loadBalancerStart
+					payload.loadBalancerEnd = form.loadBalancerEnd
+				}
+			}
+			if (isIpamMode && form.lbPoolSize) {
+				payload.lbPoolSize = Number(form.lbPoolSize)
 			}
 
 			// If in team context, include teamRef
@@ -249,6 +458,9 @@ export function CreateClusterPage() {
 				payload.proxmoxNode = form.proxmoxNode
 				payload.proxmoxStorage = form.proxmoxStorage
 				if (form.proxmoxTemplateID) payload.proxmoxTemplateID = Number(form.proxmoxTemplateID)
+			} else if (isCloudProvider(providerType)) {
+				payload.cloudProvider = providerType
+				if (form.awsSubnet) payload.awsSubnet = form.awsSubnet
 			}
 
 			await clustersApi.create(payload as unknown as Parameters<typeof clustersApi.create>[0])
@@ -360,7 +572,7 @@ export function CreateClusterPage() {
 						{selectedProvider && (
 							<div>
 								<h3 className="text-lg font-medium text-neutral-50 mb-4">
-									Infrastructure ({providerType})
+									Infrastructure ({isCloudProvider(providerType) ? providerType.toUpperCase() : providerType})
 								</h3>
 
 								{providerType === 'harvester' && (
@@ -387,6 +599,10 @@ export function CreateClusterPage() {
 
 								{providerType === 'proxmox' && (
 									<ProxmoxFields form={form} onChange={handleChange} provider={selectedProvider} />
+								)}
+
+								{isCloudProvider(providerType) && (
+									<CloudProviderFields form={form} onChange={handleChange} provider={selectedProvider} />
 								)}
 							</div>
 						)}
@@ -461,35 +677,180 @@ export function CreateClusterPage() {
 						{/* Networking */}
 						<div>
 							<h3 className="text-lg font-medium text-neutral-50 mb-4">Networking</h3>
-							<div className="grid grid-cols-2 gap-4">
-								<div>
-									<label className="block text-sm font-medium text-neutral-400 mb-1">
-										Load Balancer Start IP *
-									</label>
-									<input
-										type="text"
-										name="loadBalancerStart"
-										value={form.loadBalancerStart}
-										onChange={handleChange}
-										placeholder="10.40.1.100"
-										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-									/>
+							{isCloudMode ? (
+								<div className="space-y-3">
+									<div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+										<p className="text-sm text-blue-400">
+											This provider uses cloud-native networking. Load balancers and IP addresses are managed by {providerType.toUpperCase()} automatically.
+										</p>
+									</div>
+									{selectedProvider && (
+										<div className="grid grid-cols-2 gap-3">
+											{getProviderRegion(selectedProvider) && (
+												<div className="p-3 bg-neutral-800/50 rounded-lg">
+													<p className="text-xs text-neutral-500">Region</p>
+													<p className="text-sm text-neutral-200 font-mono">{getProviderRegion(selectedProvider)}</p>
+												</div>
+											)}
+											{getProviderNetwork(selectedProvider) && (
+												<div className="p-3 bg-neutral-800/50 rounded-lg">
+													<p className="text-xs text-neutral-500">{providerType === 'aws' ? 'VPC' : providerType === 'azure' ? 'VNet' : 'Network'}</p>
+													<p className="text-sm text-neutral-200 font-mono">{getProviderNetwork(selectedProvider)}</p>
+												</div>
+											)}
+										</div>
+									)}
 								</div>
-								<div>
-									<label className="block text-sm font-medium text-neutral-400 mb-1">
-										Load Balancer End IP *
-									</label>
-									<input
-										type="text"
-										name="loadBalancerEnd"
-										value={form.loadBalancerEnd}
-										onChange={handleChange}
-										placeholder="10.40.1.150"
-										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-									/>
+							) : isIpamMode ? (
+								<div className="space-y-4">
+									{!useManualIPs ? (
+										<>
+											<div className="p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
+												<p className="text-sm text-green-400">
+													This provider uses IPAM mode. Node and load balancer IPs will be automatically allocated from network pools.
+												</p>
+											</div>
+											<div>
+												<label className="block text-sm font-medium text-neutral-400 mb-1">
+													LB Pool Size Override
+												</label>
+												<input
+													type="number"
+													name="lbPoolSize"
+													value={form.lbPoolSize}
+													onChange={handleChange}
+													placeholder="Uses provider default"
+													min={1}
+													className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+												/>
+												<p className="text-xs text-neutral-500 mt-1">
+													Number of load balancer IPs to allocate. Leave empty to use the provider default.
+												</p>
+											</div>
+											<button
+												type="button"
+												onClick={() => setUseManualIPs(true)}
+												className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-2"
+											>
+												Need to specify IPs manually?
+											</button>
+										</>
+									) : (
+										<>
+											<div>
+												<label className="block text-sm font-medium text-neutral-400 mb-1">
+													LB Pool Size Override
+												</label>
+												<input
+													type="number"
+													name="lbPoolSize"
+													value={form.lbPoolSize}
+													onChange={handleChange}
+													placeholder="Uses provider default"
+													min={1}
+													className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+												/>
+												<p className="text-xs text-neutral-500 mt-1">
+													Number of load balancer IPs to allocate. Leave empty to use the provider default.
+												</p>
+											</div>
+											<div className="grid grid-cols-2 gap-4">
+												<div>
+													<label className="block text-sm font-medium text-neutral-400 mb-1">
+														Load Balancer Start IP *
+													</label>
+													<input
+														type="text"
+														name="loadBalancerStart"
+														value={form.loadBalancerStart}
+														onChange={handleChange}
+														placeholder="10.40.1.100"
+														className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+													/>
+												</div>
+												<div>
+													<label className="block text-sm font-medium text-neutral-400 mb-1">
+														Load Balancer End IP *
+													</label>
+													<input
+														type="text"
+														name="loadBalancerEnd"
+														value={form.loadBalancerEnd}
+														onChange={handleChange}
+														placeholder="10.40.1.150"
+														className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+													/>
+												</div>
+											</div>
+											<button
+												type="button"
+												onClick={() => setUseManualIPs(false)}
+												className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-2"
+											>
+												Use automatic IPAM allocation
+											</button>
+										</>
+									)}
 								</div>
-							</div>
+							) : (
+								<div className="grid grid-cols-2 gap-4">
+									<div>
+										<label className="block text-sm font-medium text-neutral-400 mb-1">
+											Load Balancer Start IP *
+										</label>
+										<input
+											type="text"
+											name="loadBalancerStart"
+											value={form.loadBalancerStart}
+											onChange={handleChange}
+											placeholder="10.40.1.100"
+											className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-medium text-neutral-400 mb-1">
+											Load Balancer End IP *
+										</label>
+										<input
+											type="text"
+											name="loadBalancerEnd"
+											value={form.loadBalancerEnd}
+											onChange={handleChange}
+											placeholder="10.40.1.150"
+											className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+										/>
+									</div>
+								</div>
+							)}
 						</div>
+
+						{/* Quota Warnings */}
+						{quotaWarnings.length > 0 && (
+							<div className="space-y-2">
+								{quotaWarnings.filter(w => w.severity === 'error').map((w) => (
+									<div key={w.resource} className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2">
+										<svg className="w-5 h-5 text-red-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+										</svg>
+										<div>
+											<p className="text-red-400 text-sm font-medium">{w.resource} limit exceeded</p>
+											<p className="text-red-400/80 text-sm">{w.message}</p>
+										</div>
+									</div>
+								))}
+								{quotaWarnings.filter(w => w.severity === 'warning').map((w) => (
+									<div key={w.resource} className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+										<svg className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+										</svg>
+										<div>
+											<p className="text-amber-400 text-sm font-medium">{w.resource} approaching limit</p>
+											<p className="text-amber-400/80 text-sm">{w.message}</p>
+										</div>
+									</div>
+								))}
+							</div>
+						)}
 
 						{/* Error */}
 						{error && (
@@ -503,7 +864,7 @@ export function CreateClusterPage() {
 							<Button type="button" variant="secondary" onClick={() => navigate(buildPath('/clusters'))}>
 								Cancel
 							</Button>
-							<Button type="submit" disabled={loading || providers.length === 0}>
+							<Button type="submit" disabled={loading || providers.length === 0 || hasQuotaErrors}>
 								{loading ? 'Creating...' : 'Create Cluster'}
 							</Button>
 						</div>
@@ -715,6 +1076,117 @@ function NutanixFields({ form, onChange, images, loadingImages, networks, loadin
 					className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
 				/>
 			</div>
+		</div>
+	)
+}
+
+function CloudProviderFields({ form, onChange, provider }: FieldProps & { provider: Provider }) {
+	const cloudType = provider.spec.provider
+	const region = getProviderRegion(provider)
+	const network = getProviderNetwork(provider)
+	const awsSubnets = provider.spec.aws?.subnetIDs || []
+	const awsSecurityGroups = provider.spec.aws?.securityGroupIDs || []
+
+	return (
+		<div className="space-y-4">
+			{/* Cloud provider info card */}
+			<div className="p-4 bg-neutral-800/50 border border-neutral-700/50 rounded-lg space-y-3">
+				<div className="flex items-center gap-2">
+					{cloudType === 'aws' && (
+						<span className="text-[#FF9900] font-semibold text-sm">AWS</span>
+					)}
+					{cloudType === 'azure' && (
+						<span className="text-[#0078D4] font-semibold text-sm">Azure</span>
+					)}
+					{cloudType === 'gcp' && (
+						<span className="text-[#4285F4] font-semibold text-sm">GCP</span>
+					)}
+					<span className="text-neutral-400 text-sm">Cloud Infrastructure</span>
+				</div>
+				<div className="grid grid-cols-2 gap-3">
+					{region && (
+						<div>
+							<p className="text-xs text-neutral-500">Region</p>
+							<p className="text-sm text-neutral-200 font-mono">{region}</p>
+						</div>
+					)}
+					{network && (
+						<div>
+							<p className="text-xs text-neutral-500">
+								{cloudType === 'aws' ? 'VPC' : cloudType === 'azure' ? 'VNet' : 'VPC Network'}
+							</p>
+							<p className="text-sm text-neutral-200 font-mono">{network}</p>
+						</div>
+					)}
+					{cloudType === 'azure' && provider.spec.azure?.resourceGroup && (
+						<div>
+							<p className="text-xs text-neutral-500">Resource Group</p>
+							<p className="text-sm text-neutral-200 font-mono">{provider.spec.azure.resourceGroup}</p>
+						</div>
+					)}
+					{cloudType === 'azure' && provider.spec.azure?.subscriptionID && (
+						<div>
+							<p className="text-xs text-neutral-500">Subscription</p>
+							<p className="text-sm text-neutral-200 font-mono truncate">{provider.spec.azure.subscriptionID}</p>
+						</div>
+					)}
+					{cloudType === 'gcp' && provider.spec.gcp?.projectID && (
+						<div>
+							<p className="text-xs text-neutral-500">Project</p>
+							<p className="text-sm text-neutral-200 font-mono">{provider.spec.gcp.projectID}</p>
+						</div>
+					)}
+				</div>
+				{awsSecurityGroups.length > 0 && (
+					<div>
+						<p className="text-xs text-neutral-500 mb-1">Security Groups</p>
+						<div className="flex flex-wrap gap-1">
+							{awsSecurityGroups.map(sg => (
+								<span key={sg} className="text-xs font-mono bg-neutral-700/50 text-neutral-300 px-2 py-0.5 rounded">{sg}</span>
+							))}
+						</div>
+					</div>
+				)}
+			</div>
+
+			{/* AWS subnet selection when multiple subnets available */}
+			{cloudType === 'aws' && awsSubnets.length > 1 && (
+				<div>
+					<label className="block text-sm font-medium text-neutral-400 mb-1">
+						Subnet
+					</label>
+					<select
+						name="awsSubnet"
+						value={form.awsSubnet as string}
+						onChange={onChange}
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+					>
+						<option value="">Auto-select (provider default)</option>
+						{awsSubnets.map(subnet => (
+							<option key={subnet} value={subnet}>{subnet}</option>
+						))}
+					</select>
+					<p className="text-xs text-neutral-500 mt-1">
+						Select a specific subnet or let the provider choose automatically.
+					</p>
+				</div>
+			)}
+
+			{/* GCP subnetwork selection */}
+			{cloudType === 'gcp' && provider.spec.gcp?.subnetwork && (
+				<div>
+					<p className="text-xs text-neutral-500">Subnetwork</p>
+					<p className="text-sm text-neutral-200 font-mono">{provider.spec.gcp.subnetwork}</p>
+				</div>
+			)}
+
+			{/* Azure subnet */}
+			{cloudType === 'azure' && provider.spec.azure?.subnetName && (
+				<div>
+					<p className="text-xs text-neutral-500">Subnet</p>
+					<p className="text-sm text-neutral-200 font-mono">{provider.spec.azure.subnetName}</p>
+				</div>
+			)}
 		</div>
 	)
 }

@@ -15,8 +15,14 @@ export interface PipelineConfigInfo {
   traceEndpoint?: string
 }
 
+export interface AutoEnrollConfig {
+  vectorAgent?: boolean
+  prometheus?: boolean
+  otelCollector?: boolean
+}
+
 export interface CollectionConfigInfo {
-  autoEnroll?: boolean
+  autoEnroll?: AutoEnrollConfig
   logs?: LogCollectionInfo
   metrics?: MetricCollectionInfo
 }

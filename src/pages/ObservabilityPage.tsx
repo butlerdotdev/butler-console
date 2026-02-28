@@ -48,7 +48,10 @@ export function ObservabilityPage() {
 	// Diagram visibility
 	const [showDiagram, setShowDiagram] = useState(false)
 
-	// Collection defaults form state
+	// Collection defaults form state — per-agent auto-enrollment
+	const [autoEnrollVector, setAutoEnrollVector] = useState(false)
+	const [autoEnrollPrometheus, setAutoEnrollPrometheus] = useState(false)
+	const [autoEnrollOtel, setAutoEnrollOtel] = useState(false)
 	const [defaultPodLogs, setDefaultPodLogs] = useState(true)
 	const [defaultJournald, setDefaultJournald] = useState(false)
 	const [defaultK8sEvents, setDefaultK8sEvents] = useState(false)
@@ -123,6 +126,9 @@ export function ObservabilityPage() {
 
 			if (cfg.status === 'fulfilled') {
 				setConfig(cfg.value)
+				setAutoEnrollVector(cfg.value.collection?.autoEnroll?.vectorAgent ?? false)
+				setAutoEnrollPrometheus(cfg.value.collection?.autoEnroll?.prometheus ?? false)
+				setAutoEnrollOtel(cfg.value.collection?.autoEnroll?.otelCollector ?? false)
 				setDefaultPodLogs(cfg.value.collection?.logs?.podLogs ?? true)
 				setDefaultJournald(cfg.value.collection?.logs?.journald ?? false)
 				setDefaultK8sEvents(cfg.value.collection?.logs?.kubernetesEvents ?? false)
@@ -191,6 +197,11 @@ export function ObservabilityPage() {
 		try {
 			const result = await observabilityApi.updateConfig({
 				collection: {
+					autoEnroll: {
+						vectorAgent: autoEnrollVector,
+						prometheus: autoEnrollPrometheus,
+						otelCollector: autoEnrollOtel,
+					},
 					logs: {
 						podLogs: defaultPodLogs,
 						journald: defaultJournald,
@@ -596,6 +607,65 @@ export function ObservabilityPage() {
 								<p className="text-xs text-neutral-500 mb-5">
 									Pre-filled when enabling log or metric collection on individual clusters.
 								</p>
+
+								{/* Per-agent auto-enroll toggles */}
+								<div className="mb-6 p-4 rounded-lg border border-neutral-800 bg-neutral-800/30">
+									<h3 className="text-sm font-medium text-neutral-200 mb-3">Auto-enroll new clusters</h3>
+									<p className="text-xs text-neutral-500 mb-3">
+										Automatically install observability agents on new clusters when they reach Ready state.
+									</p>
+									<div className="space-y-2">
+										<label className="flex items-start gap-3 cursor-pointer">
+											<input
+												type="checkbox"
+												checked={autoEnrollVector}
+												onChange={(e) => setAutoEnrollVector(e.target.checked)}
+												disabled={!config?.pipeline?.logEndpoint}
+												className="mt-0.5 rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 disabled:opacity-40"
+											/>
+											<div>
+												<span className="text-sm text-neutral-300">Vector Agent</span>
+												<p className="text-xs text-neutral-500 mt-0.5">
+													Log collector — forwards logs to the pipeline&apos;s aggregator endpoint.
+													{!config?.pipeline?.logEndpoint && <span className="text-amber-500"> Requires log endpoint.</span>}
+												</p>
+											</div>
+										</label>
+										<label className="flex items-start gap-3 cursor-pointer">
+											<input
+												type="checkbox"
+												checked={autoEnrollPrometheus}
+												onChange={(e) => setAutoEnrollPrometheus(e.target.checked)}
+												disabled={!config?.pipeline?.metricEndpoint}
+												className="mt-0.5 rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 disabled:opacity-40"
+											/>
+											<div>
+												<span className="text-sm text-neutral-300">Prometheus</span>
+												<p className="text-xs text-neutral-500 mt-0.5">
+													Metric collection — remote-writes to the pipeline&apos;s metric endpoint.
+													{!config?.pipeline?.metricEndpoint && <span className="text-amber-500"> Requires metric endpoint.</span>}
+												</p>
+											</div>
+										</label>
+										<label className="flex items-start gap-3 cursor-pointer">
+											<input
+												type="checkbox"
+												checked={autoEnrollOtel}
+												onChange={(e) => setAutoEnrollOtel(e.target.checked)}
+												disabled={!config?.pipeline?.traceEndpoint}
+												className="mt-0.5 rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 disabled:opacity-40"
+											/>
+											<div>
+												<span className="text-sm text-neutral-300">OpenTelemetry Collector</span>
+												<p className="text-xs text-neutral-500 mt-0.5">
+													Trace collection — forwards traces via OTLP to the pipeline&apos;s trace endpoint.
+													{!config?.pipeline?.traceEndpoint && <span className="text-amber-500"> Requires trace endpoint.</span>}
+												</p>
+											</div>
+										</label>
+									</div>
+								</div>
+
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 									<div>
 										<h3 className="text-sm font-medium text-neutral-300 mb-3">Log Sources</h3>

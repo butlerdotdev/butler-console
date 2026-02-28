@@ -21,6 +21,7 @@ on:
       - 'eslint.config.js'
       - 'Dockerfile'
       - 'nginx.conf'
+      - '.github/**'
   pull_request:
     branches: [main]
     paths:
@@ -37,6 +38,7 @@ on:
       - 'eslint.config.js'
       - 'Dockerfile'
       - 'nginx.conf'
+      - '.github/**'
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: butlerdotdev/butler-console

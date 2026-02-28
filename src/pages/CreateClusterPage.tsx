@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { clustersApi, providersApi, type Provider, type ImageInfo, type NetworkInfo, isCloudProvider, getProviderRegion, getProviderNetwork } from '@/api'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
@@ -36,6 +36,8 @@ interface QuotaWarning {
 export function CreateClusterPage() {
 	useDocumentTitle('Create Cluster')
 	const navigate = useNavigate()
+	const [searchParams] = useSearchParams()
+	const returnTo = searchParams.get('returnTo')
 	const { success, error: showError } = useToast()
 	const { currentTeam, currentTeamNamespace, currentTeamDisplayName, buildPath } = useTeamContext()
 
@@ -60,7 +62,7 @@ export function CreateClusterPage() {
 	const [form, setForm] = useState({
 		name: '',
 		namespace: defaultNamespace,
-		kubernetesVersion: 'v1.30.2',
+		kubernetesVersion: 'v1.32.2',
 		providerConfigRef: '',
 		workerReplicas: 1,
 		workerCPU: 4,
@@ -444,6 +446,17 @@ export function CreateClusterPage() {
 				payload.teamRef = currentTeam // currentTeam is the team name string
 			}
 
+			// Derive OS type from the selected image
+			const selectedImageId = providerType === 'harvester' ? form.harvesterImageName
+				: providerType === 'nutanix' ? form.nutanixImageUUID
+				: ''
+			if (selectedImageId) {
+				const selectedImage = images.find(img => img.id === selectedImageId)
+				if (selectedImage?.os) {
+					payload.osType = selectedImage.os
+				}
+			}
+
 			// Add provider-specific fields
 			if (providerType === 'harvester') {
 				payload.harvesterNamespace = form.harvesterNamespace
@@ -465,7 +478,11 @@ export function CreateClusterPage() {
 
 			await clustersApi.create(payload as unknown as Parameters<typeof clustersApi.create>[0])
 			success('Cluster Created', `${form.name} is being provisioned`)
-			navigate(buildPath(`/clusters/${form.namespace}/${form.name}`))
+			if (returnTo) {
+				navigate(`${returnTo}?newCluster=${encodeURIComponent(`${form.namespace}/${form.name}`)}`)
+			} else {
+				navigate(buildPath(`/clusters/${form.namespace}/${form.name}`))
+			}
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to create cluster'
 			setError(message)
@@ -532,9 +549,11 @@ export function CreateClusterPage() {
 										onChange={handleChange}
 										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
 									>
+										<option value="v1.32.2">v1.32.2</option>
+										<option value="v1.31.4">v1.31.4</option>
+										<option value="v1.30.8">v1.30.8</option>
 										<option value="v1.30.2">v1.30.2</option>
-										<option value="v1.29.6">v1.29.6</option>
-										<option value="v1.28.11">v1.28.11</option>
+										<option value="v1.29.12">v1.29.12</option>
 									</select>
 								</div>
 								<div>
@@ -972,7 +991,7 @@ function HarvesterFields({ form, onChange, images, loadingImages, networks, load
 					/>
 				)}
 				<p className="text-xs text-neutral-500 mt-1">
-					Select Rocky Linux or Ubuntu for tenant clusters (not Talos)
+					OS image for worker nodes
 				</p>
 			</div>
 		</div>

@@ -15,6 +15,7 @@ import { AccessDenied } from '@/components/AccessDenied'
 import { CertificatesTab } from '@/components/clusters/certificates';
 import { GitOpsTab } from '@/components/clusters/gitops';
 import { NetworkAllocationsCard } from '@/components/clusters/NetworkAllocationsCard';
+import { ObservabilityTab } from '@/components/clusters/observability';
 
 
 // Error type for API responses
@@ -24,7 +25,7 @@ interface ApiError {
 	message?: string
 }
 
-const TABS = ['overview', 'nodes', 'addons', 'gitops', 'events', 'certificates', 'terminal'] as const
+const TABS = ['overview', 'nodes', 'addons', 'gitops', 'events', 'certificates', 'observability', 'terminal'] as const
 
 type TabType = typeof TABS[number]
 
@@ -120,7 +121,7 @@ export function ClusterDetailPage() {
 	useEffect(() => {
 		if (cluster && activeTab === 'nodes') {
 			loadNodes()
-		} else if (cluster && activeTab === 'addons') {
+		} else if (cluster && (activeTab === 'addons' || activeTab === 'observability')) {
 			loadAddons()
 		} else if (cluster && activeTab === 'events') {
 			loadEvents()
@@ -284,6 +285,14 @@ export function ClusterDetailPage() {
 				{activeTab === 'gitops' && <GitOpsTab />}
 				{activeTab === 'events' && <EventsTab events={events} />}
 				{activeTab === 'certificates' && <CertificatesTab />}
+				{activeTab === 'observability' && (
+					<ObservabilityTab
+						clusterNamespace={namespace!}
+						clusterName={name!}
+						addons={addons}
+						onRefresh={loadAddons}
+					/>
+				)}
 				{activeTab === 'terminal' && phase === 'Ready' && (
 					<Card className="h-[500px] overflow-hidden">
 						<ClusterTerminal

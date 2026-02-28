@@ -12,6 +12,7 @@ export * from './gitops';
 export { identityProvidersApi, PROVIDER_PRESETS } from './identity-providers'
 export { networksApi } from './networks'
 export * from './certificates';
+export { observabilityApi } from './observability'
 
 export type { Provider, ProviderListResponse, CreateProviderRequest, ValidateResponse, ImageInfo, NetworkInfo, CloudProviderType, OnPremProviderType } from './providers'
 export { isCloudProvider, getProviderRegion, getProviderNetwork } from './providers'

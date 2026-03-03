@@ -96,6 +96,23 @@ export type ClusterPhase =
 	| 'Failed'
 	| 'Unknown'
 
+// Control Plane Resources
+export interface ControlPlaneResourcesSpec {
+	apiServer?: ComponentResources
+	controllerManager?: ComponentResources
+	scheduler?: ComponentResources
+}
+
+export interface ComponentResources {
+	requests?: ResourceQuantities
+	limits?: ResourceQuantities
+}
+
+export interface ResourceQuantities {
+	cpu?: string
+	memory?: string
+}
+
 export interface TenantClusterSpec {
 	kubernetesVersion?: string
 	teamRef?: {
@@ -118,6 +135,10 @@ export interface TenantClusterSpec {
 			start?: string
 			end?: string
 		}
+	}
+	controlPlane?: {
+		replicas?: number
+		resources?: ControlPlaneResourcesSpec
 	}
 }
 

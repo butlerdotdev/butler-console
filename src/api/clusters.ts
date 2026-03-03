@@ -51,6 +51,23 @@ export interface Cluster {
 				templateID?: number
 			}
 		}
+		controlPlane?: {
+			replicas?: number
+			resources?: {
+				apiServer?: {
+					requests?: { cpu?: string; memory?: string }
+					limits?: { cpu?: string; memory?: string }
+				}
+				controllerManager?: {
+					requests?: { cpu?: string; memory?: string }
+					limits?: { cpu?: string; memory?: string }
+				}
+				scheduler?: {
+					requests?: { cpu?: string; memory?: string }
+					limits?: { cpu?: string; memory?: string }
+				}
+			}
+		}
 	}
 	status?: {
 		phase?: string
@@ -110,6 +127,22 @@ export interface CreateClusterRequest {
 	proxmoxNode?: string
 	proxmoxStorage?: string
 	proxmoxTemplateID?: number
+
+	// Control plane resource overrides (optional)
+	controlPlaneResources?: {
+		apiServer?: {
+			requests?: { cpu?: string; memory?: string }
+			limits?: { cpu?: string; memory?: string }
+		}
+		controllerManager?: {
+			requests?: { cpu?: string; memory?: string }
+			limits?: { cpu?: string; memory?: string }
+		}
+		scheduler?: {
+			requests?: { cpu?: string; memory?: string }
+			limits?: { cpu?: string; memory?: string }
+		}
+	}
 }
 
 export interface ScaleRequest {

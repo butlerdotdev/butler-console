@@ -1,6 +1,23 @@
-# Butler Console
+<p align="center">
+  <img src="https://raw.githubusercontent.com/butlerdotdev/butler/main/assets/mascots/butler.png" alt="Butler" width="150"/>
+</p>
 
-A modern web interface for managing Kubernetes clusters provisioned by Butler. Built with React, TypeScript, and Tailwind CSS.
+<h1 align="center">Butler Console</h1>
+
+<p align="center">
+  Web UI for managing Kubernetes clusters on the <a href="https://github.com/butlerdotdev/butler">Butler</a> platform. Built with React, TypeScript, and Tailwind CSS.
+</p>
+
+<p align="center">
+  <a href="https://github.com/butlerdotdev/butler-console/releases"><img src="https://img.shields.io/github/v/release/butlerdotdev/butler-console" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/butlerdotdev/butler-console" alt="License"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/butlerdotdev/butler">Butler</a> · <a href="https://docs.butlerlabs.dev">Docs</a> · <a href="https://butlerlabs.dev">Website</a>
+</p>
+
+---
 
 ## Table of Contents
 

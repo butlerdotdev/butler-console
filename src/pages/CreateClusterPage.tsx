@@ -86,10 +86,24 @@ export function CreateClusterPage() {
 		proxmoxTemplateID: '',
 		// Cloud-specific
 		awsSubnet: '',
+		// Control plane resources (optional)
+		cpApiServerCpuReq: '',
+		cpApiServerMemReq: '',
+		cpApiServerCpuLim: '',
+		cpApiServerMemLim: '',
+		cpCMCpuReq: '',
+		cpCMMemReq: '',
+		cpCMCpuLim: '',
+		cpCMMemLim: '',
+		cpSchedulerCpuReq: '',
+		cpSchedulerMemReq: '',
+		cpSchedulerCpuLim: '',
+		cpSchedulerMemLim: '',
 	})
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [useManualIPs, setUseManualIPs] = useState(false)
+	const [showAdvancedCP, setShowAdvancedCP] = useState(false)
 
 	// Resource quota state
 	const [resourceUsage, setResourceUsage] = useState<TeamResourceUsage | null>(null)
@@ -476,6 +490,45 @@ export function CreateClusterPage() {
 				if (form.awsSubnet) payload.awsSubnet = form.awsSubnet
 			}
 
+			// Add control plane resources if any are set
+			const cpResources: Record<string, unknown> = {}
+			const apiServerRes: Record<string, unknown> = {}
+			const apiServerReq: Record<string, string> = {}
+			const apiServerLim: Record<string, string> = {}
+			if (form.cpApiServerCpuReq) apiServerReq.cpu = form.cpApiServerCpuReq
+			if (form.cpApiServerMemReq) apiServerReq.memory = form.cpApiServerMemReq
+			if (form.cpApiServerCpuLim) apiServerLim.cpu = form.cpApiServerCpuLim
+			if (form.cpApiServerMemLim) apiServerLim.memory = form.cpApiServerMemLim
+			if (Object.keys(apiServerReq).length > 0) apiServerRes.requests = apiServerReq
+			if (Object.keys(apiServerLim).length > 0) apiServerRes.limits = apiServerLim
+			if (Object.keys(apiServerRes).length > 0) cpResources.apiServer = apiServerRes
+
+			const cmRes: Record<string, unknown> = {}
+			const cmReq: Record<string, string> = {}
+			const cmLim: Record<string, string> = {}
+			if (form.cpCMCpuReq) cmReq.cpu = form.cpCMCpuReq
+			if (form.cpCMMemReq) cmReq.memory = form.cpCMMemReq
+			if (form.cpCMCpuLim) cmLim.cpu = form.cpCMCpuLim
+			if (form.cpCMMemLim) cmLim.memory = form.cpCMMemLim
+			if (Object.keys(cmReq).length > 0) cmRes.requests = cmReq
+			if (Object.keys(cmLim).length > 0) cmRes.limits = cmLim
+			if (Object.keys(cmRes).length > 0) cpResources.controllerManager = cmRes
+
+			const schedRes: Record<string, unknown> = {}
+			const schedReq: Record<string, string> = {}
+			const schedLim: Record<string, string> = {}
+			if (form.cpSchedulerCpuReq) schedReq.cpu = form.cpSchedulerCpuReq
+			if (form.cpSchedulerMemReq) schedReq.memory = form.cpSchedulerMemReq
+			if (form.cpSchedulerCpuLim) schedLim.cpu = form.cpSchedulerCpuLim
+			if (form.cpSchedulerMemLim) schedLim.memory = form.cpSchedulerMemLim
+			if (Object.keys(schedReq).length > 0) schedRes.requests = schedReq
+			if (Object.keys(schedLim).length > 0) schedRes.limits = schedLim
+			if (Object.keys(schedRes).length > 0) cpResources.scheduler = schedRes
+
+			if (Object.keys(cpResources).length > 0) {
+				payload.controlPlaneResources = cpResources
+			}
+
 			await clustersApi.create(payload as unknown as Parameters<typeof clustersApi.create>[0])
 			success('Cluster Created', `${form.name} is being provisioned`)
 			if (returnTo) {
@@ -842,6 +895,96 @@ export function CreateClusterPage() {
 								</div>
 							)}
 						</div>
+
+						{/* Control Plane Resources (Advanced) */}
+								<div className="space-y-4">
+									<button
+										type="button"
+										onClick={() => setShowAdvancedCP(!showAdvancedCP)}
+										className="flex items-center gap-2 text-sm text-neutral-400 hover:text-neutral-200"
+									>
+										<svg className={`w-4 h-4 transition-transform ${showAdvancedCP ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+										</svg>
+										Control Plane Resources (Advanced)
+									</button>
+									{showAdvancedCP && (
+										<div className="space-y-4 pl-6 border-l-2 border-neutral-700">
+											<p className="text-xs text-neutral-500">
+												Override platform defaults for tenant control plane components. Leave empty to use ButlerConfig defaults or BestEffort QoS.
+											</p>
+
+											{/* API Server */}
+											<div>
+												<h4 className="text-sm font-medium text-neutral-300 mb-2">API Server</h4>
+												<div className="grid grid-cols-2 gap-4">
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">CPU Request</label>
+														<input type="text" name="cpApiServerCpuReq" value={form.cpApiServerCpuReq} onChange={handleChange} placeholder="e.g., 100m" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">Memory Request</label>
+														<input type="text" name="cpApiServerMemReq" value={form.cpApiServerMemReq} onChange={handleChange} placeholder="e.g., 256Mi" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">CPU Limit</label>
+														<input type="text" name="cpApiServerCpuLim" value={form.cpApiServerCpuLim} onChange={handleChange} placeholder="e.g., 2" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">Memory Limit</label>
+														<input type="text" name="cpApiServerMemLim" value={form.cpApiServerMemLim} onChange={handleChange} placeholder="e.g., 1Gi" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+												</div>
+											</div>
+
+											{/* Controller Manager */}
+											<div>
+												<h4 className="text-sm font-medium text-neutral-300 mb-2">Controller Manager</h4>
+												<div className="grid grid-cols-2 gap-4">
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">CPU Request</label>
+														<input type="text" name="cpCMCpuReq" value={form.cpCMCpuReq} onChange={handleChange} placeholder="e.g., 50m" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">Memory Request</label>
+														<input type="text" name="cpCMMemReq" value={form.cpCMMemReq} onChange={handleChange} placeholder="e.g., 64Mi" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">CPU Limit</label>
+														<input type="text" name="cpCMCpuLim" value={form.cpCMCpuLim} onChange={handleChange} placeholder="e.g., 1" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">Memory Limit</label>
+														<input type="text" name="cpCMMemLim" value={form.cpCMMemLim} onChange={handleChange} placeholder="e.g., 512Mi" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+												</div>
+											</div>
+
+											{/* Scheduler */}
+											<div>
+												<h4 className="text-sm font-medium text-neutral-300 mb-2">Scheduler</h4>
+												<div className="grid grid-cols-2 gap-4">
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">CPU Request</label>
+														<input type="text" name="cpSchedulerCpuReq" value={form.cpSchedulerCpuReq} onChange={handleChange} placeholder="e.g., 25m" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">Memory Request</label>
+														<input type="text" name="cpSchedulerMemReq" value={form.cpSchedulerMemReq} onChange={handleChange} placeholder="e.g., 32Mi" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">CPU Limit</label>
+														<input type="text" name="cpSchedulerCpuLim" value={form.cpSchedulerCpuLim} onChange={handleChange} placeholder="e.g., 500m" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+													<div>
+														<label className="block text-xs text-neutral-500 mb-1">Memory Limit</label>
+														<input type="text" name="cpSchedulerMemLim" value={form.cpSchedulerMemLim} onChange={handleChange} placeholder="e.g., 256Mi" className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+													</div>
+												</div>
+											</div>
+										</div>
+									)}
+								</div>
 
 						{/* Quota Warnings */}
 						{quotaWarnings.length > 0 && (

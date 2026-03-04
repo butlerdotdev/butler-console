@@ -110,6 +110,7 @@ export function Sidebar() {
 			{ to: '/admin/teams', label: 'Teams', icon: TeamsIcon },
 			{ to: '/admin/users', label: 'Users', icon: UsersIcon },
 			{ to: '/admin/providers', label: 'Providers', icon: ProvidersIcon },
+			{ to: '/admin/images', label: 'Images', icon: ImagesIcon },
 		{ to: '/admin/networks', label: 'Network Pools', icon: NetworkPoolsIcon },
 			{ to: '/admin/identity-providers', label: 'Identity Providers', icon: IdentityProvidersIcon },
 			{ to: '/admin/observability', label: 'Observability', icon: ObservabilityIcon },
@@ -133,6 +134,7 @@ export function Sidebar() {
 			{ to: '/admin/teams', label: 'Teams', icon: TeamsIcon },
 			{ to: '/admin/users', label: 'Users', icon: UsersIcon },
 			{ to: '/admin/providers', label: 'Providers', icon: ProvidersIcon },
+			{ to: '/admin/images', label: 'Images', icon: ImagesIcon },
 		{ to: '/admin/networks', label: 'Network Pools', icon: NetworkPoolsIcon },
 			{ to: '/admin/identity-providers', label: 'Identity Providers', icon: IdentityProvidersIcon },
 			{ to: '/admin/observability', label: 'Observability', icon: ObservabilityIcon },
@@ -363,6 +365,19 @@ function IdentityProvidersIcon({ className }: { className?: string }) {
 				strokeLinejoin="round"
 				strokeWidth={2}
 				d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+			/>
+		</svg>
+	)
+}
+
+function ImagesIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<path
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth={2}
+				d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
 			/>
 		</svg>
 	)

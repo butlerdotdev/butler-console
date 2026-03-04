@@ -27,3 +27,4 @@ export { AdminTeamDetailPage } from './AdminTeamDetailPage'
 
 export { IdentityProvidersPage } from './IdentityProvidersPage'
 export { CreateIdentityProviderPage } from './CreateIdentityProviderPage'
+export { ImagesPage } from './ImagesPage'

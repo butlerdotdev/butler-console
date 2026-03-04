@@ -22,28 +22,28 @@ export const imagesApi = {
 		if (params?.schematic) searchParams.set('schematic', params.schematic)
 		const queryString = searchParams.toString()
 		return apiClient.get<ImageSyncListResponse>(
-			`/admin/images${queryString ? `?${queryString}` : ''}`
+			`/image-syncs${queryString ? `?${queryString}` : ''}`
 		)
 	},
 
 	async get(namespace: string, name: string): Promise<ImageSync> {
-		return apiClient.get<ImageSync>(`/admin/images/${namespace}/${name}`)
+		return apiClient.get<ImageSync>(`/image-syncs/${namespace}/${name}`)
 	},
 
 	async create(data: CreateImageSyncRequest): Promise<ImageSync> {
-		return apiClient.post<ImageSync>('/admin/images', data)
+		return apiClient.post<ImageSync>('/image-syncs', data)
 	},
 
 	async delete(namespace: string, name: string): Promise<void> {
-		return apiClient.delete(`/admin/images/${namespace}/${name}`)
+		return apiClient.delete(`/image-syncs/${namespace}/${name}`)
 	},
 
 	async getFactoryCatalog(): Promise<FactoryCatalogEntry[]> {
-		const response = await apiClient.get<FactoryCatalogResponse>('/admin/images/catalog')
+		const response = await apiClient.get<FactoryCatalogResponse>('/image-factory/catalog')
 		return response.entries || []
 	},
 
 	async getFactorySchematic(id: string): Promise<Record<string, unknown>> {
-		return apiClient.get<Record<string, unknown>>(`/admin/images/schematics/${id}`)
+		return apiClient.get<Record<string, unknown>>(`/image-factory/schematics/${id}`)
 	},
 }

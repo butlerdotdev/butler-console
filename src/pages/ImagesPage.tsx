@@ -277,8 +277,9 @@ interface ImageSyncRowProps {
 function ImageSyncRow({ imageSync, onDelete }: ImageSyncRowProps) {
 	const { metadata, spec, status } = imageSync
 	const phase = status?.phase || 'Unknown'
-	const schematicShort = spec.schematicID
-		? spec.schematicID.substring(0, 8)
+	const factoryRef = spec.factoryRef
+	const schematicShort = factoryRef?.schematicID
+		? factoryRef.schematicID.substring(0, 8)
 		: '-'
 
 	const providerRef = spec.providerConfigRef
@@ -320,15 +321,15 @@ function ImageSyncRow({ imageSync, onDelete }: ImageSyncRowProps) {
 			<td className="px-4 py-3">
 				<span
 					className="text-sm text-neutral-300 font-mono"
-					title={spec.schematicID}
+					title={factoryRef?.schematicID}
 				>
 					{schematicShort}
 				</span>
 			</td>
 			<td className="px-4 py-3">
-				<span className="text-sm text-neutral-300">{spec.version}</span>
-				{spec.arch && (
-					<span className="ml-1.5 text-xs text-neutral-500">({spec.arch})</span>
+				<span className="text-sm text-neutral-300">{factoryRef?.version}</span>
+				{factoryRef?.arch && (
+					<span className="ml-1.5 text-xs text-neutral-500">({factoryRef.arch})</span>
 				)}
 			</td>
 			<td className="px-4 py-3">

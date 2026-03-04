@@ -7,10 +7,15 @@ import type { ObjectMeta, Condition } from './index'
 // ImageSync CRD
 // ----------------------------------------------------------------------------
 
-export interface ImageSyncSpec {
+export interface ImageFactoryRef {
 	schematicID: string
 	version: string
 	arch?: string
+	platform?: string
+}
+
+export interface ImageSyncSpec {
+	factoryRef: ImageFactoryRef
 	providerConfigRef: {
 		name: string
 		namespace?: string
@@ -23,8 +28,13 @@ export interface ImageSyncSpec {
 export interface ImageSyncStatus {
 	phase?: ImageSyncPhase
 	providerImageRef?: string
+	providerTaskID?: string
+	artifactURL?: string
+	artifactSHA256?: string
 	failureReason?: string
 	failureMessage?: string
+	observedGeneration?: number
+	lastUpdated?: string
 	conditions?: Condition[]
 }
 
@@ -56,6 +66,7 @@ export interface CreateImageSyncRequest {
 	schematicID: string
 	version: string
 	arch?: string
+	platform?: string
 	providerConfig: string // "namespace/name" format
 	format?: string
 	transferMode?: string

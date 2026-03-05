@@ -86,6 +86,8 @@ export function CreateClusterPage() {
 		proxmoxTemplateID: '',
 		// Cloud-specific
 		awsSubnet: '',
+		// Image schematic (optional)
+		schematicID: '',
 		// Control plane resources (optional)
 		cpApiServerCpuReq: '',
 		cpApiServerMemReq: '',
@@ -529,6 +531,11 @@ export function CreateClusterPage() {
 				payload.controlPlaneResources = cpResources
 			}
 
+			// Add schematic ID if specified
+			if (form.schematicID) {
+				payload.schematicID = form.schematicID
+			}
+
 			await clustersApi.create(payload as unknown as Parameters<typeof clustersApi.create>[0])
 			success('Cluster Created', `${form.name} is being provisioned`)
 			if (returnTo) {
@@ -896,7 +903,7 @@ export function CreateClusterPage() {
 							)}
 						</div>
 
-						{/* Control Plane Resources (Advanced) */}
+						{/* Advanced Options */}
 								<div className="space-y-4">
 									<button
 										type="button"
@@ -906,10 +913,26 @@ export function CreateClusterPage() {
 										<svg className={`w-4 h-4 transition-transform ${showAdvancedCP ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
 											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
 										</svg>
-										Control Plane Resources (Advanced)
+										Advanced Options
 									</button>
 									{showAdvancedCP && (
 										<div className="space-y-4 pl-6 border-l-2 border-neutral-700">
+											{/* Schematic ID */}
+											<div>
+												<label className="block text-sm font-medium text-neutral-400 mb-1">Schematic ID</label>
+												<input
+													type="text"
+													name="schematicID"
+													value={form.schematicID}
+													onChange={handleChange}
+													placeholder="e.g., ce4c980550dd2ab1b17bbf2b08801c7eb59418ea..."
+													className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+												/>
+												<p className="text-xs text-neutral-500 mt-1">
+													Image Factory schematic hash. Leave empty to use the provider default image.
+												</p>
+											</div>
+
 											<p className="text-xs text-neutral-500">
 												Override platform defaults for tenant control plane components. Leave empty to use ButlerConfig defaults or BestEffort QoS.
 											</p>

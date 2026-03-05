@@ -13,6 +13,7 @@ export { identityProvidersApi, PROVIDER_PRESETS } from './identity-providers'
 export { networksApi } from './networks'
 export * from './certificates';
 export { observabilityApi } from './observability'
+export { imagesApi } from './images'
 
 export type { Provider, ProviderListResponse, CreateProviderRequest, ValidateResponse, ImageInfo, NetworkInfo, CloudProviderType, OnPremProviderType } from './providers'
 export { isCloudProvider, getProviderRegion, getProviderNetwork } from './providers'
@@ -45,6 +46,13 @@ export type {
 	IPAllocationListResponse,
 	CreateNetworkPoolRequest,
 } from '@/types/networks'
+
+export type {
+	ImageSync,
+	ImageSyncListResponse,
+	CreateImageSyncRequest,
+	FactoryCatalogEntry,
+} from '@/types/imagesync'
 
 // Backwards compatible aliases
 export type { ManagementCluster as ManagementClusterInfo } from './clusters'

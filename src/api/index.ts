@@ -14,6 +14,18 @@ export { networksApi } from './networks'
 export * from './certificates';
 export { observabilityApi } from './observability'
 export { imagesApi } from './images'
+export { configApi } from './config'
+export type {
+	ButlerConfigResponse,
+	UpdateConfigRequest,
+	MultiTenancyInfo,
+	ControlPlaneExposureInfo,
+	AddonVersionsInfo,
+	TeamLimitsInfo,
+	CPResourcesInfo,
+	ImageFactoryInfo,
+	ConfigStatusInfo,
+} from './config'
 
 export type { Provider, ProviderListResponse, CreateProviderRequest, ValidateResponse, ImageInfo, NetworkInfo, CloudProviderType, OnPremProviderType } from './providers'
 export { isCloudProvider, getProviderRegion, getProviderNetwork } from './providers'

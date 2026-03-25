@@ -120,6 +120,22 @@ export function ClusterDetailPage() {
 		}
 	}, [namespace, name, loadCluster])
 
+	// Auto-poll every 5s when workers are scaling (ready !== desired)
+	useEffect(() => {
+		if (!cluster) return
+		const ready = cluster.status?.workerNodesReady ?? 0
+		const desired = cluster.status?.workerNodesDesired ?? 0
+		const phase = cluster.status?.phase
+		const isConverging = desired > 0 && ready !== desired
+		const isNotReady = phase && phase !== 'Ready'
+		if (!isConverging && !isNotReady) return
+
+		const interval = setInterval(() => {
+			loadCluster()
+		}, 5000)
+		return () => clearInterval(interval)
+	}, [cluster, loadCluster])
+
 	useEffect(() => {
 		if (cluster && activeTab === 'nodes') {
 			loadNodes()
@@ -364,8 +380,25 @@ function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace
 							</dd>
 						</div>
 						<div className="flex justify-between">
-							<dt className="text-neutral-400">Worker Replicas</dt>
-							<dd className="text-neutral-50">{spec.workers?.replicas || 0}</dd>
+							<dt className="text-neutral-400">Workers</dt>
+							<dd className="text-neutral-50">
+								{(() => {
+									const desired = status?.workerNodesDesired ?? spec.workers?.replicas ?? 0
+									const ready = status?.workerNodesReady ?? 0
+									if (desired > 0 && ready !== desired) {
+										return (
+											<span className="flex items-center gap-2">
+												<span className="text-amber-400">{ready}/{desired} ready</span>
+												<svg className="w-4 h-4 text-amber-400 animate-spin" fill="none" viewBox="0 0 24 24">
+													<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+													<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+												</svg>
+											</span>
+										)
+									}
+									return <span>{desired}</span>
+								})()}
+							</dd>
 						</div>
 					</dl>
 				</Card>
@@ -386,16 +419,28 @@ function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace
 							<dd className="text-neutral-50">{isControlPlaneReady ? 'Yes' : 'No'}</dd>
 						</div>
 						{status?.conditions && (() => {
-							const networkReady = (status.conditions as Array<{type: string; status: string; reason?: string; message?: string}>)
-								.find((c) => c.type === 'NetworkReady')
-							if (!networkReady) return null
+							const conditions = status.conditions as Array<{type: string; status: string; reason?: string; message?: string}>
+							const workersReady = conditions.find((c) => c.type === 'WorkersReady')
+							const networkReady = conditions.find((c) => c.type === 'NetworkReady')
 							return (
-								<div className="flex justify-between">
-									<dt className="text-neutral-400">Network Ready</dt>
-									<dd>
-										<StatusBadge status={networkReady.status === 'True' ? 'Ready' : networkReady.status === 'False' ? 'Failed' : 'Pending'} />
-									</dd>
-								</div>
+								<>
+									{workersReady && (
+										<div className="flex justify-between">
+											<dt className="text-neutral-400">Workers Ready</dt>
+											<dd>
+												<StatusBadge status={workersReady.status === 'True' ? 'Ready' : workersReady.reason === 'WorkersProvisioning' ? 'Provisioning' : 'Pending'} />
+											</dd>
+										</div>
+									)}
+									{networkReady && (
+										<div className="flex justify-between">
+											<dt className="text-neutral-400">Network Ready</dt>
+											<dd>
+												<StatusBadge status={networkReady.status === 'True' ? 'Ready' : networkReady.status === 'False' ? 'Failed' : 'Pending'} />
+											</dd>
+										</div>
+									)}
+								</>
 							)
 						})()}
 					</dl>

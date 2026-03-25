@@ -9,6 +9,7 @@ import { clustersApi, type Cluster, type Node, type Addon, type ClusterEvent } f
 import { Card, Spinner, StatusBadge, Button, FadeIn } from '@/components/ui'
 import { ClusterTerminal } from '@/components/terminal'
 import { DeleteClusterModal } from '@/components/clusters/DeleteClusterModal'
+import { ScaleWorkersModal } from '@/components/clusters/ScaleWorkersModal'
 import { useToast } from '@/hooks/useToast'
 import { AddonsTab } from '@/components/clusters'
 import { AccessDenied } from '@/components/AccessDenied'
@@ -59,6 +60,7 @@ export function ClusterDetailPage() {
 	const [accessDenied, setAccessDenied] = useState(false)
 	const [accessDeniedMessage, setAccessDeniedMessage] = useState<string>('')
 	const [showDeleteModal, setShowDeleteModal] = useState(false)
+	const [showScaleModal, setShowScaleModal] = useState(false)
 
 	const loadCluster = useCallback(async () => {
 		if (!namespace || !name) return
@@ -142,6 +144,13 @@ export function ClusterDetailPage() {
 				showError('Delete Failed', err instanceof Error ? err.message : 'Failed to delete cluster')
 			}
 		}
+	}
+
+	const handleScale = async (replicas: number) => {
+		if (!namespace || !name) return
+		await clustersApi.scale(namespace, name, replicas)
+		success('Workers Scaled', `Cluster ${name} scaled to ${replicas} worker${replicas !== 1 ? 's' : ''}`)
+		loadCluster()
 	}
 
 	const handleDownloadKubeconfig = async () => {
@@ -244,6 +253,12 @@ export function ClusterDetailPage() {
 							Download Kubeconfig
 						</Button>
 						<Button
+							variant="secondary"
+							onClick={() => setShowScaleModal(true)}
+						>
+							Scale Workers
+						</Button>
+						<Button
 							variant="danger"
 							onClick={() => setShowDeleteModal(true)}
 						>
@@ -312,6 +327,13 @@ export function ClusterDetailPage() {
 				clusterName={clusterName}
 				clusterNamespace={clusterNamespace}
 				workerCount={workerCount}
+			/>
+			<ScaleWorkersModal
+				isOpen={showScaleModal}
+				onClose={() => setShowScaleModal(false)}
+				onScale={handleScale}
+				clusterName={clusterName}
+				currentReplicas={workerCount}
 			/>
 		</FadeIn>
 	)

@@ -57,40 +57,42 @@ export function SettingsPage() {
 
 	const [sshKey, setSSHKey] = useState('')
 
+	const populateFormState = useCallback((data: ButlerConfigResponse) => {
+		setMultiTenancyMode(data.multiTenancy?.mode || 'Disabled')
+		setDefaultNamespace(data.defaultNamespace || '')
+		setDefaultProviderName(data.defaultProviderRef?.name || '')
+
+		setExposureMode(data.controlPlaneExposure?.mode || 'LoadBalancer')
+		setExposureHostname(data.controlPlaneExposure?.hostname || '')
+		setExposureIngressClass(data.controlPlaneExposure?.ingressClassName || '')
+		setExposureControllerType(data.controlPlaneExposure?.controllerType || '')
+		setExposureGatewayRef(data.controlPlaneExposure?.gatewayRef || '')
+
+		setAddonVersions(data.defaultAddonVersions || {})
+		setTeamLimits(data.defaultTeamLimits || {})
+		setCPResources(data.defaultControlPlaneResources || {})
+
+		setFactoryURL(data.imageFactory?.url || '')
+		setFactoryCredRef(data.imageFactory?.credentialsRef || '')
+		setFactorySchematicID(data.imageFactory?.defaultSchematicID || '')
+		setFactoryAutoSync(data.imageFactory?.autoSync !== false)
+
+		setSSHKey(data.sshAuthorizedKey || '')
+	}, [])
+
 	const loadConfig = useCallback(async () => {
 		try {
 			setLoading(true)
 			setError(null)
 			const data = await configApi.getConfig()
 			setConfig(data)
-
-			// Populate form state from loaded config
-			setMultiTenancyMode(data.multiTenancy?.mode || 'Disabled')
-			setDefaultNamespace(data.defaultNamespace || '')
-			setDefaultProviderName(data.defaultProviderRef?.name || '')
-
-			setExposureMode(data.controlPlaneExposure?.mode || 'LoadBalancer')
-			setExposureHostname(data.controlPlaneExposure?.hostname || '')
-			setExposureIngressClass(data.controlPlaneExposure?.ingressClassName || '')
-			setExposureControllerType(data.controlPlaneExposure?.controllerType || '')
-			setExposureGatewayRef(data.controlPlaneExposure?.gatewayRef || '')
-
-			setAddonVersions(data.defaultAddonVersions || {})
-			setTeamLimits(data.defaultTeamLimits || {})
-			setCPResources(data.defaultControlPlaneResources || {})
-
-			setFactoryURL(data.imageFactory?.url || '')
-			setFactoryCredRef(data.imageFactory?.credentialsRef || '')
-			setFactorySchematicID(data.imageFactory?.defaultSchematicID || '')
-			setFactoryAutoSync(data.imageFactory?.autoSync !== false)
-
-			setSSHKey(data.sshAuthorizedKey || '')
+			populateFormState(data)
 		} catch {
 			setError('Failed to load platform configuration')
 		} finally {
 			setLoading(false)
 		}
-	}, [])
+	}, [populateFormState])
 
 	useEffect(() => {
 		loadConfig()
@@ -105,6 +107,7 @@ export function SettingsPage() {
 			setSaving(true)
 			const updated = await configApi.updateConfig(data)
 			setConfig(updated)
+			populateFormState(updated)
 			toast.success(`${sectionName} saved`)
 		} catch {
 			toast.error(`Failed to save ${sectionName.toLowerCase()}`)
@@ -162,9 +165,7 @@ export function SettingsPage() {
 									{
 										multiTenancy: { mode: multiTenancyMode },
 										defaultNamespace: defaultNamespace,
-										defaultProviderRef: defaultProviderName
-											? { name: defaultProviderName }
-											: undefined,
+										defaultProviderRef: { name: defaultProviderName },
 									},
 									setSavingGeneral,
 									'General settings'
@@ -218,10 +219,10 @@ export function SettingsPage() {
 							onClick={() => {
 								const exposure: ControlPlaneExposureInfo = {
 									mode: exposureMode,
-									hostname: exposureHostname || undefined,
-									ingressClassName: exposureIngressClass || undefined,
-									controllerType: exposureControllerType || undefined,
-									gatewayRef: exposureGatewayRef || undefined,
+									hostname: exposureHostname,
+									ingressClassName: exposureIngressClass,
+									controllerType: exposureControllerType,
+									gatewayRef: exposureGatewayRef,
 								}
 								saveSection(
 									{ controlPlaneExposure: exposure },
@@ -499,8 +500,8 @@ export function SettingsPage() {
 							onClick={() => {
 								const factory: ImageFactoryInfo = {
 									url: factoryURL,
-									credentialsRef: factoryCredRef || undefined,
-									defaultSchematicID: factorySchematicID || undefined,
+									credentialsRef: factoryCredRef,
+									defaultSchematicID: factorySchematicID,
 									autoSync: factoryAutoSync,
 								}
 								saveSection({ imageFactory: factory }, setSavingFactory, 'Image factory')

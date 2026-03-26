@@ -66,6 +66,15 @@ interface TeamResourceUsage {
 	memoryUtilization?: number
 }
 
+interface ClusterDefaults {
+	kubernetesVersion?: string
+	workerCount?: number
+	workerCPU?: number
+	workerMemoryGi?: number
+	workerDiskGi?: number
+	defaultAddons?: string[]
+}
+
 interface TeamDetails {
 	name: string
 	displayName: string
@@ -76,6 +85,7 @@ interface TeamDetails {
 	memberCount: number
 	resourceLimits?: TeamResourceLimits
 	resourceUsage?: TeamResourceUsage
+	clusterDefaults?: ClusterDefaults
 }
 
 export function AdminTeamDetailPage() {
@@ -116,6 +126,14 @@ export function AdminTeamDetailPage() {
 	// Group sync to remove
 	const [groupSyncToRemove, setGroupSyncToRemove] = useState<GroupSync | null>(null)
 	const [removingGroupSync, setRemovingGroupSync] = useState(false)
+
+	// Edit resource limits modal
+	const [showEditLimitsModal, setShowEditLimitsModal] = useState(false)
+	const [savingLimits, setSavingLimits] = useState(false)
+
+	// Edit cluster defaults modal
+	const [showEditDefaultsModal, setShowEditDefaultsModal] = useState(false)
+	const [savingDefaults, setSavingDefaults] = useState(false)
 
 	const fetchTeam = useCallback(async () => {
 		if (!teamName) return
@@ -411,6 +429,85 @@ export function AdminTeamDetailPage() {
 		}
 	}
 
+	const handleSaveLimits = async (limits: TeamResourceLimits) => {
+		if (!teamName) return
+
+		setSavingLimits(true)
+		try {
+			const body: Record<string, unknown> = {}
+			const limitsPayload: Record<string, unknown> = {}
+
+			if (limits.maxClusters != null) limitsPayload.maxClusters = limits.maxClusters
+			if (limits.maxTotalNodes != null) limitsPayload.maxTotalNodes = limits.maxTotalNodes
+			if (limits.maxNodesPerCluster != null) limitsPayload.maxNodesPerCluster = limits.maxNodesPerCluster
+			if (limits.maxCPUCores) limitsPayload.maxCPUCores = limits.maxCPUCores
+			if (limits.maxMemory) limitsPayload.maxMemory = limits.maxMemory
+			if (limits.maxStorage) limitsPayload.maxStorage = limits.maxStorage
+
+			body.resourceLimits = limitsPayload
+
+			const response = await fetch(`/api/teams/${teamName}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify(body),
+			})
+
+			if (!response.ok) {
+				const data = await response.json()
+				toast.error('Failed to update limits', data.error || 'Unknown error')
+				return
+			}
+
+			toast.success('Limits Updated', 'Resource limits have been updated')
+			setShowEditLimitsModal(false)
+			fetchTeam()
+		} catch {
+			toast.error('Error', 'An error occurred while updating resource limits')
+		} finally {
+			setSavingLimits(false)
+		}
+	}
+
+	const handleSaveDefaults = async (defaults: ClusterDefaults) => {
+		if (!teamName) return
+
+		setSavingDefaults(true)
+		try {
+			const body: Record<string, unknown> = {}
+			const defaultsPayload: Record<string, unknown> = {}
+
+			if (defaults.kubernetesVersion) defaultsPayload.kubernetesVersion = defaults.kubernetesVersion
+			if (defaults.workerCount != null) defaultsPayload.workerCount = defaults.workerCount
+			if (defaults.workerCPU != null) defaultsPayload.workerCPU = defaults.workerCPU
+			if (defaults.workerMemoryGi != null) defaultsPayload.workerMemoryGi = defaults.workerMemoryGi
+			if (defaults.workerDiskGi != null) defaultsPayload.workerDiskGi = defaults.workerDiskGi
+
+			body.clusterDefaults = defaultsPayload
+
+			const response = await fetch(`/api/teams/${teamName}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify(body),
+			})
+
+			if (!response.ok) {
+				const data = await response.json()
+				toast.error('Failed to update defaults', data.error || 'Unknown error')
+				return
+			}
+
+			toast.success('Defaults Updated', 'Cluster defaults have been updated')
+			setShowEditDefaultsModal(false)
+			fetchTeam()
+		} catch {
+			toast.error('Error', 'An error occurred while updating cluster defaults')
+		} finally {
+			setSavingDefaults(false)
+		}
+	}
+
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center h-64">
@@ -590,9 +687,14 @@ export function AdminTeamDetailPage() {
 
 				{/* Resource Usage Section */}
 				<Card className="p-5">
-					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">
-						Resource Usage
-					</h3>
+					<div className="flex items-center justify-between mb-4">
+						<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide">
+							Resource Usage
+						</h3>
+						<Button size="sm" variant="secondary" onClick={() => setShowEditLimitsModal(true)}>
+							Edit Limits
+						</Button>
+					</div>
 					{team.resourceUsage ? (
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
 							<ResourceUsageBar
@@ -636,6 +738,56 @@ export function AdminTeamDetailPage() {
 					) : (
 						<div className="text-sm text-neutral-500">
 							Resource usage data is not yet available. The controller has not populated usage metrics for this team.
+						</div>
+					)}
+				</Card>
+
+				{/* Cluster Defaults Section */}
+				<Card className="p-5">
+					<div className="flex items-center justify-between mb-4">
+						<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide">
+							Cluster Defaults
+						</h3>
+						<Button size="sm" variant="secondary" onClick={() => setShowEditDefaultsModal(true)}>
+							Edit Defaults
+						</Button>
+					</div>
+					{team.clusterDefaults ? (
+						<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+							{team.clusterDefaults.kubernetesVersion && (
+								<div>
+									<p className="text-xs text-neutral-500">K8s Version</p>
+									<p className="text-sm font-mono text-neutral-200">{team.clusterDefaults.kubernetesVersion}</p>
+								</div>
+							)}
+							{team.clusterDefaults.workerCount != null && (
+								<div>
+									<p className="text-xs text-neutral-500">Worker Count</p>
+									<p className="text-sm font-mono text-neutral-200">{team.clusterDefaults.workerCount}</p>
+								</div>
+							)}
+							{team.clusterDefaults.workerCPU != null && (
+								<div>
+									<p className="text-xs text-neutral-500">Worker CPU</p>
+									<p className="text-sm font-mono text-neutral-200">{team.clusterDefaults.workerCPU} cores</p>
+								</div>
+							)}
+							{team.clusterDefaults.workerMemoryGi != null && (
+								<div>
+									<p className="text-xs text-neutral-500">Worker Memory</p>
+									<p className="text-sm font-mono text-neutral-200">{team.clusterDefaults.workerMemoryGi} Gi</p>
+								</div>
+							)}
+							{team.clusterDefaults.workerDiskGi != null && (
+								<div>
+									<p className="text-xs text-neutral-500">Worker Disk</p>
+									<p className="text-sm font-mono text-neutral-200">{team.clusterDefaults.workerDiskGi} Gi</p>
+								</div>
+							)}
+						</div>
+					) : (
+						<div className="text-sm text-neutral-500">
+							No cluster defaults configured. New clusters will use platform defaults.
 						</div>
 					)}
 				</Card>
@@ -1122,6 +1274,257 @@ export function AdminTeamDetailPage() {
 					</Button>
 				</ModalFooter>
 			</Modal>
+			{/* Edit Resource Limits Modal */}
+			<EditResourceLimitsModal
+				isOpen={showEditLimitsModal}
+				onClose={() => setShowEditLimitsModal(false)}
+				onSave={handleSaveLimits}
+				currentLimits={team.resourceLimits}
+				saving={savingLimits}
+			/>
+
+			{/* Edit Cluster Defaults Modal */}
+			<EditClusterDefaultsModal
+				isOpen={showEditDefaultsModal}
+				onClose={() => setShowEditDefaultsModal(false)}
+				onSave={handleSaveDefaults}
+				currentDefaults={team.clusterDefaults}
+				saving={savingDefaults}
+			/>
 		</FadeIn>
+	)
+}
+
+function EditResourceLimitsModal({
+	isOpen,
+	onClose,
+	onSave,
+	currentLimits,
+	saving,
+}: {
+	isOpen: boolean
+	onClose: () => void
+	onSave: (limits: TeamResourceLimits) => void
+	currentLimits?: TeamResourceLimits
+	saving: boolean
+}) {
+	const [form, setForm] = useState({
+		maxClusters: '',
+		maxTotalNodes: '',
+		maxNodesPerCluster: '',
+		maxCPUCores: '',
+		maxMemory: '',
+		maxStorage: '',
+	})
+
+	useEffect(() => {
+		if (isOpen) {
+			setForm({
+				maxClusters: currentLimits?.maxClusters?.toString() || '',
+				maxTotalNodes: currentLimits?.maxTotalNodes?.toString() || '',
+				maxNodesPerCluster: currentLimits?.maxNodesPerCluster?.toString() || '',
+				maxCPUCores: currentLimits?.maxCPUCores || '',
+				maxMemory: currentLimits?.maxMemory || '',
+				maxStorage: currentLimits?.maxStorage || '',
+			})
+		}
+	}, [isOpen, currentLimits])
+
+	const handleSubmit = (e: React.FormEvent) => {
+		e.preventDefault()
+		const limits: TeamResourceLimits = {}
+		if (form.maxClusters) limits.maxClusters = parseInt(form.maxClusters, 10)
+		if (form.maxTotalNodes) limits.maxTotalNodes = parseInt(form.maxTotalNodes, 10)
+		if (form.maxNodesPerCluster) limits.maxNodesPerCluster = parseInt(form.maxNodesPerCluster, 10)
+		if (form.maxCPUCores) limits.maxCPUCores = form.maxCPUCores
+		if (form.maxMemory) limits.maxMemory = form.maxMemory
+		if (form.maxStorage) limits.maxStorage = form.maxStorage
+		onSave(limits)
+	}
+
+	return (
+		<Modal isOpen={isOpen} onClose={onClose}>
+			<ModalHeader>
+				<h2 className="text-lg font-semibold text-neutral-100">Edit Resource Limits</h2>
+			</ModalHeader>
+			<form onSubmit={handleSubmit}>
+				<ModalBody className="space-y-4">
+					<p className="text-sm text-neutral-500">
+						Set resource quotas for this team. Leave fields empty to remove the limit.
+					</p>
+					<div className="grid grid-cols-2 gap-4">
+						<Input
+							id="maxClusters"
+							label="Max Clusters"
+							type="number"
+							min={0}
+							value={form.maxClusters}
+							onChange={(e) => setForm({ ...form, maxClusters: e.target.value })}
+							placeholder="Unlimited"
+						/>
+						<Input
+							id="maxTotalNodes"
+							label="Max Total Nodes"
+							type="number"
+							min={0}
+							value={form.maxTotalNodes}
+							onChange={(e) => setForm({ ...form, maxTotalNodes: e.target.value })}
+							placeholder="Unlimited"
+						/>
+						<Input
+							id="maxNodesPerCluster"
+							label="Max Nodes per Cluster"
+							type="number"
+							min={0}
+							value={form.maxNodesPerCluster}
+							onChange={(e) => setForm({ ...form, maxNodesPerCluster: e.target.value })}
+							placeholder="Unlimited"
+						/>
+						<Input
+							id="maxCPUCores"
+							label="Max CPU Cores"
+							value={form.maxCPUCores}
+							onChange={(e) => setForm({ ...form, maxCPUCores: e.target.value })}
+							placeholder="e.g. 200"
+						/>
+						<Input
+							id="maxMemory"
+							label="Max Memory"
+							value={form.maxMemory}
+							onChange={(e) => setForm({ ...form, maxMemory: e.target.value })}
+							placeholder="e.g. 400Gi"
+						/>
+						<Input
+							id="maxStorage"
+							label="Max Storage"
+							value={form.maxStorage}
+							onChange={(e) => setForm({ ...form, maxStorage: e.target.value })}
+							placeholder="e.g. 2Ti"
+						/>
+					</div>
+				</ModalBody>
+				<ModalFooter>
+					<Button type="button" variant="secondary" onClick={onClose}>
+						Cancel
+					</Button>
+					<Button type="submit" disabled={saving}>
+						{saving ? 'Saving...' : 'Save Limits'}
+					</Button>
+				</ModalFooter>
+			</form>
+		</Modal>
+	)
+}
+
+function EditClusterDefaultsModal({
+	isOpen,
+	onClose,
+	onSave,
+	currentDefaults,
+	saving,
+}: {
+	isOpen: boolean
+	onClose: () => void
+	onSave: (defaults: ClusterDefaults) => void
+	currentDefaults?: ClusterDefaults
+	saving: boolean
+}) {
+	const [form, setForm] = useState({
+		kubernetesVersion: '',
+		workerCount: '',
+		workerCPU: '',
+		workerMemoryGi: '',
+		workerDiskGi: '',
+	})
+
+	useEffect(() => {
+		if (isOpen) {
+			setForm({
+				kubernetesVersion: currentDefaults?.kubernetesVersion || '',
+				workerCount: currentDefaults?.workerCount?.toString() || '',
+				workerCPU: currentDefaults?.workerCPU?.toString() || '',
+				workerMemoryGi: currentDefaults?.workerMemoryGi?.toString() || '',
+				workerDiskGi: currentDefaults?.workerDiskGi?.toString() || '',
+			})
+		}
+	}, [isOpen, currentDefaults])
+
+	const handleSubmit = (e: React.FormEvent) => {
+		e.preventDefault()
+		const defaults: ClusterDefaults = {}
+		if (form.kubernetesVersion) defaults.kubernetesVersion = form.kubernetesVersion
+		if (form.workerCount) defaults.workerCount = parseInt(form.workerCount, 10)
+		if (form.workerCPU) defaults.workerCPU = parseInt(form.workerCPU, 10)
+		if (form.workerMemoryGi) defaults.workerMemoryGi = parseInt(form.workerMemoryGi, 10)
+		if (form.workerDiskGi) defaults.workerDiskGi = parseInt(form.workerDiskGi, 10)
+		onSave(defaults)
+	}
+
+	return (
+		<Modal isOpen={isOpen} onClose={onClose}>
+			<ModalHeader>
+				<h2 className="text-lg font-semibold text-neutral-100">Edit Cluster Defaults</h2>
+			</ModalHeader>
+			<form onSubmit={handleSubmit}>
+				<ModalBody className="space-y-4">
+					<p className="text-sm text-neutral-500">
+						Set default values for new clusters created by this team. Leave fields empty to use platform defaults.
+					</p>
+					<Input
+						id="kubernetesVersion"
+						label="Kubernetes Version"
+						value={form.kubernetesVersion}
+						onChange={(e) => setForm({ ...form, kubernetesVersion: e.target.value })}
+						placeholder="e.g. v1.31.0"
+					/>
+					<div className="grid grid-cols-2 gap-4">
+						<Input
+							id="workerCount"
+							label="Worker Count"
+							type="number"
+							min={0}
+							value={form.workerCount}
+							onChange={(e) => setForm({ ...form, workerCount: e.target.value })}
+							placeholder="Platform default"
+						/>
+						<Input
+							id="workerCPU"
+							label="Worker CPU (cores)"
+							type="number"
+							min={1}
+							value={form.workerCPU}
+							onChange={(e) => setForm({ ...form, workerCPU: e.target.value })}
+							placeholder="Platform default"
+						/>
+						<Input
+							id="workerMemoryGi"
+							label="Worker Memory (Gi)"
+							type="number"
+							min={1}
+							value={form.workerMemoryGi}
+							onChange={(e) => setForm({ ...form, workerMemoryGi: e.target.value })}
+							placeholder="Platform default"
+						/>
+						<Input
+							id="workerDiskGi"
+							label="Worker Disk (Gi)"
+							type="number"
+							min={10}
+							value={form.workerDiskGi}
+							onChange={(e) => setForm({ ...form, workerDiskGi: e.target.value })}
+							placeholder="Platform default"
+						/>
+					</div>
+				</ModalBody>
+				<ModalFooter>
+					<Button type="button" variant="secondary" onClick={onClose}>
+						Cancel
+					</Button>
+					<Button type="submit" disabled={saving}>
+						{saving ? 'Saving...' : 'Save Defaults'}
+					</Button>
+				</ModalFooter>
+			</form>
+		</Modal>
 	)
 }

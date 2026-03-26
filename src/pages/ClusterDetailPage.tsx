@@ -178,7 +178,7 @@ export function ClusterDetailPage() {
 		await clustersApi.scale(namespace, name, replicas)
 		setScaleTarget(replicas)
 		success('Workers Scaled', `Cluster ${name} scaling to ${replicas} worker${replicas !== 1 ? 's' : ''}`)
-		loadCluster()
+		loadCluster(true)
 	}
 
 	const handleDownloadKubeconfig = async () => {

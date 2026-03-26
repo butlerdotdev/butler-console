@@ -98,7 +98,7 @@ export function ScaleWorkersModal({
 						min={1}
 						max={100}
 						value={replicas}
-						onChange={(e) => setReplicas(Number(e.target.value))}
+						onChange={(e) => setReplicas(parseInt(e.target.value, 10) || 1)}
 						onKeyDown={(e) => e.key === 'Enter' && isValid && !isScaling && handleScale()}
 						disabled={isScaling}
 						autoFocus

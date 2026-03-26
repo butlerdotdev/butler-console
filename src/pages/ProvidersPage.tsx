@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { providersApi, type Provider, type ValidateResponse, type NetworkInfo } from '@/api/providers'
+import { providersApi, type Provider, type ValidateResponse, type NetworkInfo, type CreateProviderRequest } from '@/api/providers'
 import { Card, Spinner, Button, FadeIn } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { useToast } from '@/hooks/useToast'
@@ -21,6 +21,7 @@ export function ProvidersPage() {
 	const [deleteTarget, setDeleteTarget] = useState<Provider | null>(null)
 	const [deleting, setDeleting] = useState(false)
 	const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null)
+	const [editProvider, setEditProvider] = useState<Provider | null>(null)
 
 	useEffect(() => {
 		loadProviders()
@@ -173,6 +174,11 @@ export function ProvidersPage() {
 								Close
 							</Button>
 							<Button
+								onClick={() => { setEditProvider(selectedProvider); setSelectedProvider(null) }}
+							>
+								Edit
+							</Button>
+							<Button
 								variant="danger"
 								onClick={() => { setSelectedProvider(null); setDeleteTarget(selectedProvider) }}
 							>
@@ -182,6 +188,25 @@ export function ProvidersPage() {
 					</>
 				)}
 			</Modal>
+
+			{/* Edit Provider Modal */}
+			{editProvider && (
+				<EditProviderModal
+					provider={editProvider}
+					isOpen={!!editProvider}
+					onClose={() => setEditProvider(null)}
+					onSave={async (data) => {
+						try {
+							await providersApi.update(editProvider.metadata.namespace, editProvider.metadata.name, data)
+							success('Provider Updated', `${editProvider.metadata.name} has been updated`)
+							setEditProvider(null)
+							await loadProviders()
+						} catch (err) {
+							showError('Update Failed', err instanceof Error ? err.message : 'Failed to update provider')
+						}
+					}}
+				/>
+			)}
 
 			{/* Delete Confirmation Modal */}
 			<Modal isOpen={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)}>
@@ -567,6 +592,206 @@ function ProviderDetail({
 					</div>
 				)}
 			</div>
+		</div>
+	)
+}
+
+function EditProviderModal({
+	provider,
+	isOpen,
+	onClose,
+	onSave,
+}: {
+	provider: Provider
+	isOpen: boolean
+	onClose: () => void
+	onSave: (data: Partial<CreateProviderRequest>) => Promise<void>
+}) {
+	const type = provider.spec.provider
+	const [saving, setSaving] = useState(false)
+	const [form, setForm] = useState<Record<string, string>>({})
+
+	const handleSave = async () => {
+		setSaving(true)
+		try {
+			const data: Partial<CreateProviderRequest> = {}
+
+			switch (type) {
+				case 'harvester':
+					if (form.kubeconfig) data.harvesterKubeconfig = form.kubeconfig
+					break
+				case 'nutanix':
+					if (form.endpoint) data.nutanixEndpoint = form.endpoint
+					if (form.username) data.nutanixUsername = form.username
+					if (form.password) data.nutanixPassword = form.password
+					break
+				case 'proxmox':
+					if (form.endpoint) data.proxmoxEndpoint = form.endpoint
+					if (form.tokenId) data.proxmoxTokenId = form.tokenId
+					if (form.tokenSecret) data.proxmoxTokenSecret = form.tokenSecret
+					if (form.username) data.proxmoxUsername = form.username
+					if (form.password) data.proxmoxPassword = form.password
+					break
+				case 'aws':
+					if (form.region) data.awsRegion = form.region
+					if (form.accessKeyId) data.awsAccessKeyId = form.accessKeyId
+					if (form.secretAccessKey) data.awsSecretAccessKey = form.secretAccessKey
+					if (form.vpcId) data.awsVpcId = form.vpcId
+					break
+				case 'azure':
+					if (form.tenantId) data.azureTenantId = form.tenantId
+					if (form.clientId) data.azureClientId = form.clientId
+					if (form.clientSecret) data.azureClientSecret = form.clientSecret
+					if (form.subscriptionId) data.azureSubscriptionId = form.subscriptionId
+					if (form.resourceGroup) data.azureResourceGroup = form.resourceGroup
+					if (form.location) data.azureLocation = form.location
+					break
+				case 'gcp':
+					if (form.projectId) data.gcpProjectId = form.projectId
+					if (form.region) data.gcpRegion = form.region
+					if (form.serviceAccount) data.gcpServiceAccount = form.serviceAccount
+					break
+			}
+
+			await onSave(data)
+		} finally {
+			setSaving(false)
+		}
+	}
+
+	const hasChanges = Object.values(form).some(v => v.trim() !== '')
+
+	const renderCredentialFields = () => {
+		switch (type) {
+			case 'harvester':
+				return (
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Kubeconfig</label>
+						<textarea
+							value={form.kubeconfig || ''}
+							onChange={(e) => setForm(prev => ({ ...prev, kubeconfig: e.target.value }))}
+							placeholder="Paste new kubeconfig to rotate credentials"
+							rows={4}
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm resize-none"
+						/>
+					</div>
+				)
+			case 'nutanix':
+				return (
+					<>
+						<EditField label="Endpoint" placeholder={provider.spec.nutanix?.endpoint || 'e.g. 10.0.0.1'} value={form.endpoint || ''} onChange={v => setForm(prev => ({ ...prev, endpoint: v }))} />
+						<EditField label="Username" placeholder="Leave blank to keep current" value={form.username || ''} onChange={v => setForm(prev => ({ ...prev, username: v }))} />
+						<EditField label="Password" placeholder="Leave blank to keep current" value={form.password || ''} onChange={v => setForm(prev => ({ ...prev, password: v }))} type="password" />
+					</>
+				)
+			case 'proxmox':
+				return (
+					<>
+						<EditField label="Endpoint" placeholder={provider.spec.proxmox?.endpoint || 'e.g. https://proxmox:8006'} value={form.endpoint || ''} onChange={v => setForm(prev => ({ ...prev, endpoint: v }))} />
+						<EditField label="Token ID" placeholder="Leave blank to keep current" value={form.tokenId || ''} onChange={v => setForm(prev => ({ ...prev, tokenId: v }))} />
+						<EditField label="Token Secret" placeholder="Leave blank to keep current" value={form.tokenSecret || ''} onChange={v => setForm(prev => ({ ...prev, tokenSecret: v }))} type="password" />
+					</>
+				)
+			case 'aws':
+				return (
+					<>
+						<EditField label="Region" placeholder={provider.spec.aws?.region || 'e.g. us-west-2'} value={form.region || ''} onChange={v => setForm(prev => ({ ...prev, region: v }))} />
+						<EditField label="Access Key ID" placeholder="Leave blank to keep current" value={form.accessKeyId || ''} onChange={v => setForm(prev => ({ ...prev, accessKeyId: v }))} />
+						<EditField label="Secret Access Key" placeholder="Leave blank to keep current" value={form.secretAccessKey || ''} onChange={v => setForm(prev => ({ ...prev, secretAccessKey: v }))} type="password" />
+						<EditField label="VPC ID" placeholder={provider.spec.aws?.vpcID || 'e.g. vpc-12345'} value={form.vpcId || ''} onChange={v => setForm(prev => ({ ...prev, vpcId: v }))} />
+					</>
+				)
+			case 'azure':
+				return (
+					<>
+						<EditField label="Subscription ID" placeholder={provider.spec.azure?.subscriptionID || ''} value={form.subscriptionId || ''} onChange={v => setForm(prev => ({ ...prev, subscriptionId: v }))} />
+						<EditField label="Tenant ID" placeholder="Leave blank to keep current" value={form.tenantId || ''} onChange={v => setForm(prev => ({ ...prev, tenantId: v }))} />
+						<EditField label="Client ID" placeholder="Leave blank to keep current" value={form.clientId || ''} onChange={v => setForm(prev => ({ ...prev, clientId: v }))} />
+						<EditField label="Client Secret" placeholder="Leave blank to keep current" value={form.clientSecret || ''} onChange={v => setForm(prev => ({ ...prev, clientSecret: v }))} type="password" />
+						<EditField label="Resource Group" placeholder={provider.spec.azure?.resourceGroup || ''} value={form.resourceGroup || ''} onChange={v => setForm(prev => ({ ...prev, resourceGroup: v }))} />
+						<EditField label="Location" placeholder={provider.spec.azure?.location || ''} value={form.location || ''} onChange={v => setForm(prev => ({ ...prev, location: v }))} />
+					</>
+				)
+			case 'gcp':
+				return (
+					<>
+						<EditField label="Project ID" placeholder={provider.spec.gcp?.projectID || ''} value={form.projectId || ''} onChange={v => setForm(prev => ({ ...prev, projectId: v }))} />
+						<EditField label="Region" placeholder={provider.spec.gcp?.region || ''} value={form.region || ''} onChange={v => setForm(prev => ({ ...prev, region: v }))} />
+						<div>
+							<label className="block text-sm font-medium text-neutral-400 mb-1">Service Account JSON</label>
+							<textarea
+								value={form.serviceAccount || ''}
+								onChange={(e) => setForm(prev => ({ ...prev, serviceAccount: e.target.value }))}
+								placeholder="Paste new service account JSON to rotate credentials"
+								rows={4}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm resize-none"
+							/>
+						</div>
+					</>
+				)
+			default:
+				return <p className="text-neutral-500">Editing not supported for this provider type</p>
+		}
+	}
+
+	return (
+		<Modal isOpen={isOpen} onClose={onClose} size="lg">
+			<ModalHeader>
+				<div className="flex items-center gap-3">
+					<div className="w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center">
+						<ProviderLogo provider={type} />
+					</div>
+					<div>
+						<h2 className="text-lg font-semibold text-neutral-100">Edit {provider.metadata.name}</h2>
+						<p className="text-sm text-neutral-400">Update credentials and configuration</p>
+					</div>
+				</div>
+			</ModalHeader>
+
+			<ModalBody>
+				<div className="space-y-4">
+					<p className="text-sm text-neutral-400">
+						Only fill in fields you want to change. Leave fields blank to keep current values.
+					</p>
+					{renderCredentialFields()}
+				</div>
+			</ModalBody>
+
+			<ModalFooter>
+				<Button variant="secondary" onClick={onClose} disabled={saving}>
+					Cancel
+				</Button>
+				<Button onClick={handleSave} disabled={saving || !hasChanges}>
+					{saving ? 'Saving...' : 'Save Changes'}
+				</Button>
+			</ModalFooter>
+		</Modal>
+	)
+}
+
+function EditField({
+	label,
+	placeholder,
+	value,
+	onChange,
+	type = 'text',
+}: {
+	label: string
+	placeholder: string
+	value: string
+	onChange: (value: string) => void
+	type?: string
+}) {
+	return (
+		<div>
+			<label className="block text-sm font-medium text-neutral-400 mb-1">{label}</label>
+			<input
+				type={type}
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				placeholder={placeholder}
+				className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+			/>
 		</div>
 	)
 }

@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { identityProvidersApi, type IdentityProvider, type TestDiscoveryResponse } from '@/api/identity-providers'
+import { identityProvidersApi, type IdentityProvider, type TestDiscoveryResponse, type CreateIdentityProviderRequest } from '@/api/identity-providers'
 import { Card, Button, StatusBadge, FadeIn, Spinner, Modal } from '@/components/ui'
 import { useToast } from '@/hooks/useToast'
 
@@ -91,10 +91,11 @@ interface ProviderDetailModalProps {
 	isOpen: boolean
 	onClose: () => void
 	onValidate: (name: string) => void
+	onEdit: () => void
 	validating: boolean
 }
 
-function ProviderDetailModal({ provider, isOpen, onClose, onValidate, validating }: ProviderDetailModalProps) {
+function ProviderDetailModal({ provider, isOpen, onClose, onValidate, onEdit, validating }: ProviderDetailModalProps) {
 	if (!provider) return null
 
 	const issuerURL = provider.spec.oidc?.issuerURL || ''
@@ -207,6 +208,9 @@ function ProviderDetailModal({ provider, isOpen, onClose, onValidate, validating
 					<Button variant="secondary" onClick={onClose}>
 						Close
 					</Button>
+					<Button variant="secondary" onClick={onEdit}>
+						Edit
+					</Button>
 					<Button
 						onClick={() => onValidate(provider.metadata.name)}
 						disabled={validating}
@@ -265,6 +269,7 @@ export function IdentityProvidersPage() {
 	const [selectedProvider, setSelectedProvider] = useState<IdentityProvider | null>(null)
 	const [detailModalOpen, setDetailModalOpen] = useState(false)
 	const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+	const [editModalOpen, setEditModalOpen] = useState(false)
 	const [validating, setValidating] = useState(false)
 	const [deleting, setDeleting] = useState(false)
 
@@ -329,9 +334,29 @@ export function IdentityProvidersPage() {
 		}
 	}
 
+	async function handleUpdate(data: Partial<CreateIdentityProviderRequest>) {
+		if (!selectedProvider) return
+
+		try {
+			await identityProvidersApi.update(selectedProvider.metadata.name, data)
+			toast.success(`Updated ${selectedProvider.spec.displayName || selectedProvider.metadata.name}`)
+			setEditModalOpen(false)
+			setSelectedProvider(null)
+			fetchProviders()
+		} catch (err) {
+			toast.error(err instanceof Error ? err.message : 'Failed to update provider')
+		}
+	}
+
 	function openDetail(provider: IdentityProvider) {
 		setSelectedProvider(provider)
 		setDetailModalOpen(true)
+	}
+
+	function openEdit(provider: IdentityProvider) {
+		setSelectedProvider(provider)
+		setDetailModalOpen(false)
+		setEditModalOpen(true)
 	}
 
 	function openDelete(provider: IdentityProvider) {
@@ -456,8 +481,18 @@ export function IdentityProvidersPage() {
 				isOpen={detailModalOpen}
 				onClose={() => setDetailModalOpen(false)}
 				onValidate={handleValidate}
+				onEdit={() => selectedProvider && openEdit(selectedProvider)}
 				validating={validating}
 			/>
+
+			{editModalOpen && selectedProvider && (
+				<EditIdentityProviderModal
+					provider={selectedProvider}
+					isOpen={editModalOpen}
+					onClose={() => { setEditModalOpen(false); setSelectedProvider(null) }}
+					onSave={handleUpdate}
+				/>
+			)}
 
 			<DeleteModal
 				provider={selectedProvider}
@@ -467,5 +502,102 @@ export function IdentityProvidersPage() {
 				deleting={deleting}
 			/>
 		</FadeIn>
+	)
+}
+
+function EditIdentityProviderModal({
+	provider,
+	isOpen,
+	onClose,
+	onSave,
+}: {
+	provider: IdentityProvider
+	isOpen: boolean
+	onClose: () => void
+	onSave: (data: Partial<CreateIdentityProviderRequest>) => Promise<void>
+}) {
+	const [saving, setSaving] = useState(false)
+	const [form, setForm] = useState({
+		displayName: '',
+		issuerURL: '',
+		clientID: '',
+		clientSecret: '',
+		redirectURL: '',
+		hostedDomain: '',
+		groupsClaim: '',
+		emailClaim: '',
+	})
+
+	const handleSave = async () => {
+		setSaving(true)
+		try {
+			const data: Partial<CreateIdentityProviderRequest> = {}
+			if (form.displayName) data.displayName = form.displayName
+			if (form.issuerURL) data.issuerURL = form.issuerURL
+			if (form.clientID) data.clientID = form.clientID
+			if (form.clientSecret) data.clientSecret = form.clientSecret
+			if (form.redirectURL) data.redirectURL = form.redirectURL
+			if (form.hostedDomain) data.hostedDomain = form.hostedDomain
+			if (form.groupsClaim) data.groupsClaim = form.groupsClaim
+			if (form.emailClaim) data.emailClaim = form.emailClaim
+			await onSave(data)
+		} finally {
+			setSaving(false)
+		}
+	}
+
+	const hasChanges = Object.values(form).some(v => v.trim() !== '')
+
+	const field = (label: string, key: keyof typeof form, opts?: { placeholder?: string; type?: string }) => (
+		<div>
+			<label className="block text-sm font-medium text-neutral-400 mb-1">{label}</label>
+			<input
+				type={opts?.type || 'text'}
+				value={form[key]}
+				onChange={(e) => setForm(prev => ({ ...prev, [key]: e.target.value }))}
+				placeholder={opts?.placeholder || 'Leave blank to keep current'}
+				className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+			/>
+		</div>
+	)
+
+	return (
+		<Modal isOpen={isOpen} onClose={onClose}>
+			<div className="space-y-4">
+				<div className="flex items-center gap-3">
+					<div className="w-10 h-10 bg-neutral-800 rounded-lg flex items-center justify-center">
+						{getProviderIcon(provider.spec.oidc?.issuerURL)}
+					</div>
+					<div>
+						<h3 className="text-lg font-medium text-neutral-100">Edit {provider.spec.displayName || provider.metadata.name}</h3>
+						<p className="text-sm text-neutral-400">Update OIDC configuration and credentials</p>
+					</div>
+				</div>
+
+				<p className="text-sm text-neutral-500">
+					Only fill in fields you want to change. Leave fields blank to keep current values.
+				</p>
+
+				<div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+					{field('Display Name', 'displayName', { placeholder: provider.spec.displayName || provider.metadata.name })}
+					{field('Issuer URL', 'issuerURL', { placeholder: provider.spec.oidc?.issuerURL || '' })}
+					{field('Client ID', 'clientID', { placeholder: provider.spec.oidc?.clientID || '' })}
+					{field('Client Secret', 'clientSecret', { type: 'password' })}
+					{field('Redirect URL', 'redirectURL', { placeholder: provider.spec.oidc?.redirectURL || '' })}
+					{field('Hosted Domain', 'hostedDomain', { placeholder: provider.spec.oidc?.hostedDomain || '' })}
+					{field('Groups Claim', 'groupsClaim', { placeholder: provider.spec.oidc?.groupsClaim || 'groups' })}
+					{field('Email Claim', 'emailClaim', { placeholder: provider.spec.oidc?.emailClaim || 'email' })}
+				</div>
+
+				<div className="flex justify-end gap-3 pt-2">
+					<Button variant="secondary" onClick={onClose} disabled={saving}>
+						Cancel
+					</Button>
+					<Button onClick={handleSave} disabled={saving || !hasChanges}>
+						{saving ? 'Saving...' : 'Save Changes'}
+					</Button>
+				</div>
+			</div>
+		</Modal>
 	)
 }

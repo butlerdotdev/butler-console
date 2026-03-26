@@ -156,6 +156,13 @@ export const identityProvidersApi = {
 	},
 
 	/**
+	 * Update an existing identity provider.
+	 */
+	async update(name: string, data: Partial<CreateIdentityProviderRequest>): Promise<IdentityProvider> {
+		return apiClient.put<IdentityProvider>(`/admin/identity-providers/${name}`, data)
+	},
+
+	/**
 	 * Delete an identity provider.
 	 */
 	async delete(name: string): Promise<{ status: string; message: string }> {

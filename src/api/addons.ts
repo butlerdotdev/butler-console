@@ -53,6 +53,7 @@ export interface InstalledAddon {
 	managedBy?: 'butler' | 'platform' | 'gitops'
 	namespace?: string
 	message?: string
+	values?: Record<string, unknown>
 	helmRelease?: {
 		name: string
 		namespace: string

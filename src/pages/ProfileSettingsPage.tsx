@@ -1,7 +1,7 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useDocumentTitle } from '@/hooks'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, Button, FadeIn } from '@/components/ui'
@@ -15,16 +15,98 @@ interface TeamRef {
 	role?: string
 }
 
+interface SSHKey {
+	name: string
+	fingerprint: string
+	addedAt: string
+	preview: string
+}
+
 export function ProfileSettingsPage() {
 	useDocumentTitle('Profile Settings')
 	const { user } = useAuth()
-	const { success } = useToast()
+	const { success, error: showError } = useToast()
 
 	const [form, setForm] = useState({
 		name: user?.name || '',
 		email: user?.email || '',
 	})
 	const [saving, setSaving] = useState(false)
+
+	// SSH key state
+	const [sshKeys, setSSHKeys] = useState<SSHKey[]>([])
+	const [loadingKeys, setLoadingKeys] = useState(true)
+	const [showAddKey, setShowAddKey] = useState(false)
+	const [keyName, setKeyName] = useState('')
+	const [keyPublic, setKeyPublic] = useState('')
+	const [addingKey, setAddingKey] = useState(false)
+	const [deletingFingerprint, setDeletingFingerprint] = useState<string | null>(null)
+
+	const fetchSSHKeys = useCallback(async () => {
+		try {
+			const res = await fetch('/api/auth/ssh-keys', { credentials: 'include' })
+			if (res.ok) {
+				const data = await res.json()
+				setSSHKeys(data.sshKeys || [])
+			}
+		} catch {
+			// Silently fail on load — keys section will show empty
+		} finally {
+			setLoadingKeys(false)
+		}
+	}, [])
+
+	useEffect(() => {
+		fetchSSHKeys()
+	}, [fetchSSHKeys])
+
+	const handleAddKey = async () => {
+		if (!keyName.trim() || !keyPublic.trim()) return
+		setAddingKey(true)
+		try {
+			const res = await fetch('/api/auth/ssh-keys', {
+				method: 'POST',
+				credentials: 'include',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name: keyName.trim(), publicKey: keyPublic.trim() }),
+			})
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({ error: 'Failed to add SSH key' }))
+				showError('Error', data.error || 'Failed to add SSH key')
+				return
+			}
+			success('SSH Key Added', `Key "${keyName.trim()}" has been added`)
+			setKeyName('')
+			setKeyPublic('')
+			setShowAddKey(false)
+			await fetchSSHKeys()
+		} catch {
+			showError('Error', 'Failed to add SSH key')
+		} finally {
+			setAddingKey(false)
+		}
+	}
+
+	const handleDeleteKey = async (fingerprint: string, name: string) => {
+		setDeletingFingerprint(fingerprint)
+		try {
+			const res = await fetch(`/api/auth/ssh-keys/${encodeURIComponent(fingerprint)}`, {
+				method: 'DELETE',
+				credentials: 'include',
+			})
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({ error: 'Failed to remove SSH key' }))
+				showError('Error', data.error || 'Failed to remove SSH key')
+				return
+			}
+			success('SSH Key Removed', `Key "${name}" has been removed`)
+			await fetchSSHKeys()
+		} catch {
+			showError('Error', 'Failed to remove SSH key')
+		} finally {
+			setDeletingFingerprint(null)
+		}
+	}
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -123,6 +205,103 @@ export function ProfileSettingsPage() {
 								{saving ? 'Saving...' : 'Save Changes'}
 							</Button>
 						</div>
+					</Card>
+
+					{/* SSH Keys */}
+					<Card className="p-6">
+						<div className="flex items-center justify-between mb-4">
+							<h3 className="text-lg font-medium text-neutral-50">
+								<KeyIcon className="w-5 h-5 inline mr-2" />
+								SSH Keys
+							</h3>
+							{!showAddKey && (
+								<Button onClick={() => setShowAddKey(true)}>
+									Add Key
+								</Button>
+							)}
+						</div>
+
+						{showAddKey && (
+							<div className="mb-4 p-4 bg-neutral-800/50 rounded-lg border border-neutral-700 space-y-3">
+								<div>
+									<label className="block text-sm font-medium text-neutral-400 mb-1">
+										Key Name
+									</label>
+									<input
+										type="text"
+										value={keyName}
+										onChange={(e) => setKeyName(e.target.value)}
+										placeholder="e.g. Work Laptop"
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+									/>
+								</div>
+								<div>
+									<label className="block text-sm font-medium text-neutral-400 mb-1">
+										Public Key
+									</label>
+									<textarea
+										value={keyPublic}
+										onChange={(e) => setKeyPublic(e.target.value)}
+										placeholder="ssh-ed25519 AAAA... user@host"
+										rows={3}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm resize-none"
+									/>
+									<p className="text-xs text-neutral-500 mt-1">
+										Paste the contents of your public key file (e.g. ~/.ssh/id_ed25519.pub)
+									</p>
+								</div>
+								<div className="flex justify-end gap-2">
+									<button
+										onClick={() => { setShowAddKey(false); setKeyName(''); setKeyPublic('') }}
+										className="px-3 py-1.5 text-sm text-neutral-400 hover:text-neutral-200"
+									>
+										Cancel
+									</button>
+									<Button
+										onClick={handleAddKey}
+										disabled={addingKey || !keyName.trim() || !keyPublic.trim()}
+									>
+										{addingKey ? 'Adding...' : 'Add SSH Key'}
+									</Button>
+								</div>
+							</div>
+						)}
+
+						{loadingKeys ? (
+							<p className="text-neutral-500 text-sm">Loading SSH keys...</p>
+						) : sshKeys.length > 0 ? (
+							<div className="space-y-2">
+								{sshKeys.map((key) => (
+									<div
+										key={key.fingerprint}
+										className="flex items-center justify-between p-3 bg-neutral-800/50 rounded-lg"
+									>
+										<div className="min-w-0 flex-1">
+											<p className="text-sm font-medium text-neutral-200">
+												{key.name}
+											</p>
+											<p className="text-xs text-neutral-500 font-mono truncate">
+												{key.fingerprint}
+											</p>
+											<p className="text-xs text-neutral-500">
+												Added {new Date(key.addedAt).toLocaleDateString()}
+											</p>
+										</div>
+										<button
+											onClick={() => handleDeleteKey(key.fingerprint, key.name)}
+											disabled={deletingFingerprint === key.fingerprint}
+											className="ml-4 px-2 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded disabled:opacity-50"
+										>
+											{deletingFingerprint === key.fingerprint ? 'Removing...' : 'Remove'}
+										</button>
+									</div>
+								))}
+							</div>
+						) : (
+							<p className="text-neutral-500 text-sm">
+								No SSH keys added. SSH keys are used for workspace access.
+							</p>
+						)}
 					</Card>
 
 					{/* Team Memberships */}
@@ -228,6 +407,19 @@ function BuildingIcon({ className }: { className?: string }) {
 				strokeLinejoin="round"
 				strokeWidth={2}
 				d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+			/>
+		</svg>
+	)
+}
+
+function KeyIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<path
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth={2}
+				d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
 			/>
 		</svg>
 	)

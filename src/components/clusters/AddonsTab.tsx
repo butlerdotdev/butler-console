@@ -67,6 +67,7 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 
 	// Modal states
 	const [configureAddon, setConfigureAddon] = useState<AddonDefinition | null>(null)
+	const [editAddon, setEditAddon] = useState<SimpleAddon | null>(null)
 	const [gitopsExportAddon, setGitopsExportAddon] = useState<AddonDefinition | null>(null)
 	const [installingAddon, setInstallingAddon] = useState<string | null>(null)
 	const [migrateToGitOps, setMigrateToGitOps] = useState<SimpleAddon | null>(null)
@@ -309,11 +310,11 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 	}
 
 	// Handle configure request - check for GitOps management first
-	const handleConfigureRequest = (addon: SimpleAddon, catalogInfo?: AddonDefinition) => {
+	const handleConfigureRequest = (addon: SimpleAddon, _catalogInfo?: AddonDefinition) => {
 		if (addon.managedBy === 'gitops') {
-			setGitopsWarning({ addon, catalogInfo, action: 'configure' })
-		} else if (catalogInfo) {
-			setConfigureAddon(catalogInfo)
+			setGitopsWarning({ addon, catalogInfo: _catalogInfo, action: 'configure' })
+		} else {
+			setEditAddon(addon)
 		}
 	}
 
@@ -340,8 +341,8 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 	const handleGitOpsWarningProceed = () => {
 		if (!gitopsWarning) return
 
-		if (gitopsWarning.action === 'configure' && gitopsWarning.catalogInfo) {
-			setConfigureAddon(gitopsWarning.catalogInfo)
+		if (gitopsWarning.action === 'configure') {
+			setEditAddon(gitopsWarning.addon)
 		} else if (gitopsWarning.action === 'uninstall') {
 			handleUninstall(gitopsWarning.addon)
 		}
@@ -381,6 +382,17 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 			onRefresh?.()
 		} catch (err) {
 			showError('Migration Failed', err instanceof Error ? err.message : 'Failed to migrate to GitOps')
+		}
+	}
+
+	const handleUpdateValues = async (addonName: string, values: Record<string, unknown>) => {
+		try {
+			await addonsApi.update(clusterNamespace, clusterName, addonName, { values })
+			success('Addon Updated', `${addonName} configuration has been updated`)
+			setEditAddon(null)
+			onRefresh?.()
+		} catch (err) {
+			showError('Update Failed', err instanceof Error ? err.message : 'Failed to update addon values')
 		}
 	}
 
@@ -583,6 +595,19 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 					action={gitopsWarning.action}
 					onClose={() => setGitopsWarning(null)}
 					onProceed={handleGitOpsWarningProceed}
+				/>
+			)}
+
+			{/* Edit Addon Values Modal */}
+			{editAddon && (
+				<EditAddonValuesModal
+					addonName={editAddon.name}
+					displayName={editAddon.displayName || editAddon.name}
+					clusterNamespace={clusterNamespace}
+					clusterName={clusterName}
+					isOpen={!!editAddon}
+					onClose={() => setEditAddon(null)}
+					onSave={(values) => handleUpdateValues(editAddon.name, values)}
 				/>
 			)}
 
@@ -1210,6 +1235,121 @@ function ConfigureAddonModal({ addon, isOpen, onClose, onInstall, installing }: 
 						</>
 					) : (
 						'Install'
+					)}
+				</Button>
+			</ModalFooter>
+		</Modal>
+	)
+}
+
+// Edit Addon Values Modal
+
+interface EditAddonValuesModalProps {
+	addonName: string
+	displayName: string
+	clusterNamespace: string
+	clusterName: string
+	isOpen: boolean
+	onClose: () => void
+	onSave: (values: Record<string, unknown>) => void
+}
+
+function EditAddonValuesModal({ addonName, displayName, clusterNamespace, clusterName, isOpen, onClose, onSave }: EditAddonValuesModalProps) {
+	const [yamlContent, setYamlContent] = useState('')
+	const [loading, setLoading] = useState(true)
+	const [saving, setSaving] = useState(false)
+	const [parseError, setParseError] = useState<string | null>(null)
+
+	useEffect(() => {
+		if (!isOpen) return
+
+		const fetchValues = async () => {
+			setLoading(true)
+			try {
+				const addon = await addonsApi.getDetails(clusterNamespace, clusterName, addonName)
+				const values = (addon as unknown as { values?: Record<string, unknown> }).values || {}
+				setYamlContent(Object.keys(values).length > 0 ? objectToYaml(values) : '')
+			} catch {
+				setYamlContent('')
+			} finally {
+				setLoading(false)
+			}
+		}
+		fetchValues()
+	}, [isOpen, addonName, clusterNamespace, clusterName])
+
+	const handleYamlChange = (yaml: string) => {
+		setYamlContent(yaml)
+		setParseError(null)
+		if (yaml.trim()) {
+			try {
+				yamlToObject(yaml)
+			} catch {
+				setParseError('Invalid YAML syntax')
+			}
+		}
+	}
+
+	const handleSave = async () => {
+		setSaving(true)
+		try {
+			const values = yamlContent.trim() ? yamlToObject(yamlContent) : {}
+			await onSave(values)
+		} catch {
+			setParseError('Invalid YAML syntax')
+		} finally {
+			setSaving(false)
+		}
+	}
+
+	return (
+		<Modal isOpen={isOpen} onClose={onClose} size="lg">
+			<ModalHeader>
+				<div className="flex items-center gap-3">
+					<span className="text-2xl">⚙️</span>
+					<div>
+						<h2 className="text-lg font-semibold">Edit {displayName} Values</h2>
+						<p className="text-sm text-neutral-400">Modify Helm values for this addon</p>
+					</div>
+				</div>
+			</ModalHeader>
+
+			<ModalBody>
+				{loading ? (
+					<div className="flex items-center justify-center py-8">
+						<Spinner size="lg" />
+						<span className="ml-3 text-neutral-400">Loading current values...</span>
+					</div>
+				) : (
+					<div className="space-y-3">
+						<p className="text-sm text-neutral-400">
+							Edit the Helm values in YAML format. Only include values you want to override from defaults.
+						</p>
+						<textarea
+							value={yamlContent}
+							onChange={(e) => handleYamlChange(e.target.value)}
+							className="w-full h-80 font-mono text-sm bg-neutral-900 border border-neutral-700 rounded-lg p-4 text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+							placeholder="# Enter Helm values in YAML format&#10;# Example:&#10;# replicas: 3&#10;# resources:&#10;#   limits:&#10;#     memory: 512Mi"
+						/>
+						{parseError && (
+							<p className="text-sm text-red-400">{parseError}</p>
+						)}
+					</div>
+				)}
+			</ModalBody>
+
+			<ModalFooter>
+				<Button variant="secondary" onClick={onClose} disabled={saving}>
+					Cancel
+				</Button>
+				<Button variant="primary" onClick={handleSave} disabled={saving || loading || !!parseError}>
+					{saving ? (
+						<>
+							<Spinner size="sm" className="mr-2" />
+							Saving...
+						</>
+					) : (
+						'Save Values'
 					)}
 				</Button>
 			</ModalFooter>

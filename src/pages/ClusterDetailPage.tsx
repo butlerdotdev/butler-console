@@ -61,6 +61,7 @@ export function ClusterDetailPage() {
 	const [accessDeniedMessage, setAccessDeniedMessage] = useState<string>('')
 	const [showDeleteModal, setShowDeleteModal] = useState(false)
 	const [showScaleModal, setShowScaleModal] = useState(false)
+	const [scaleTarget, setScaleTarget] = useState<number | null>(null)
 
 	const loadCluster = useCallback(async () => {
 		if (!namespace || !name) return
@@ -120,22 +121,31 @@ export function ClusterDetailPage() {
 		}
 	}, [namespace, name, loadCluster])
 
-	// Auto-poll every 5s when workers are scaling (ready !== desired) or cluster not Ready
+	// Clear scaleTarget when scaling is complete
+	useEffect(() => {
+		if (scaleTarget == null || !cluster) return
+		const ready = cluster.status?.workerNodesReady
+		if (ready != null && ready === scaleTarget) {
+			setScaleTarget(null)
+		}
+	}, [cluster, scaleTarget])
+
+	// Auto-poll every 5s when workers are scaling or cluster not Ready
 	useEffect(() => {
 		if (!cluster) return
 		const phase = cluster.status?.phase
 		const ready = cluster.status?.workerNodesReady
 		const desired = cluster.status?.workerNodesDesired
-		// Only treat as converging when both fields are explicitly set by the controller
 		const isConverging = ready != null && desired != null && ready !== desired
 		const isNotReady = phase && phase !== 'Ready'
-		if (!isConverging && !isNotReady) return
+		const isScaling = scaleTarget != null
+		if (!isConverging && !isNotReady && !isScaling) return
 
 		const interval = setInterval(() => {
 			loadCluster()
 		}, 5000)
 		return () => clearInterval(interval)
-	}, [cluster, loadCluster])
+	}, [cluster, scaleTarget, loadCluster])
 
 	useEffect(() => {
 		if (cluster && activeTab === 'nodes') {
@@ -166,7 +176,8 @@ export function ClusterDetailPage() {
 	const handleScale = async (replicas: number) => {
 		if (!namespace || !name) return
 		await clustersApi.scale(namespace, name, replicas)
-		success('Workers Scaled', `Cluster ${name} scaled to ${replicas} worker${replicas !== 1 ? 's' : ''}`)
+		setScaleTarget(replicas)
+		success('Workers Scaled', `Cluster ${name} scaling to ${replicas} worker${replicas !== 1 ? 's' : ''}`)
 		loadCluster()
 	}
 
@@ -304,7 +315,7 @@ export function ClusterDetailPage() {
 				</div>
 
 				{/* Tab Content */}
-				{activeTab === 'overview' && <OverviewTab cluster={cluster} namespace={namespace!} name={name!} />}
+				{activeTab === 'overview' && <OverviewTab cluster={cluster} namespace={namespace!} name={name!} scaleTarget={scaleTarget} />}
 				{activeTab === 'nodes' && <NodesTab nodes={nodes} />}
 				{activeTab === 'addons' && (
 					<AddonsTab
@@ -356,7 +367,7 @@ export function ClusterDetailPage() {
 	)
 }
 
-function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace: string; name: string }) {
+function OverviewTab({ cluster, namespace, name, scaleTarget }: { cluster: Cluster; namespace: string; name: string; scaleTarget: number | null }) {
 	const spec = cluster.spec
 	const status = cluster.status
 	const provider = spec.providerConfigRef?.name || 'Default'
@@ -387,7 +398,7 @@ function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace
 									const ready = status?.workerNodesReady
 									const desired = status?.workerNodesDesired
 									const specReplicas = spec.workers?.replicas ?? 0
-									// Only show ready/desired progress when both fields are set by the controller
+									// Server reports both fields — use accurate progress
 									if (ready != null && desired != null && ready !== desired) {
 										return (
 											<span className="flex items-center gap-2">
@@ -401,6 +412,18 @@ function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace
 									}
 									if (ready != null && desired != null) {
 										return <span>{ready}/{desired} ready</span>
+									}
+									// Client-side scale tracking — server doesn't report ready count yet
+									if (scaleTarget != null) {
+										return (
+											<span className="flex items-center gap-2">
+												<span className="text-amber-400">Scaling to {scaleTarget}...</span>
+												<svg className="w-4 h-4 text-amber-400 animate-spin" fill="none" viewBox="0 0 24 24">
+													<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+													<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+												</svg>
+											</span>
+										)
 									}
 									return <span>{specReplicas}</span>
 								})()}

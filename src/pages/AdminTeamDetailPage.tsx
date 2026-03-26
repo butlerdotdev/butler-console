@@ -135,6 +135,11 @@ export function AdminTeamDetailPage() {
 	const [showEditDefaultsModal, setShowEditDefaultsModal] = useState(false)
 	const [savingDefaults, setSavingDefaults] = useState(false)
 
+	// Delete team
+	const [showDeleteTeamModal, setShowDeleteTeamModal] = useState(false)
+	const [deletingTeam, setDeletingTeam] = useState(false)
+	const [deleteConfirmName, setDeleteConfirmName] = useState('')
+
 	const fetchTeam = useCallback(async () => {
 		if (!teamName) return
 
@@ -508,6 +513,31 @@ export function AdminTeamDetailPage() {
 		}
 	}
 
+	const handleDeleteTeam = async () => {
+		if (!teamName || deleteConfirmName !== teamName) return
+
+		setDeletingTeam(true)
+		try {
+			const response = await fetch(`/api/teams/${teamName}`, {
+				method: 'DELETE',
+				credentials: 'include',
+			})
+
+			if (!response.ok) {
+				const data = await response.json()
+				toast.error('Failed to delete team', data.error || 'Unknown error')
+				return
+			}
+
+			toast.success('Team Deleted', `${team?.displayName || teamName} has been deleted`)
+			navigate('/admin/teams')
+		} catch {
+			toast.error('Error', 'An error occurred while deleting the team')
+		} finally {
+			setDeletingTeam(false)
+		}
+	}
+
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center h-64">
@@ -564,6 +594,16 @@ export function AdminTeamDetailPage() {
 							<p className="text-neutral-400 mt-1">@{team.name}</p>
 						</div>
 					</div>
+					<Button
+						variant="danger"
+						size="sm"
+						onClick={() => setShowDeleteTeamModal(true)}
+					>
+						<svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+						</svg>
+						Delete Team
+					</Button>
 				</div>
 
 				{/* Team Info */}
@@ -1291,6 +1331,52 @@ export function AdminTeamDetailPage() {
 				currentDefaults={team.clusterDefaults}
 				saving={savingDefaults}
 			/>
+
+			{/* Delete Team Confirmation */}
+			<Modal isOpen={showDeleteTeamModal} onClose={() => { setShowDeleteTeamModal(false); setDeleteConfirmName('') }}>
+				<ModalHeader>
+					<h2 className="text-lg font-semibold text-neutral-100">Delete Team</h2>
+				</ModalHeader>
+				<ModalBody className="space-y-4">
+					<p className="text-neutral-400">
+						This will permanently delete{' '}
+						<strong className="text-neutral-200">{team.displayName || team.name}</strong> and
+						its namespace. This action cannot be undone.
+					</p>
+					{clusters.length > 0 && (
+						<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+							<p className="text-sm text-red-300">
+								This team has <strong>{clusters.length} cluster{clusters.length !== 1 ? 's' : ''}</strong> that
+								will be affected. Ensure all clusters are deleted before removing the team.
+							</p>
+						</div>
+					)}
+					{members.length > 0 && (
+						<p className="text-sm text-neutral-500">
+							{members.length} member{members.length !== 1 ? 's' : ''} will lose access.
+						</p>
+					)}
+					<Input
+						id="deleteConfirm"
+						label={`Type "${teamName}" to confirm`}
+						value={deleteConfirmName}
+						onChange={(e) => setDeleteConfirmName(e.target.value)}
+						placeholder={teamName}
+					/>
+				</ModalBody>
+				<ModalFooter>
+					<Button variant="secondary" onClick={() => { setShowDeleteTeamModal(false); setDeleteConfirmName('') }}>
+						Cancel
+					</Button>
+					<Button
+						variant="danger"
+						onClick={handleDeleteTeam}
+						disabled={deletingTeam || deleteConfirmName !== teamName}
+					>
+						{deletingTeam ? 'Deleting...' : 'Delete Team'}
+					</Button>
+				</ModalFooter>
+			</Modal>
 		</FadeIn>
 	)
 }

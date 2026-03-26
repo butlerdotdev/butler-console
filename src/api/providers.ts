@@ -184,6 +184,10 @@ export const providersApi = {
 		return apiClient.post<Provider>('/providers', data)
 	},
 
+	async update(namespace: string, name: string, data: Partial<CreateProviderRequest>): Promise<Provider> {
+		return apiClient.put<Provider>(`/providers/${namespace}/${name}`, data)
+	},
+
 	async delete(namespace: string, name: string): Promise<void> {
 		return apiClient.delete(`/providers/${namespace}/${name}`)
 	},

@@ -120,13 +120,14 @@ export function ClusterDetailPage() {
 		}
 	}, [namespace, name, loadCluster])
 
-	// Auto-poll every 5s when workers are scaling (ready !== desired)
+	// Auto-poll every 5s when workers are scaling (ready !== desired) or cluster not Ready
 	useEffect(() => {
 		if (!cluster) return
-		const ready = cluster.status?.workerNodesReady ?? 0
-		const desired = cluster.status?.workerNodesDesired ?? 0
 		const phase = cluster.status?.phase
-		const isConverging = desired > 0 && ready !== desired
+		const ready = cluster.status?.workerNodesReady
+		const desired = cluster.status?.workerNodesDesired
+		// Only treat as converging when both fields are explicitly set by the controller
+		const isConverging = ready != null && desired != null && ready !== desired
 		const isNotReady = phase && phase !== 'Ready'
 		if (!isConverging && !isNotReady) return
 
@@ -383,9 +384,11 @@ function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace
 							<dt className="text-neutral-400">Workers</dt>
 							<dd className="text-neutral-50">
 								{(() => {
-									const desired = status?.workerNodesDesired ?? spec.workers?.replicas ?? 0
-									const ready = status?.workerNodesReady ?? 0
-									if (desired > 0 && ready !== desired) {
+									const ready = status?.workerNodesReady
+									const desired = status?.workerNodesDesired
+									const specReplicas = spec.workers?.replicas ?? 0
+									// Only show ready/desired progress when both fields are set by the controller
+									if (ready != null && desired != null && ready !== desired) {
 										return (
 											<span className="flex items-center gap-2">
 												<span className="text-amber-400">{ready}/{desired} ready</span>
@@ -396,7 +399,10 @@ function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace
 											</span>
 										)
 									}
-									return <span>{desired}</span>
+									if (ready != null && desired != null) {
+										return <span>{ready}/{desired} ready</span>
+									}
+									return <span>{specReplicas}</span>
 								})()}
 							</dd>
 						</div>
@@ -422,13 +428,14 @@ function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace
 							const conditions = status.conditions as Array<{type: string; status: string; reason?: string; message?: string}>
 							const workersReady = conditions.find((c) => c.type === 'WorkersReady')
 							const networkReady = conditions.find((c) => c.type === 'NetworkReady')
+							const clusterIsReady = status?.phase === 'Ready'
 							return (
 								<>
 									{workersReady && (
 										<div className="flex justify-between">
 											<dt className="text-neutral-400">Workers Ready</dt>
 											<dd>
-												<StatusBadge status={workersReady.status === 'True' ? 'Ready' : workersReady.reason === 'WorkersProvisioning' ? 'Provisioning' : 'Pending'} />
+												<StatusBadge status={workersReady.status === 'True' || clusterIsReady ? 'Ready' : workersReady.reason === 'WorkersProvisioning' ? 'Provisioning' : 'Pending'} />
 											</dd>
 										</div>
 									)}

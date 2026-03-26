@@ -9,6 +9,7 @@ import { clustersApi, type Cluster, type Node, type Addon, type ClusterEvent } f
 import { Card, Spinner, StatusBadge, Button, FadeIn } from '@/components/ui'
 import { ClusterTerminal } from '@/components/terminal'
 import { DeleteClusterModal } from '@/components/clusters/DeleteClusterModal'
+import { ScaleWorkersModal } from '@/components/clusters/ScaleWorkersModal'
 import { useToast } from '@/hooks/useToast'
 import { AddonsTab } from '@/components/clusters'
 import { AccessDenied } from '@/components/AccessDenied'
@@ -59,11 +60,13 @@ export function ClusterDetailPage() {
 	const [accessDenied, setAccessDenied] = useState(false)
 	const [accessDeniedMessage, setAccessDeniedMessage] = useState<string>('')
 	const [showDeleteModal, setShowDeleteModal] = useState(false)
+	const [showScaleModal, setShowScaleModal] = useState(false)
+	const [scaleTarget, setScaleTarget] = useState<number | null>(null)
 
-	const loadCluster = useCallback(async () => {
+	const loadCluster = useCallback(async (silent = false) => {
 		if (!namespace || !name) return
 		try {
-			setLoading(true)
+			if (!silent) setLoading(true)
 			setAccessDenied(false)
 			const data = await clustersApi.get(namespace, name)
 			setCluster(data)
@@ -74,11 +77,11 @@ export function ClusterDetailPage() {
 				(apiErr?.message && apiErr.message.includes('forbidden'))) {
 				setAccessDenied(true)
 				setAccessDeniedMessage(apiErr?.message || 'You do not have access to this cluster')
-			} else {
+			} else if (!silent) {
 				setError(err instanceof Error ? err.message : 'Failed to load cluster')
 			}
 		} finally {
-			setLoading(false)
+			if (!silent) setLoading(false)
 		}
 	}, [namespace, name])
 
@@ -118,6 +121,32 @@ export function ClusterDetailPage() {
 		}
 	}, [namespace, name, loadCluster])
 
+	// Clear scaleTarget when scaling is complete
+	useEffect(() => {
+		if (scaleTarget == null || !cluster) return
+		const ready = cluster.status?.workerNodesReady
+		if (ready != null && ready === scaleTarget) {
+			setScaleTarget(null)
+		}
+	}, [cluster, scaleTarget])
+
+	// Auto-poll every 5s when workers are scaling or cluster not Ready
+	useEffect(() => {
+		if (!cluster) return
+		const phase = cluster.status?.phase
+		const ready = cluster.status?.workerNodesReady
+		const desired = cluster.status?.workerNodesDesired
+		const isConverging = ready != null && desired != null && ready !== desired
+		const isNotReady = phase && phase !== 'Ready'
+		const isScaling = scaleTarget != null
+		if (!isConverging && !isNotReady && !isScaling) return
+
+		const interval = setInterval(() => {
+			loadCluster(true)
+		}, 5000)
+		return () => clearInterval(interval)
+	}, [cluster, scaleTarget, loadCluster])
+
 	useEffect(() => {
 		if (cluster && activeTab === 'nodes') {
 			loadNodes()
@@ -142,6 +171,14 @@ export function ClusterDetailPage() {
 				showError('Delete Failed', err instanceof Error ? err.message : 'Failed to delete cluster')
 			}
 		}
+	}
+
+	const handleScale = async (replicas: number) => {
+		if (!namespace || !name) return
+		await clustersApi.scale(namespace, name, replicas)
+		setScaleTarget(replicas)
+		success('Workers Scaled', `Cluster ${name} scaling to ${replicas} worker${replicas !== 1 ? 's' : ''}`)
+		loadCluster(true)
 	}
 
 	const handleDownloadKubeconfig = async () => {
@@ -244,6 +281,12 @@ export function ClusterDetailPage() {
 							Download Kubeconfig
 						</Button>
 						<Button
+							variant="secondary"
+							onClick={() => setShowScaleModal(true)}
+						>
+							Scale Workers
+						</Button>
+						<Button
 							variant="danger"
 							onClick={() => setShowDeleteModal(true)}
 						>
@@ -272,7 +315,7 @@ export function ClusterDetailPage() {
 				</div>
 
 				{/* Tab Content */}
-				{activeTab === 'overview' && <OverviewTab cluster={cluster} namespace={namespace!} name={name!} />}
+				{activeTab === 'overview' && <OverviewTab cluster={cluster} namespace={namespace!} name={name!} scaleTarget={scaleTarget} />}
 				{activeTab === 'nodes' && <NodesTab nodes={nodes} />}
 				{activeTab === 'addons' && (
 					<AddonsTab
@@ -313,11 +356,18 @@ export function ClusterDetailPage() {
 				clusterNamespace={clusterNamespace}
 				workerCount={workerCount}
 			/>
+			<ScaleWorkersModal
+				isOpen={showScaleModal}
+				onClose={() => setShowScaleModal(false)}
+				onScale={handleScale}
+				clusterName={clusterName}
+				currentReplicas={workerCount}
+			/>
 		</FadeIn>
 	)
 }
 
-function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace: string; name: string }) {
+function OverviewTab({ cluster, namespace, name, scaleTarget }: { cluster: Cluster; namespace: string; name: string; scaleTarget: number | null }) {
 	const spec = cluster.spec
 	const status = cluster.status
 	const provider = spec.providerConfigRef?.name || 'Default'
@@ -342,8 +392,42 @@ function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace
 							</dd>
 						</div>
 						<div className="flex justify-between">
-							<dt className="text-neutral-400">Worker Replicas</dt>
-							<dd className="text-neutral-50">{spec.workers?.replicas || 0}</dd>
+							<dt className="text-neutral-400">Workers</dt>
+							<dd className="text-neutral-50">
+								{(() => {
+									const ready = status?.workerNodesReady
+									const desired = status?.workerNodesDesired
+									const specReplicas = spec.workers?.replicas ?? 0
+									// Server reports both fields — use accurate progress
+									if (ready != null && desired != null && ready !== desired) {
+										return (
+											<span className="flex items-center gap-2">
+												<span className="text-amber-400">{ready}/{desired} ready</span>
+												<svg className="w-4 h-4 text-amber-400 animate-spin" fill="none" viewBox="0 0 24 24">
+													<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+													<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+												</svg>
+											</span>
+										)
+									}
+									if (ready != null && desired != null) {
+										return <span>{ready}/{desired} ready</span>
+									}
+									// Client-side scale tracking — server doesn't report ready count yet
+									if (scaleTarget != null) {
+										return (
+											<span className="flex items-center gap-2">
+												<span className="text-amber-400">Scaling to {scaleTarget}...</span>
+												<svg className="w-4 h-4 text-amber-400 animate-spin" fill="none" viewBox="0 0 24 24">
+													<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+													<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+												</svg>
+											</span>
+										)
+									}
+									return <span>{specReplicas}</span>
+								})()}
+							</dd>
 						</div>
 					</dl>
 				</Card>
@@ -364,16 +448,29 @@ function OverviewTab({ cluster, namespace, name }: { cluster: Cluster; namespace
 							<dd className="text-neutral-50">{isControlPlaneReady ? 'Yes' : 'No'}</dd>
 						</div>
 						{status?.conditions && (() => {
-							const networkReady = (status.conditions as Array<{type: string; status: string; reason?: string; message?: string}>)
-								.find((c) => c.type === 'NetworkReady')
-							if (!networkReady) return null
+							const conditions = status.conditions as Array<{type: string; status: string; reason?: string; message?: string}>
+							const workersReady = conditions.find((c) => c.type === 'WorkersReady')
+							const networkReady = conditions.find((c) => c.type === 'NetworkReady')
+							const clusterIsReady = status?.phase === 'Ready'
 							return (
-								<div className="flex justify-between">
-									<dt className="text-neutral-400">Network Ready</dt>
-									<dd>
-										<StatusBadge status={networkReady.status === 'True' ? 'Ready' : networkReady.status === 'False' ? 'Failed' : 'Pending'} />
-									</dd>
-								</div>
+								<>
+									{workersReady && (
+										<div className="flex justify-between">
+											<dt className="text-neutral-400">Workers Ready</dt>
+											<dd>
+												<StatusBadge status={workersReady.status === 'True' || clusterIsReady ? 'Ready' : workersReady.reason === 'WorkersProvisioning' ? 'Provisioning' : 'Pending'} />
+											</dd>
+										</div>
+									)}
+									{networkReady && (
+										<div className="flex justify-between">
+											<dt className="text-neutral-400">Network Ready</dt>
+											<dd>
+												<StatusBadge status={networkReady.status === 'True' ? 'Ready' : networkReady.status === 'False' ? 'Failed' : 'Pending'} />
+											</dd>
+										</div>
+									)}
+								</>
 							)
 						})()}
 					</dl>

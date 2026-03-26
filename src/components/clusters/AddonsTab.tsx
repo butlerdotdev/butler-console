@@ -857,8 +857,7 @@ function InstalledAddonCard({
 
 				{menuOpen && (
 					<div className="absolute top-full left-0 right-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl z-10 overflow-hidden">
-						{catalogInfo && (
-							<DropdownOption
+						<DropdownOption
 								icon="⚙️"
 								label="Configure"
 								description={isGitOpsManaged ? "Update values (GitOps warning)" : "Update Helm values"}
@@ -868,7 +867,6 @@ function InstalledAddonCard({
 								}}
 								warning={isGitOpsManaged}
 							/>
-						)}
 						{gitopsEnabled && !isGitOpsManaged && (
 							<DropdownOption
 								icon="🔄"

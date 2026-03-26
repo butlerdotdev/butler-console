@@ -63,10 +63,10 @@ export function ClusterDetailPage() {
 	const [showScaleModal, setShowScaleModal] = useState(false)
 	const [scaleTarget, setScaleTarget] = useState<number | null>(null)
 
-	const loadCluster = useCallback(async () => {
+	const loadCluster = useCallback(async (silent = false) => {
 		if (!namespace || !name) return
 		try {
-			setLoading(true)
+			if (!silent) setLoading(true)
 			setAccessDenied(false)
 			const data = await clustersApi.get(namespace, name)
 			setCluster(data)
@@ -77,11 +77,11 @@ export function ClusterDetailPage() {
 				(apiErr?.message && apiErr.message.includes('forbidden'))) {
 				setAccessDenied(true)
 				setAccessDeniedMessage(apiErr?.message || 'You do not have access to this cluster')
-			} else {
+			} else if (!silent) {
 				setError(err instanceof Error ? err.message : 'Failed to load cluster')
 			}
 		} finally {
-			setLoading(false)
+			if (!silent) setLoading(false)
 		}
 	}, [namespace, name])
 
@@ -142,7 +142,7 @@ export function ClusterDetailPage() {
 		if (!isConverging && !isNotReady && !isScaling) return
 
 		const interval = setInterval(() => {
-			loadCluster()
+			loadCluster(true)
 		}, 5000)
 		return () => clearInterval(interval)
 	}, [cluster, scaleTarget, loadCluster])

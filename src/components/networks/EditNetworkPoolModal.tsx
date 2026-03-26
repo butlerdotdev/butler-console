@@ -22,7 +22,6 @@ export function EditNetworkPoolModal({ isOpen, onClose, onUpdated, pool }: EditN
 	const [reserved, setReserved] = useState<Array<{ cidr: string; description: string }>>([])
 	const [allocStart, setAllocStart] = useState('')
 	const [allocEnd, setAllocEnd] = useState('')
-	const [nodesPerTenant, setNodesPerTenant] = useState('')
 	const [lbPoolPerTenant, setLbPoolPerTenant] = useState('')
 
 	// Initialize form from pool data when modal opens
@@ -33,9 +32,6 @@ export function EditNetworkPoolModal({ isOpen, onClose, onUpdated, pool }: EditN
 			)
 			setAllocStart(pool.spec.tenantAllocation?.start || '')
 			setAllocEnd(pool.spec.tenantAllocation?.end || '')
-			setNodesPerTenant(
-				pool.spec.tenantAllocation?.defaults?.nodesPerTenant?.toString() || ''
-			)
 			setLbPoolPerTenant(
 				pool.spec.tenantAllocation?.defaults?.lbPoolPerTenant?.toString() || ''
 			)
@@ -56,15 +52,14 @@ export function EditNetworkPoolModal({ isOpen, onClose, onUpdated, pool }: EditN
 			// Always send reserved (empty array clears them)
 			req.reserved = reserved.filter(r => r.cidr)
 
-			const hasTenantAlloc = allocStart || allocEnd || nodesPerTenant || lbPoolPerTenant
+			const hasTenantAlloc = allocStart || allocEnd || lbPoolPerTenant
 			if (hasTenantAlloc) {
 				req.tenantAllocation = {}
 				if (allocStart) req.tenantAllocation.start = allocStart
 				if (allocEnd) req.tenantAllocation.end = allocEnd
-				if (nodesPerTenant || lbPoolPerTenant) {
+				if (lbPoolPerTenant) {
 					req.tenantAllocation.defaults = {}
-					if (nodesPerTenant) req.tenantAllocation.defaults.nodesPerTenant = parseInt(nodesPerTenant)
-					if (lbPoolPerTenant) req.tenantAllocation.defaults.lbPoolPerTenant = parseInt(lbPoolPerTenant)
+					req.tenantAllocation.defaults.lbPoolPerTenant = parseInt(lbPoolPerTenant)
 				}
 			} else {
 				// Clear tenant allocation by sending empty object
@@ -186,15 +181,7 @@ export function EditNetworkPoolModal({ isOpen, onClose, onUpdated, pool }: EditN
 								placeholder="10.40.255.254"
 							/>
 							<Input
-								label="Nodes per Tenant"
-								id="edit-nodes-per-tenant"
-								type="number"
-								value={nodesPerTenant}
-								onChange={(e) => setNodesPerTenant(e.target.value)}
-								placeholder="3"
-							/>
-							<Input
-								label="LB Pool per Tenant"
+								label="LB IPs per Tenant"
 								id="edit-lb-pool-per-tenant"
 								type="number"
 								value={lbPoolPerTenant}

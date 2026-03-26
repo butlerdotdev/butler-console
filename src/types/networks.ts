@@ -110,3 +110,18 @@ export interface CreateNetworkPoolRequest {
 		}
 	}
 }
+
+export interface UpdateNetworkPoolRequest {
+	reserved?: Array<{
+		cidr: string
+		description?: string
+	}>
+	tenantAllocation?: {
+		start?: string
+		end?: string
+		defaults?: {
+			nodesPerTenant?: number
+			lbPoolPerTenant?: number
+		}
+	}
+}

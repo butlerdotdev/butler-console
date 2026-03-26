@@ -7,6 +7,7 @@ import type {
 	NetworkPoolListResponse,
 	IPAllocationListResponse,
 	CreateNetworkPoolRequest,
+	UpdateNetworkPoolRequest,
 } from '@/types/networks'
 
 export const networksApi = {
@@ -20,6 +21,10 @@ export const networksApi = {
 
 	async createPool(data: CreateNetworkPoolRequest): Promise<NetworkPool> {
 		return apiClient.post<NetworkPool>('/admin/networks', data)
+	},
+
+	async updatePool(namespace: string, name: string, data: UpdateNetworkPoolRequest): Promise<NetworkPool> {
+		return apiClient.put<NetworkPool>(`/admin/networks/${namespace}/${name}`, data)
 	},
 
 	async deletePool(namespace: string, name: string): Promise<void> {

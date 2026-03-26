@@ -9,6 +9,7 @@ import { Card, Spinner, Button, FadeIn, StatusBadge } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { PoolUsageBar } from '@/components/networks/PoolUsageBar'
 import { IPAddressMap } from '@/components/networks/IPAddressMap'
+import { EditNetworkPoolModal } from '@/components/networks/EditNetworkPoolModal'
 import { useToast } from '@/hooks/useToast'
 import type { NetworkPool, IPAllocation } from '@/types/networks'
 
@@ -25,6 +26,7 @@ export function NetworkPoolDetailPage() {
 	const [error, setError] = useState<string | null>(null)
 	const [releaseTarget, setReleaseTarget] = useState<IPAllocation | null>(null)
 	const [releasing, setReleasing] = useState(false)
+	const [showEditModal, setShowEditModal] = useState(false)
 
 	const loadPool = useCallback(async () => {
 		if (!namespace || !name) return
@@ -132,6 +134,9 @@ export function NetworkPoolDetailPage() {
 							<p className="text-neutral-400 mt-1">{pool.metadata.namespace}</p>
 						</div>
 					</div>
+					<Button variant="secondary" onClick={() => setShowEditModal(true)}>
+						Edit Pool
+					</Button>
 				</div>
 
 				{/* Stats Cards */}
@@ -355,6 +360,18 @@ export function NetworkPoolDetailPage() {
 					</Button>
 				</ModalFooter>
 			</Modal>
+			{/* Edit Pool Modal */}
+			{pool && (
+				<EditNetworkPoolModal
+					isOpen={showEditModal}
+					onClose={() => setShowEditModal(false)}
+					onUpdated={() => {
+						setShowEditModal(false)
+						loadPool()
+					}}
+					pool={pool}
+				/>
+			)}
 		</FadeIn>
 	)
 }

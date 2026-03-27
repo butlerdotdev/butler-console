@@ -111,6 +111,22 @@ export interface ManagementAddon {
 	}
 }
 
+export interface CreateAddonDefinitionRequest {
+	name: string
+	displayName: string
+	description: string
+	category: AddonCategory
+	icon?: string
+	chartRepository: string
+	chartName: string
+	defaultVersion: string
+	availableVersions?: string[]
+	defaultNamespace?: string
+	platform: boolean
+	dependsOn?: string[]
+	links?: Record<string, string>
+}
+
 export interface InstallManagementAddonRequest {
 	name: string
 	addon: string
@@ -181,6 +197,19 @@ export const addonsApi = {
 
 	async uninstallManagementAddon(name: string): Promise<void> {
 		return apiClient.delete(`/management/addons/${name}`)
+	},
+
+	// Admin addon catalog management
+	async createDefinition(data: CreateAddonDefinitionRequest): Promise<AddonDefinition> {
+		return apiClient.post<AddonDefinition>('/admin/addons/catalog', data)
+	},
+
+	async updateDefinition(name: string, data: CreateAddonDefinitionRequest): Promise<AddonDefinition> {
+		return apiClient.put<AddonDefinition>(`/admin/addons/catalog/${name}`, data)
+	},
+
+	async deleteDefinition(name: string): Promise<void> {
+		return apiClient.delete(`/admin/addons/catalog/${name}`)
 	},
 }
 

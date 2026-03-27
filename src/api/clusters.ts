@@ -224,6 +224,67 @@ export interface ManagementPod {
 	age: string
 }
 
+export interface MachineRequest {
+	apiVersion?: string
+	kind?: string
+	metadata: {
+		name: string
+		namespace: string
+		creationTimestamp?: string
+		labels?: Record<string, string>
+	}
+	spec: {
+		clusterName?: string
+		providerRef?: { name: string; namespace?: string }
+		machineTemplate?: {
+			cpu?: number
+			memory?: string
+			diskSize?: string
+		}
+		userData?: string
+	}
+	status?: {
+		phase?: string
+		vmID?: string
+		ipAddress?: string
+		providerStatus?: string
+		conditions?: Array<{
+			type: string
+			status: string
+			reason?: string
+			message?: string
+		}>
+	}
+}
+
+export interface LoadBalancerRequest {
+	apiVersion?: string
+	kind?: string
+	metadata: {
+		name: string
+		namespace: string
+		creationTimestamp?: string
+		labels?: Record<string, string>
+	}
+	spec: {
+		clusterName?: string
+		providerRef?: { name: string; namespace?: string }
+		type?: string
+		ports?: Array<{ port: number; targetPort?: number; protocol?: string }>
+	}
+	status?: {
+		phase?: string
+		vip?: string
+		loadBalancerID?: string
+		conditions?: Array<{
+			type: string
+			status: string
+			reason?: string
+			message?: string
+		}>
+	}
+}
+
 export const clustersApi = {
 	/**
 	 * List clusters with optional filters
@@ -283,5 +344,29 @@ export const clustersApi = {
 
 	async getManagementPods(namespace: string): Promise<{ pods: ManagementPod[] }> {
 		return apiClient.get<{ pods: ManagementPod[] }>(`/management/namespaces/${namespace}/pods`)
+	},
+
+	async exportYAML(namespace: string, name: string): Promise<string> {
+		const headers: Record<string, string> = {}
+		const team = apiClient.getTeam()
+		if (team) {
+			headers['X-Butler-Team'] = team
+		}
+		const response = await fetch(`/api/clusters/${namespace}/${name}/export`, {
+			credentials: 'include',
+			headers,
+		})
+		if (!response.ok) {
+			throw new Error(`Export failed: ${response.statusText}`)
+		}
+		return response.text()
+	},
+
+	async getMachineRequests(namespace: string, name: string): Promise<{ machineRequests: MachineRequest[] }> {
+		return apiClient.get<{ machineRequests: MachineRequest[] }>(`/clusters/${namespace}/${name}/machines`)
+	},
+
+	async getLoadBalancerRequests(namespace: string, name: string): Promise<{ loadBalancerRequests: LoadBalancerRequest[] }> {
+		return apiClient.get<{ loadBalancerRequests: LoadBalancerRequest[] }>(`/clusters/${namespace}/${name}/load-balancers`)
 	},
 }

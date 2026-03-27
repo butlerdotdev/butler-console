@@ -41,6 +41,7 @@ import { NetworkPoolDetailPage } from '@/pages/NetworkPoolDetailPage'
 import { TeamProvidersPage } from '@/pages/TeamProvidersPage'
 import { ObservabilityPage } from '@/pages/ObservabilityPage'
 import { ImagesPage } from '@/pages/ImagesPage'
+import { AddonCatalogPage } from '@/pages/AddonCatalogPage'
 
 
 interface TeamRef {
@@ -142,6 +143,7 @@ export default function App() {
 					<Route path="admin/networks/:namespace/:name" element={<RequireAdmin><NetworkPoolDetailPage /></RequireAdmin>} />
 					<Route path="admin/identity-providers" element={<RequireAdmin><IdentityProvidersPage /></RequireAdmin>} />
 					<Route path="admin/identity-providers/create" element={<RequireAdmin><CreateIdentityProviderPage /></RequireAdmin>} />
+					<Route path="admin/addons" element={<RequireAdmin><AddonCatalogPage /></RequireAdmin>} />
 					<Route path="admin/images" element={<RequireAdmin><ImagesPage /></RequireAdmin>} />
 					<Route path="admin/observability" element={<RequireAdmin><ObservabilityPage /></RequireAdmin>} />
 					<Route path="admin/settings" element={<RequireAdmin><SettingsPage /></RequireAdmin>} />

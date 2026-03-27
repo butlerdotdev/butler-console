@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { useTeamContext } from '@/hooks/useTeamContext'
-import { clustersApi, type Cluster, type Node, type Addon, type ClusterEvent } from '@/api'
+import { clustersApi, type Cluster, type Node, type Addon, type ClusterEvent, type MachineRequest, type LoadBalancerRequest } from '@/api'
 import { Card, Spinner, StatusBadge, Button, FadeIn } from '@/components/ui'
 import { ClusterTerminal } from '@/components/terminal'
 import { DeleteClusterModal } from '@/components/clusters/DeleteClusterModal'
@@ -62,6 +62,8 @@ export function ClusterDetailPage() {
 	const [showDeleteModal, setShowDeleteModal] = useState(false)
 	const [showScaleModal, setShowScaleModal] = useState(false)
 	const [scaleTarget, setScaleTarget] = useState<number | null>(null)
+	const [loadBalancerRequests, setLoadBalancerRequests] = useState<LoadBalancerRequest[]>([])
+	const [machineRequests, setMachineRequests] = useState<MachineRequest[]>([])
 
 	const loadCluster = useCallback(async (silent = false) => {
 		if (!namespace || !name) return
@@ -115,6 +117,26 @@ export function ClusterDetailPage() {
 		}
 	}, [namespace, name])
 
+	const loadMachineRequests = useCallback(async () => {
+		if (!namespace || !name) return
+		try {
+			const data = await clustersApi.getMachineRequests(namespace, name)
+			setMachineRequests(data.machineRequests || [])
+		} catch {
+			// Silently handle - CRD may not exist
+		}
+	}, [namespace, name])
+
+	const loadLoadBalancerRequests = useCallback(async () => {
+		if (!namespace || !name) return
+		try {
+			const data = await clustersApi.getLoadBalancerRequests(namespace, name)
+			setLoadBalancerRequests(data.loadBalancerRequests || [])
+		} catch {
+			// Silently handle error
+		}
+	}, [namespace, name])
+
 	useEffect(() => {
 		if (namespace && name) {
 			loadCluster()
@@ -154,8 +176,11 @@ export function ClusterDetailPage() {
 			loadAddons()
 		} else if (cluster && activeTab === 'events') {
 			loadEvents()
+		} else if (cluster && activeTab === 'overview') {
+			loadLoadBalancerRequests()
+			loadMachineRequests()
 		}
-	}, [cluster, activeTab, loadNodes, loadAddons, loadEvents])
+	}, [cluster, activeTab, loadNodes, loadAddons, loadEvents, loadLoadBalancerRequests, loadMachineRequests])
 
 	const handleDelete = async () => {
 		if (!namespace || !name) return
@@ -179,6 +204,23 @@ export function ClusterDetailPage() {
 		setScaleTarget(replicas)
 		success('Workers Scaled', `Cluster ${name} scaling to ${replicas} worker${replicas !== 1 ? 's' : ''}`)
 		loadCluster(true)
+	}
+
+	const handleExportYAML = async () => {
+		if (!namespace || !name) return
+		try {
+			const yamlContent = await clustersApi.exportYAML(namespace, name)
+			const blob = new Blob([yamlContent], { type: 'application/x-yaml' })
+			const url = URL.createObjectURL(blob)
+			const a = document.createElement('a')
+			a.href = url
+			a.download = `${name}.yaml`
+			a.click()
+			URL.revokeObjectURL(url)
+			success('Exported', `Cluster manifest saved as ${name}.yaml`)
+		} catch (err) {
+			showError('Export Failed', err instanceof Error ? err.message : 'Failed to export cluster YAML')
+		}
 	}
 
 	const handleDownloadKubeconfig = async () => {
@@ -275,6 +317,15 @@ export function ClusterDetailPage() {
 						</Link>
 						<Button
 							variant="secondary"
+							onClick={handleExportYAML}
+						>
+							<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+							</svg>
+							Export YAML
+						</Button>
+						<Button
+							variant="secondary"
 							onClick={handleDownloadKubeconfig}
 							disabled={phase !== 'Ready'}
 						>
@@ -315,8 +366,8 @@ export function ClusterDetailPage() {
 				</div>
 
 				{/* Tab Content */}
-				{activeTab === 'overview' && <OverviewTab cluster={cluster} namespace={namespace!} name={name!} scaleTarget={scaleTarget} />}
-				{activeTab === 'nodes' && <NodesTab nodes={nodes} />}
+				{activeTab === 'overview' && <OverviewTab cluster={cluster} namespace={namespace!} name={name!} scaleTarget={scaleTarget} loadBalancerRequests={loadBalancerRequests} machineRequests={machineRequests} />}
+			{activeTab === 'nodes' && <NodesTab nodes={nodes} />}
 				{activeTab === 'addons' && (
 					<AddonsTab
 						clusterNamespace={namespace!}
@@ -367,7 +418,7 @@ export function ClusterDetailPage() {
 	)
 }
 
-function OverviewTab({ cluster, namespace, name, scaleTarget }: { cluster: Cluster; namespace: string; name: string; scaleTarget: number | null }) {
+function OverviewTab({ cluster, namespace, name, scaleTarget, loadBalancerRequests, machineRequests }: { cluster: Cluster; namespace: string; name: string; scaleTarget: number | null; loadBalancerRequests: LoadBalancerRequest[]; machineRequests: MachineRequest[] }) {
 	const spec = cluster.spec
 	const status = cluster.status
 	const provider = spec.providerConfigRef?.name || 'Default'
@@ -398,7 +449,6 @@ function OverviewTab({ cluster, namespace, name, scaleTarget }: { cluster: Clust
 									const ready = status?.workerNodesReady
 									const desired = status?.workerNodesDesired
 									const specReplicas = spec.workers?.replicas ?? 0
-									// Server reports both fields — use accurate progress
 									if (ready != null && desired != null && ready !== desired) {
 										return (
 											<span className="flex items-center gap-2">
@@ -413,7 +463,6 @@ function OverviewTab({ cluster, namespace, name, scaleTarget }: { cluster: Clust
 									if (ready != null && desired != null) {
 										return <span>{ready}/{desired} ready</span>
 									}
-									// Client-side scale tracking — server doesn't report ready count yet
 									if (scaleTarget != null) {
 										return (
 											<span className="flex items-center gap-2">
@@ -429,6 +478,34 @@ function OverviewTab({ cluster, namespace, name, scaleTarget }: { cluster: Clust
 								})()}
 							</dd>
 						</div>
+						{spec.controlPlane?.replicas != null && (
+							<div className="flex justify-between">
+								<dt className="text-neutral-400">Control Plane Replicas</dt>
+								<dd className="text-neutral-50">{spec.controlPlane.replicas}</dd>
+							</div>
+						)}
+						{spec.workers?.machineTemplate && (
+							<>
+								{spec.workers.machineTemplate.cpu != null && (
+									<div className="flex justify-between">
+										<dt className="text-neutral-400">Worker CPU</dt>
+										<dd className="text-neutral-50">{spec.workers.machineTemplate.cpu} cores</dd>
+									</div>
+								)}
+								{spec.workers.machineTemplate.memory && (
+									<div className="flex justify-between">
+										<dt className="text-neutral-400">Worker Memory</dt>
+										<dd className="text-neutral-50">{spec.workers.machineTemplate.memory}</dd>
+									</div>
+								)}
+								{spec.workers.machineTemplate.diskSize && (
+									<div className="flex justify-between">
+										<dt className="text-neutral-400">Worker Disk</dt>
+										<dd className="text-neutral-50">{spec.workers.machineTemplate.diskSize}</dd>
+									</div>
+								)}
+							</>
+						)}
 					</dl>
 				</Card>
 
@@ -477,6 +554,52 @@ function OverviewTab({ cluster, namespace, name, scaleTarget }: { cluster: Clust
 				</Card>
 			</div>
 
+			{/* Control Plane Resources */}
+			{spec.controlPlane?.resources && (
+				<Card className="p-5">
+					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Control Plane Resources</h3>
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+						{(['apiServer', 'controllerManager', 'scheduler'] as const).map((component) => {
+							const res = spec.controlPlane?.resources?.[component]
+							if (!res) return null
+							return (
+								<div key={component} className="p-3 bg-neutral-800/50 rounded-lg">
+									<p className="text-xs font-medium text-neutral-400 uppercase mb-2">
+										{component === 'apiServer' ? 'API Server' : component === 'controllerManager' ? 'Controller Manager' : 'Scheduler'}
+									</p>
+									<dl className="space-y-1 text-sm">
+										{res.requests?.cpu && (
+											<div className="flex justify-between">
+												<dt className="text-neutral-500">CPU Request</dt>
+												<dd className="text-neutral-300 font-mono">{res.requests.cpu}</dd>
+											</div>
+										)}
+										{res.limits?.cpu && (
+											<div className="flex justify-between">
+												<dt className="text-neutral-500">CPU Limit</dt>
+												<dd className="text-neutral-300 font-mono">{res.limits.cpu}</dd>
+											</div>
+										)}
+										{res.requests?.memory && (
+											<div className="flex justify-between">
+												<dt className="text-neutral-500">Mem Request</dt>
+												<dd className="text-neutral-300 font-mono">{res.requests.memory}</dd>
+											</div>
+										)}
+										{res.limits?.memory && (
+											<div className="flex justify-between">
+												<dt className="text-neutral-500">Mem Limit</dt>
+												<dd className="text-neutral-300 font-mono">{res.limits.memory}</dd>
+											</div>
+										)}
+									</dl>
+								</div>
+							)
+						})}
+					</div>
+				</Card>
+			)}
+
 			{/* Networking */}
 			{spec.networking?.loadBalancerPool && (
 				<Card className="p-5">
@@ -489,6 +612,95 @@ function OverviewTab({ cluster, namespace, name, scaleTarget }: { cluster: Clust
 									{spec.networking.loadBalancerPool.start} - {spec.networking.loadBalancerPool.end}
 								</dd>
 							</div>
+						)}
+					</dl>
+				</Card>
+			)}
+
+			{/* Machine Provisioning (only visible when MachineRequests exist) */}
+			{machineRequests.length > 0 && (
+				<Card className="p-5">
+					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">
+						Provisioning ({machineRequests.filter(m => m.status?.phase === 'Running').length}/{machineRequests.length} VMs ready)
+					</h3>
+					<div className="space-y-2">
+						{machineRequests.map((machine) => (
+							<div key={machine.metadata.name} className="flex items-center justify-between p-3 bg-neutral-800/50 rounded-lg">
+								<div>
+									<p className="text-sm text-neutral-200 font-mono">{machine.metadata.name}</p>
+									{machine.status?.ipAddress && (
+										<p className="text-xs text-neutral-400 mt-0.5">IP: {machine.status.ipAddress}</p>
+									)}
+								</div>
+								<StatusBadge status={machine.status?.phase || 'Pending'} />
+							</div>
+						))}
+					</div>
+				</Card>
+			)}
+
+			{/* Load Balancer Requests */}
+			{loadBalancerRequests.length > 0 && (
+				<Card className="p-5">
+					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Load Balancer Requests</h3>
+					<div className="space-y-3">
+						{loadBalancerRequests.map((lb) => (
+							<div key={lb.metadata.name} className="flex items-center justify-between p-3 bg-neutral-800/50 rounded-lg">
+								<div>
+									<p className="text-sm text-neutral-200 font-mono">{lb.metadata.name}</p>
+									{lb.status?.vip && (
+										<p className="text-xs text-neutral-400 mt-0.5">VIP: {lb.status.vip}</p>
+									)}
+								</div>
+								<StatusBadge status={lb.status?.phase || 'Pending'} />
+							</div>
+						))}
+					</div>
+				</Card>
+			)}
+
+			{/* Infrastructure Override */}
+			{spec.infrastructureOverride && (
+				<Card className="p-5">
+					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Infrastructure Override</h3>
+					<dl className="space-y-3">
+						{spec.infrastructureOverride.harvester && (
+							<>
+								{spec.infrastructureOverride.harvester.namespace && (
+									<div className="flex justify-between">
+										<dt className="text-neutral-400">Harvester Namespace</dt>
+										<dd className="text-neutral-50 font-mono">{spec.infrastructureOverride.harvester.namespace}</dd>
+									</div>
+								)}
+								{spec.infrastructureOverride.harvester.networkName && (
+									<div className="flex justify-between">
+										<dt className="text-neutral-400">Network</dt>
+										<dd className="text-neutral-50 font-mono">{spec.infrastructureOverride.harvester.networkName}</dd>
+									</div>
+								)}
+								{spec.infrastructureOverride.harvester.imageName && (
+									<div className="flex justify-between">
+										<dt className="text-neutral-400">Image</dt>
+										<dd className="text-neutral-50 font-mono">{spec.infrastructureOverride.harvester.imageName}</dd>
+									</div>
+								)}
+							</>
+						)}
+						{spec.infrastructureOverride.nutanix && (
+							<>
+								{spec.infrastructureOverride.nutanix.clusterUUID && (
+									<div className="flex justify-between">
+										<dt className="text-neutral-400">Nutanix Cluster</dt>
+										<dd className="text-neutral-50 font-mono text-xs">{spec.infrastructureOverride.nutanix.clusterUUID}</dd>
+									</div>
+								)}
+								{spec.infrastructureOverride.nutanix.subnetUUID && (
+									<div className="flex justify-between">
+										<dt className="text-neutral-400">Subnet</dt>
+										<dd className="text-neutral-50 font-mono text-xs">{spec.infrastructureOverride.nutanix.subnetUUID}</dd>
+									</div>
+								)}
+							</>
 						)}
 					</dl>
 				</Card>

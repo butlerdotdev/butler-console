@@ -1,7 +1,7 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useDocumentTitle } from '@/hooks'
 import { useToast } from '@/hooks/useToast'
 import {
@@ -32,6 +32,8 @@ const CATEGORIES: AddonCategory[] = [
 export function AddonCatalogPage() {
 	useDocumentTitle('Addon Catalog')
 	const toast = useToast()
+	const toastRef = useRef(toast)
+	toastRef.current = toast
 
 	const [addons, setAddons] = useState<AddonDefinition[]>([])
 	const [loading, setLoading] = useState(true)
@@ -47,11 +49,11 @@ export function AddonCatalogPage() {
 			const data = await addonsApi.getCatalog()
 			setAddons(data.addons || [])
 		} catch {
-			toast.error('Error', 'Failed to load addon catalog')
+			toastRef.current.error('Error', 'Failed to load addon catalog')
 		} finally {
 			setLoading(false)
 		}
-	}, [toast])
+	}, [])
 
 	useEffect(() => {
 		loadCatalog()
@@ -168,20 +170,24 @@ export function AddonCatalogPage() {
 											<StatusBadge status={addon.source === 'builtin' ? 'Ready' : 'Custom'} />
 										</td>
 										<td className="px-5 py-4 text-right">
-											<div className="flex items-center justify-end gap-2">
-												<button
-													onClick={() => setEditAddon(addon)}
-													className="text-sm text-violet-400 hover:text-violet-300"
-												>
-													Edit
-												</button>
-												<button
-													onClick={() => setDeleteAddon(addon)}
-													className="text-sm text-red-400 hover:text-red-300"
-												>
-													Delete
-												</button>
-											</div>
+											{addon.source === 'builtin' ? (
+												<span className="text-xs text-neutral-500">managed</span>
+											) : (
+												<div className="flex items-center justify-end gap-2">
+													<button
+														onClick={() => setEditAddon(addon)}
+														className="text-sm text-violet-400 hover:text-violet-300"
+													>
+														Edit
+													</button>
+													<button
+														onClick={() => setDeleteAddon(addon)}
+														className="text-sm text-red-400 hover:text-red-300"
+													>
+														Delete
+													</button>
+												</div>
+											)}
 										</td>
 									</tr>
 								))}

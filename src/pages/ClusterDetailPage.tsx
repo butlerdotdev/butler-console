@@ -367,7 +367,7 @@ export function ClusterDetailPage() {
 
 				{/* Tab Content */}
 				{activeTab === 'overview' && <OverviewTab cluster={cluster} namespace={namespace!} name={name!} scaleTarget={scaleTarget} loadBalancerRequests={loadBalancerRequests} machineRequests={machineRequests} />}
-		{activeTab === 'nodes' && <NodesTab nodes={nodes} />}
+			{activeTab === 'nodes' && <NodesTab nodes={nodes} />}
 				{activeTab === 'addons' && (
 					<AddonsTab
 						clusterNamespace={namespace!}

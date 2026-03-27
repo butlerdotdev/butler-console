@@ -347,8 +347,14 @@ export const clustersApi = {
 	},
 
 	async exportYAML(namespace: string, name: string): Promise<string> {
+		const headers: Record<string, string> = {}
+		const team = apiClient.getTeam()
+		if (team) {
+			headers['X-Butler-Team'] = team
+		}
 		const response = await fetch(`/api/clusters/${namespace}/${name}/export`, {
 			credentials: 'include',
+			headers,
 		})
 		if (!response.ok) {
 			throw new Error(`Export failed: ${response.statusText}`)

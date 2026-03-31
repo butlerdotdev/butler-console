@@ -1,7 +1,7 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { ApiError } from '@/api/client'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { Button } from '@/components/ui'
@@ -295,7 +295,7 @@ export function EditClusterModal({ isOpen, onClose, onSaved, cluster, isAdmin }:
 				<Button variant="secondary" onClick={handleClose} disabled={saving}>
 					Cancel
 				</Button>
-				<Button onClick={handleSave} disabled={!changed || saving}>
+				<Button onClick={handleSave} disabled={!changed || saving || (needsDowngradeAck && !ackDowngrade)}>
 					{saving ? 'Saving...' : 'Save Changes'}
 				</Button>
 			</ModalFooter>

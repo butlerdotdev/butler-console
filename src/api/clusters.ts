@@ -173,11 +173,7 @@ export interface FieldError {
 	current?: string
 }
 
-export interface UpdateClusterError {
-	error?: string
-	errors?: FieldError[]
-	current?: Cluster
-}
+
 
 export interface Node {
 	name: string

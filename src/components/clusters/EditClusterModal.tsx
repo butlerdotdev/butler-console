@@ -1,7 +1,8 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { ApiError } from '@/api/client'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { Button } from '@/components/ui'
 import { clustersApi, type Cluster, type UpdateClusterRequest, type FieldError } from '@/api'
@@ -53,9 +54,6 @@ function buildRequest(form: FormState, original: FormState, resourceVersion: str
 	}
 	if (form.cpReplicas !== original.cpReplicas) {
 		req.controlPlane = { replicas: form.cpReplicas }
-		if (original.cpReplicas === 3 && form.cpReplicas === 1) {
-			req.acknowledgeDowngrade = true
-		}
 	}
 
 	const workerChanges: Record<string, unknown> = {}
@@ -75,25 +73,30 @@ function buildRequest(form: FormState, original: FormState, resourceVersion: str
 }
 
 export function EditClusterModal({ isOpen, onClose, onSaved, cluster, isAdmin }: EditClusterModalProps) {
-	const original = formFromCluster(cluster)
-	const [form, setForm] = useState<FormState>(original)
+	const [original, setOriginal] = useState<FormState>(() => formFromCluster(cluster))
+	const [form, setForm] = useState<FormState>(() => formFromCluster(cluster))
 	const [saving, setSaving] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [fieldErrors, setFieldErrors] = useState<FieldError[]>([])
 	const [conflict, setConflict] = useState(false)
+	const [ackDowngrade, setAckDowngrade] = useState(false)
 
 	useEffect(() => {
 		if (isOpen) {
-			setForm(formFromCluster(cluster))
+			const snapshot = formFromCluster(cluster)
+			setOriginal(snapshot)
+			setForm(snapshot)
 			setError(null)
 			setFieldErrors([])
 			setSaving(false)
 			setConflict(false)
+			setAckDowngrade(false)
 		}
 	}, [isOpen, cluster])
 
 	const changed = hasChanges(form, original)
 	const phase = cluster.status?.phase
+	const needsDowngradeAck = original.cpReplicas === 3 && form.cpReplicas === 1
 
 	const handleClose = () => {
 		if (saving) return
@@ -102,6 +105,7 @@ export function EditClusterModal({ isOpen, onClose, onSaved, cluster, isAdmin }:
 
 	const handleSave = async () => {
 		if (!changed || saving) return
+		if (needsDowngradeAck && !ackDowngrade) return
 		const rv = cluster.metadata.resourceVersion
 		if (!rv) {
 			setError('Missing resourceVersion. Refresh and try again.')
@@ -113,18 +117,21 @@ export function EditClusterModal({ isOpen, onClose, onSaved, cluster, isAdmin }:
 		setFieldErrors([])
 
 		try {
-			await clustersApi.update(cluster.metadata.namespace, cluster.metadata.name, buildRequest(form, original, rv))
+			const req = buildRequest(form, original, rv)
+			if (ackDowngrade) req.acknowledgeDowngrade = true
+			await clustersApi.update(cluster.metadata.namespace, cluster.metadata.name, req)
 			onSaved()
 			onClose()
 		} catch (err: unknown) {
-			const resp = err as { status?: number; body?: { error?: string; errors?: FieldError[]; current?: Cluster } }
-			if (resp.status === 409) {
-				setConflict(true)
-				setError('This cluster was modified by another user.')
-			} else if (resp.body?.errors) {
-				setFieldErrors(resp.body.errors)
-			} else if (resp.body?.error) {
-				setError(resp.body.error)
+			if (err instanceof ApiError) {
+				if (err.status === 409) {
+					setConflict(true)
+					setError('This cluster was modified by another user.')
+				} else if (err.body?.errors) {
+					setFieldErrors(err.body.errors as FieldError[])
+				} else {
+					setError(err.message)
+				}
 			} else {
 				setError(err instanceof Error ? err.message : 'Failed to update cluster')
 			}
@@ -188,8 +195,17 @@ export function EditClusterModal({ isOpen, onClose, onSaved, cluster, isAdmin }:
 								</button>
 							))}
 						</div>
-						{form.cpReplicas === 1 && original.cpReplicas === 3 && (
-							<p className="text-xs text-amber-400 mt-1">Reducing from 3 to 1 loses HA. This will be acknowledged automatically.</p>
+						{needsDowngradeAck && (
+							<label className="flex items-center gap-2 mt-2">
+								<input
+									type="checkbox"
+									checked={ackDowngrade}
+									onChange={e => setAckDowngrade(e.target.checked)}
+									disabled={saving}
+									className="rounded border-neutral-600 bg-neutral-800 text-blue-500 focus:ring-blue-500"
+								/>
+								<span className="text-xs text-amber-400">I understand reducing from 3 to 1 removes high availability</span>
+							</label>
 						)}
 						{fieldError('spec.controlPlane.replicas') && (
 							<p className="text-xs text-red-400 mt-1">{fieldError('spec.controlPlane.replicas')!.reason}</p>

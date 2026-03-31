@@ -33,6 +33,8 @@ export type {
 	Cluster,
 	ClusterListResponse,
 	CreateClusterRequest,
+	UpdateClusterRequest,
+	FieldError,
 	Node,
 	Addon,
 	ClusterEvent,

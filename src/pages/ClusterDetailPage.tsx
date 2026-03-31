@@ -5,11 +5,13 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { useTeamContext } from '@/hooks/useTeamContext'
+import { useAuth } from '@/hooks/useAuth'
 import { clustersApi, type Cluster, type Node, type Addon, type ClusterEvent, type MachineRequest, type LoadBalancerRequest } from '@/api'
 import { Card, Spinner, StatusBadge, Button, FadeIn } from '@/components/ui'
 import { ClusterTerminal } from '@/components/terminal'
 import { DeleteClusterModal } from '@/components/clusters/DeleteClusterModal'
 import { ScaleWorkersModal } from '@/components/clusters/ScaleWorkersModal'
+import { EditClusterModal } from '@/components/clusters/EditClusterModal'
 import { useToast } from '@/hooks/useToast'
 import { AddonsTab } from '@/components/clusters'
 import { AccessDenied } from '@/components/AccessDenied'
@@ -38,7 +40,9 @@ export function ClusterDetailPage() {
 	const { namespace, name } = useParams<{ namespace: string; name: string }>()
 	const navigate = useNavigate()
 	const { success, error: showError } = useToast()
-	const { buildPath } = useTeamContext()
+	const { buildPath, activeTeam } = useTeamContext()
+	const { user } = useAuth()
+	const isAdmin = user?.isPlatformAdmin || user?.teams?.some(t => t.name === activeTeam && t.role === 'admin') || false
 
 	// URL-based tab persistence
 	const [searchParams, setSearchParams] = useSearchParams()
@@ -61,6 +65,7 @@ export function ClusterDetailPage() {
 	const [accessDeniedMessage, setAccessDeniedMessage] = useState<string>('')
 	const [showDeleteModal, setShowDeleteModal] = useState(false)
 	const [showScaleModal, setShowScaleModal] = useState(false)
+	const [showEditModal, setShowEditModal] = useState(false)
 	const [scaleTarget, setScaleTarget] = useState<number | null>(null)
 	const [loadBalancerRequests, setLoadBalancerRequests] = useState<LoadBalancerRequest[]>([])
 	const [machineRequests, setMachineRequests] = useState<MachineRequest[]>([])
@@ -333,6 +338,13 @@ export function ClusterDetailPage() {
 						</Button>
 						<Button
 							variant="secondary"
+							onClick={() => setShowEditModal(true)}
+							disabled={phase === 'Failed' || phase === 'Deleting'}
+						>
+							Edit
+						</Button>
+						<Button
+							variant="secondary"
 							onClick={() => setShowScaleModal(true)}
 						>
 							Scale Workers
@@ -414,6 +426,15 @@ export function ClusterDetailPage() {
 				clusterName={clusterName}
 				currentReplicas={workerCount}
 			/>
+			{cluster && (
+				<EditClusterModal
+					isOpen={showEditModal}
+					onClose={() => setShowEditModal(false)}
+					onSaved={() => { success('Cluster Updated', `Cluster ${name} has been updated`); loadCluster(true) }}
+					cluster={cluster}
+					isAdmin={isAdmin}
+				/>
+			)}
 		</FadeIn>
 	)
 }

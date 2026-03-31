@@ -8,6 +8,7 @@ export interface Cluster {
 		name: string
 		namespace: string
 		uid?: string
+		resourceVersion?: string
 		creationTimestamp?: string
 	}
 	spec: {
@@ -150,6 +151,28 @@ export interface CreateClusterRequest {
 export interface ScaleRequest {
 	replicas: number
 }
+
+export interface UpdateClusterRequest {
+	resourceVersion: string
+	kubernetesVersion?: string
+	controlPlane?: {
+		replicas?: number
+		resources?: Record<string, unknown>
+	}
+	workers?: {
+		replicas?: number
+		machineTemplate?: Record<string, unknown>
+	}
+	infrastructureOverride?: Record<string, unknown>
+	acknowledgeDowngrade?: boolean
+}
+
+export interface FieldError {
+	field: string
+	reason: string
+	current?: string
+}
+
 
 export interface Node {
 	name: string
@@ -312,6 +335,10 @@ export const clustersApi = {
 
 	async delete(namespace: string, name: string): Promise<void> {
 		return apiClient.delete(`/clusters/${namespace}/${name}`)
+	},
+
+	async update(namespace: string, name: string, data: UpdateClusterRequest): Promise<Cluster> {
+		return apiClient.put<Cluster>(`/clusters/${namespace}/${name}`, data)
 	},
 
 	async scale(namespace: string, name: string, replicas: number): Promise<Cluster> {

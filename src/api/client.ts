@@ -8,11 +8,13 @@ const API_BASE = '/api'
  */
 export class ApiError extends Error {
 	status: number
+	body: Record<string, unknown> | null
 
-	constructor(message: string, status: number) {
+	constructor(message: string, status: number, body?: Record<string, unknown>) {
 		super(message)
 		this.name = 'ApiError'
 		this.status = status
+		this.body = body ?? null
 	}
 }
 
@@ -63,9 +65,8 @@ class ApiClient {
 		const response = await fetch(url, options)
 
 		if (!response.ok) {
-			const error = await response.json().catch(() => ({ error: 'Request failed' }))
-			// Include status code in error for proper handling
-			throw new ApiError(error.error || `HTTP ${response.status}`, response.status)
+			const body = await response.json().catch(() => ({ error: 'Request failed' }))
+			throw new ApiError(body.error || `HTTP ${response.status}`, response.status, body)
 		}
 
 		return response.json()

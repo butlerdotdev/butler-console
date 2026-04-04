@@ -7,6 +7,30 @@ import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Moda
 import { Button } from '@/components/ui'
 import { clustersApi, type Cluster, type UpdateClusterRequest, type FieldError } from '@/api'
 
+const SUPPORTED_K8S_VERSIONS = [
+	'v1.35.0', 'v1.34.2', 'v1.34.1', 'v1.34.0',
+	'v1.33.2', 'v1.33.1', 'v1.33.0',
+	'v1.32.2', 'v1.32.1', 'v1.32.0',
+	'v1.31.2', 'v1.31.1', 'v1.31.0',
+	'v1.30.2', 'v1.30.1', 'v1.30.0',
+]
+
+function parseVersion(v: string): [number, number, number] | null {
+	const match = v.replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)$/)
+	if (!match) return null
+	return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])]
+}
+
+function isDowngrade(current: string, target: string): boolean {
+	const c = parseVersion(current)
+	const t = parseVersion(target)
+	if (!c || !t) return false
+	if (t[0] < c[0]) return true
+	if (t[0] === c[0] && t[1] < c[1]) return true
+	if (t[0] === c[0] && t[1] === c[1] && t[2] < c[2]) return true
+	return false
+}
+
 interface EditClusterModalProps {
 	isOpen: boolean
 	onClose: () => void
@@ -162,14 +186,30 @@ export function EditClusterModal({ isOpen, onClose, onSaved, cluster, isAdmin }:
 				{/* Kubernetes Version */}
 				<div>
 					<label className="block text-sm font-medium text-neutral-300 mb-1">Kubernetes Version</label>
-					<input
-						type="text"
+					<select
 						value={form.kubernetesVersion}
 						onChange={e => setForm(f => ({ ...f, kubernetesVersion: e.target.value }))}
 						disabled={saving}
-						placeholder="v1.32.0"
 						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 font-mono text-sm"
-					/>
+					>
+						{!SUPPORTED_K8S_VERSIONS.includes(form.kubernetesVersion) && form.kubernetesVersion && (
+							<option value={form.kubernetesVersion}>{form.kubernetesVersion} (current)</option>
+						)}
+						{SUPPORTED_K8S_VERSIONS.map(v => (
+							<option
+								key={v}
+								value={v}
+								disabled={isDowngrade(cluster.spec.kubernetesVersion || '', v)}
+							>
+								{v}{v === cluster.spec.kubernetesVersion ? ' (current)' : ''}
+							</option>
+						))}
+					</select>
+					{form.kubernetesVersion !== cluster.spec.kubernetesVersion && form.kubernetesVersion && (
+						<p className="text-xs text-amber-400 mt-1">
+							Upgrading from {cluster.spec.kubernetesVersion} to {form.kubernetesVersion}. Workers will be rolled sequentially.
+						</p>
+					)}
 					{fieldError('spec.kubernetesVersion') && (
 						<p className="text-xs text-red-400 mt-1">{fieldError('spec.kubernetesVersion')!.reason}</p>
 					)}

@@ -192,6 +192,9 @@ export function EditClusterModal({ isOpen, onClose, onSaved, cluster, isAdmin }:
 						disabled={saving}
 						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 font-mono text-sm"
 					>
+						{!form.kubernetesVersion && (
+							<option value="" disabled>Select a version</option>
+						)}
 						{!SUPPORTED_K8S_VERSIONS.includes(form.kubernetesVersion) && form.kubernetesVersion && (
 							<option value={form.kubernetesVersion}>{form.kubernetesVersion} (current)</option>
 						)}

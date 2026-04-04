@@ -445,8 +445,41 @@ function OverviewTab({ cluster, namespace, name, scaleTarget, loadBalancerReques
 	const provider = spec.providerConfigRef?.name || 'Default'
 	const isControlPlaneReady = status?.phase === 'Ready'
 
+	const conditions = (status?.conditions || []) as Array<{type: string; status: string; reason?: string; message?: string}>
+	const readyCondition = conditions.find(c => c.type === 'Ready')
+	const isDegraded = readyCondition?.reason === 'ReconcileDegraded'
+	const ready = status?.workerNodesReady
+	const desired = status?.workerNodesDesired
+	const hasStaleNodes = status?.phase === 'Ready' && ready != null && desired != null && ready > desired
+
 	return (
 		<div className="space-y-6">
+			{isDegraded && (
+				<div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+					<div className="flex items-start gap-3">
+						<svg className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+						</svg>
+						<div>
+							<p className="text-sm font-medium text-amber-400">Cluster Degraded</p>
+							<p className="text-xs text-neutral-400 mt-1">{readyCondition?.message}</p>
+						</div>
+					</div>
+				</div>
+			)}
+			{hasStaleNodes && (
+				<div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+					<div className="flex items-start gap-3">
+						<svg className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+							<path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+						</svg>
+						<div>
+							<p className="text-sm font-medium text-amber-400">Stale Nodes Detected</p>
+							<p className="text-xs text-neutral-400 mt-1">{ready} nodes reporting but only {desired} desired. Check the Nodes tab for NotReady nodes that may need manual cleanup.</p>
+						</div>
+					</div>
+				</div>
+			)}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 				<Card className="p-5">
 					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Specification</h3>

@@ -484,9 +484,18 @@ function OverviewTab({ cluster, namespace, name, scaleTarget, loadBalancerReques
 					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Specification</h3>
 					<dl className="space-y-3">
 						<div className="flex justify-between">
-							<dt className="text-neutral-400">Kubernetes Version</dt>
+							<dt className="text-neutral-400">Control Plane Version</dt>
 							<dd className="text-neutral-50">{spec.kubernetesVersion || 'Unknown'}</dd>
 						</div>
+						{spec.workers?.machineTemplate?.os && (
+							<div className="flex justify-between">
+								<dt className="text-neutral-400">Worker OS</dt>
+								<dd className="text-neutral-50">
+									{spec.workers.machineTemplate.os.type || 'Unknown'}
+									{spec.workers.machineTemplate.os.version ? ` ${spec.workers.machineTemplate.os.version}` : ''}
+								</dd>
+							</div>
+						)}
 						<div className="flex justify-between">
 							<dt className="text-neutral-400">Provider</dt>
 							<dd className="text-neutral-50">

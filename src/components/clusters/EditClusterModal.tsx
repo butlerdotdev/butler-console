@@ -183,9 +183,9 @@ export function EditClusterModal({ isOpen, onClose, onSaved, cluster, isAdmin }:
 			</ModalHeader>
 
 			<ModalBody className="space-y-5">
-				{/* Kubernetes Version */}
+				{/* Control Plane Version */}
 				<div>
-					<label className="block text-sm font-medium text-neutral-300 mb-1">Kubernetes Version</label>
+					<label className="block text-sm font-medium text-neutral-300 mb-1">Control Plane Version</label>
 					<select
 						value={form.kubernetesVersion}
 						onChange={e => setForm(f => ({ ...f, kubernetesVersion: e.target.value }))}
@@ -210,7 +210,7 @@ export function EditClusterModal({ isOpen, onClose, onSaved, cluster, isAdmin }:
 					</select>
 					{form.kubernetesVersion !== cluster.spec.kubernetesVersion && form.kubernetesVersion && (
 						<p className="text-xs text-amber-400 mt-1">
-							Upgrading from {cluster.spec.kubernetesVersion} to {form.kubernetesVersion}. Workers will be rolled sequentially.
+							Control plane upgrade from {cluster.spec.kubernetesVersion} to {form.kubernetesVersion}. Worker kubelet version is determined by the OS image.
 						</p>
 					)}
 					{fieldError('spec.kubernetesVersion') && (

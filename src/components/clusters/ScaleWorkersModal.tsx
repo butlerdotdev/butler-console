@@ -1,7 +1,7 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { Button } from '@/components/ui'
 
@@ -23,14 +23,16 @@ export function ScaleWorkersModal({
 	const [replicas, setReplicas] = useState(currentReplicas)
 	const [isScaling, setIsScaling] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [lastOpen, setLastOpen] = useState(false)
 
-	useEffect(() => {
-		if (isOpen) {
-			setReplicas(currentReplicas)
-			setError(null)
-			setIsScaling(false)
-		}
-	}, [isOpen, currentReplicas])
+	if (isOpen && !lastOpen) {
+		setReplicas(currentReplicas)
+		setError(null)
+		setIsScaling(false)
+	}
+	if (isOpen !== lastOpen) {
+		setLastOpen(isOpen)
+	}
 
 	const isValid = replicas >= 1 && replicas <= 100 && replicas !== currentReplicas
 

@@ -267,8 +267,9 @@ function AddonDefinitionModal({
 		platform: false,
 	})
 
-	useEffect(() => {
-		if (isOpen && initial) {
+	const [lastOpen, setLastOpen] = useState(false)
+	if (isOpen && !lastOpen) {
+		if (initial) {
 			setForm({
 				name: initial.name,
 				displayName: initial.displayName,
@@ -280,7 +281,7 @@ function AddonDefinitionModal({
 				defaultNamespace: initial.defaultNamespace || '',
 				platform: initial.platform,
 			})
-		} else if (isOpen) {
+		} else {
 			setForm({
 				name: '',
 				displayName: '',
@@ -293,7 +294,10 @@ function AddonDefinitionModal({
 				platform: false,
 			})
 		}
-	}, [isOpen, initial])
+	}
+	if (isOpen !== lastOpen) {
+		setLastOpen(isOpen)
+	}
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault()

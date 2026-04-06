@@ -1405,18 +1405,20 @@ function EditResourceLimitsModal({
 		maxStorage: '',
 	})
 
-	useEffect(() => {
-		if (isOpen) {
-			setForm({
-				maxClusters: currentLimits?.maxClusters?.toString() || '',
-				maxTotalNodes: currentLimits?.maxTotalNodes?.toString() || '',
-				maxNodesPerCluster: currentLimits?.maxNodesPerCluster?.toString() || '',
-				maxCPUCores: currentLimits?.maxCPUCores || '',
-				maxMemory: currentLimits?.maxMemory || '',
-				maxStorage: currentLimits?.maxStorage || '',
-			})
-		}
-	}, [isOpen, currentLimits])
+	const [lastOpenLimits, setLastOpenLimits] = useState(false)
+	if (isOpen && !lastOpenLimits) {
+		setForm({
+			maxClusters: currentLimits?.maxClusters?.toString() || '',
+			maxTotalNodes: currentLimits?.maxTotalNodes?.toString() || '',
+			maxNodesPerCluster: currentLimits?.maxNodesPerCluster?.toString() || '',
+			maxCPUCores: currentLimits?.maxCPUCores || '',
+			maxMemory: currentLimits?.maxMemory || '',
+			maxStorage: currentLimits?.maxStorage || '',
+		})
+	}
+	if (isOpen !== lastOpenLimits) {
+		setLastOpenLimits(isOpen)
+	}
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault()
@@ -1525,17 +1527,19 @@ function EditClusterDefaultsModal({
 		workerDiskGi: '',
 	})
 
-	useEffect(() => {
-		if (isOpen) {
-			setForm({
-				kubernetesVersion: currentDefaults?.kubernetesVersion || '',
-				workerCount: currentDefaults?.workerCount?.toString() || '',
-				workerCPU: currentDefaults?.workerCPU?.toString() || '',
-				workerMemoryGi: currentDefaults?.workerMemoryGi?.toString() || '',
-				workerDiskGi: currentDefaults?.workerDiskGi?.toString() || '',
-			})
-		}
-	}, [isOpen, currentDefaults])
+	const [lastOpenDefaults, setLastOpenDefaults] = useState(false)
+	if (isOpen && !lastOpenDefaults) {
+		setForm({
+			kubernetesVersion: currentDefaults?.kubernetesVersion || '',
+			workerCount: currentDefaults?.workerCount?.toString() || '',
+			workerCPU: currentDefaults?.workerCPU?.toString() || '',
+			workerMemoryGi: currentDefaults?.workerMemoryGi?.toString() || '',
+			workerDiskGi: currentDefaults?.workerDiskGi?.toString() || '',
+		})
+	}
+	if (isOpen !== lastOpenDefaults) {
+		setLastOpenDefaults(isOpen)
+	}
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault()

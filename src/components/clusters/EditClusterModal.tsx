@@ -210,7 +210,7 @@ export function EditClusterModal({ isOpen, onClose, onSaved, cluster, isAdmin }:
 					</select>
 					{form.kubernetesVersion !== cluster.spec.kubernetesVersion && form.kubernetesVersion && (
 						<p className="text-xs text-amber-400 mt-1">
-							Control plane upgrade from {cluster.spec.kubernetesVersion} to {form.kubernetesVersion}. Worker kubelet version is determined by the OS image.
+							Control plane upgrade from {cluster.spec.kubernetesVersion} to {form.kubernetesVersion}. The API server pod will restart briefly during the upgrade. Worker kubelet version is determined by the OS image.
 						</p>
 					)}
 					{fieldError('spec.kubernetesVersion') && (

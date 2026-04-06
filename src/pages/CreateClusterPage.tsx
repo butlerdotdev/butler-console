@@ -9,6 +9,7 @@ import { Card, Button, FadeIn, Spinner } from '@/components/ui'
 import { parseQuantity } from '@/components/ui/ResourceUsageBar'
 import { useToast } from '@/hooks/useToast'
 import { useTeamContext } from '@/hooks/useTeamContext'
+import { SUPPORTED_K8S_VERSIONS } from '@/lib/versions'
 
 interface TeamResourceLimits {
 	maxClusters?: number
@@ -62,7 +63,7 @@ export function CreateClusterPage() {
 	const [form, setForm] = useState({
 		name: '',
 		namespace: defaultNamespace,
-		kubernetesVersion: 'v1.32.2',
+		kubernetesVersion: SUPPORTED_K8S_VERSIONS[0],
 		providerConfigRef: '',
 		workerReplicas: 1,
 		workerCPU: 4,
@@ -601,7 +602,7 @@ export function CreateClusterPage() {
 								</div>
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
-										Kubernetes Version
+										Control Plane Version
 									</label>
 									<select
 										name="kubernetesVersion"
@@ -609,12 +610,11 @@ export function CreateClusterPage() {
 										onChange={handleChange}
 										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
 									>
-										<option value="v1.32.2">v1.32.2</option>
-										<option value="v1.31.4">v1.31.4</option>
-										<option value="v1.30.8">v1.30.8</option>
-										<option value="v1.30.2">v1.30.2</option>
-										<option value="v1.29.12">v1.29.12</option>
+										{SUPPORTED_K8S_VERSIONS.map(v => (
+											<option key={v} value={v}>{v}</option>
+										))}
 									</select>
+									<p className="text-xs text-neutral-500 mt-1">Worker kubelet version is determined by the OS image.</p>
 								</div>
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">

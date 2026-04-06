@@ -128,6 +128,12 @@ export interface TenantClusterSpec {
 			cpu?: number
 			memory?: string
 			diskSize?: string
+			os?: {
+				type?: string
+				version?: string
+				talos?: { version?: string; installDisk?: string }
+				schematicID?: string
+			}
 		}
 	}
 	networking?: {

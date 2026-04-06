@@ -40,9 +40,9 @@ export function ClusterDetailPage() {
 	const { namespace, name } = useParams<{ namespace: string; name: string }>()
 	const navigate = useNavigate()
 	const { success, error: showError } = useToast()
-	const { buildPath, activeTeam } = useTeamContext()
+	const { buildPath, currentTeam } = useTeamContext()
 	const { user } = useAuth()
-	const isAdmin = user?.isPlatformAdmin || user?.teams?.some(t => t.name === activeTeam && t.role === 'admin') || false
+	const isAdmin = user?.isPlatformAdmin || user?.teams?.some(t => t.name === currentTeam && t.role === 'admin') || false
 
 	// URL-based tab persistence
 	const [searchParams, setSearchParams] = useSearchParams()

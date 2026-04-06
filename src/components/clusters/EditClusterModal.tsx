@@ -6,6 +6,7 @@ import { ApiError } from '@/api/client'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { Button } from '@/components/ui'
 import { clustersApi, type Cluster, type UpdateClusterRequest, type FieldError } from '@/api'
+import { SUPPORTED_K8S_VERSIONS, isDowngrade } from '@/lib/versions'
 
 interface EditClusterModalProps {
 	isOpen: boolean
@@ -159,17 +160,36 @@ export function EditClusterModal({ isOpen, onClose, onSaved, cluster, isAdmin }:
 			</ModalHeader>
 
 			<ModalBody className="space-y-5">
-				{/* Kubernetes Version */}
+				{/* Control Plane Version */}
 				<div>
-					<label className="block text-sm font-medium text-neutral-300 mb-1">Kubernetes Version</label>
-					<input
-						type="text"
+					<label className="block text-sm font-medium text-neutral-300 mb-1">Control Plane Version</label>
+					<select
 						value={form.kubernetesVersion}
 						onChange={e => setForm(f => ({ ...f, kubernetesVersion: e.target.value }))}
 						disabled={saving}
-						placeholder="v1.32.0"
 						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 font-mono text-sm"
-					/>
+					>
+						{!form.kubernetesVersion && (
+							<option value="" disabled>Select a version</option>
+						)}
+						{!SUPPORTED_K8S_VERSIONS.includes(form.kubernetesVersion) && form.kubernetesVersion && (
+							<option value={form.kubernetesVersion}>{form.kubernetesVersion} (current)</option>
+						)}
+						{SUPPORTED_K8S_VERSIONS.map(v => (
+							<option
+								key={v}
+								value={v}
+								disabled={isDowngrade(cluster.spec.kubernetesVersion || '', v)}
+							>
+								{v}{v === cluster.spec.kubernetesVersion ? ' (current)' : ''}
+							</option>
+						))}
+					</select>
+					{form.kubernetesVersion !== cluster.spec.kubernetesVersion && form.kubernetesVersion && (
+						<p className="text-xs text-amber-400 mt-1">
+							Control plane upgrade from {cluster.spec.kubernetesVersion} to {form.kubernetesVersion}. The API server pod will restart briefly during the upgrade. Worker kubelet version is determined by the OS image.
+						</p>
+					)}
 					{fieldError('spec.kubernetesVersion') && (
 						<p className="text-xs text-red-400 mt-1">{fieldError('spec.kubernetesVersion')!.reason}</p>
 					)}

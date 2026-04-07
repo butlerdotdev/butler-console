@@ -40,12 +40,20 @@ export interface Provider {
 			location?: string
 			vnetName?: string
 			subnetName?: string
+			vmSize?: string
+			imageURN?: string
 		}
 		gcp?: {
 			projectID?: string
 			region?: string
 			network?: string
 			subnetwork?: string
+			zone?: string
+			machineType?: string
+			imageProject?: string
+			imageFamily?: string
+			image?: string
+			tags?: string[]
 		}
 		network?: {
 			mode?: 'ipam' | 'cloud'
@@ -74,6 +82,7 @@ export interface Provider {
 			status: string
 			reason: string
 			message: string
+			lastTransitionTime?: string
 		}>
 		capacity?: {
 			availableIPs?: number
@@ -135,12 +144,20 @@ export interface CreateProviderRequest {
 	azureLocation?: string
 	azureVnetName?: string
 	azureSubnetName?: string
+	azureVmSize?: string
+	azureImageUrn?: string
 	// GCP
 	gcpProjectId?: string
 	gcpRegion?: string
 	gcpServiceAccount?: string
 	gcpNetwork?: string
 	gcpSubnetwork?: string
+	gcpZone?: string
+	gcpMachineType?: string
+	gcpImageProject?: string
+	gcpImageFamily?: string
+	gcpImage?: string
+	gcpTags?: string[]
 	// Scope
 	scopeType?: 'platform' | 'team'
 	scopeTeamRef?: string

@@ -474,6 +474,57 @@ function ProviderDetail({
 				</div>
 			)}
 
+			{type === 'aws' && provider.spec.aws && (
+				<div>
+					<h4 className="text-sm font-medium text-neutral-400 mb-3">AWS Configuration</h4>
+					<div className="grid grid-cols-2 gap-4">
+						<InfoRow label="Region" value={provider.spec.aws.region || 'N/A'} />
+						{provider.spec.aws.vpcID && <InfoRow label="VPC ID" value={provider.spec.aws.vpcID} />}
+						{provider.spec.aws.subnetIDs && provider.spec.aws.subnetIDs.length > 0 && (
+							<InfoRow label="Subnet IDs" value={provider.spec.aws.subnetIDs.join(', ')} />
+						)}
+						{provider.spec.aws.securityGroupIDs && provider.spec.aws.securityGroupIDs.length > 0 && (
+							<InfoRow label="Security Group IDs" value={provider.spec.aws.securityGroupIDs.join(', ')} />
+						)}
+					</div>
+				</div>
+			)}
+
+			{type === 'azure' && provider.spec.azure && (
+				<div>
+					<h4 className="text-sm font-medium text-neutral-400 mb-3">Azure Configuration</h4>
+					<div className="grid grid-cols-2 gap-4">
+						<InfoRow label="Subscription ID" value={provider.spec.azure.subscriptionID || 'N/A'} />
+						{provider.spec.azure.resourceGroup && <InfoRow label="Resource Group" value={provider.spec.azure.resourceGroup} />}
+						{provider.spec.azure.location && <InfoRow label="Location" value={provider.spec.azure.location} />}
+						{provider.spec.azure.vnetName && <InfoRow label="VNet Name" value={provider.spec.azure.vnetName} />}
+						{provider.spec.azure.subnetName && <InfoRow label="Subnet Name" value={provider.spec.azure.subnetName} />}
+						{provider.spec.azure.vmSize && <InfoRow label="VM Size" value={provider.spec.azure.vmSize} />}
+						{provider.spec.azure.imageURN && <InfoRow label="Image URN" value={provider.spec.azure.imageURN} />}
+					</div>
+				</div>
+			)}
+
+			{type === 'gcp' && provider.spec.gcp && (
+				<div>
+					<h4 className="text-sm font-medium text-neutral-400 mb-3">GCP Configuration</h4>
+					<div className="grid grid-cols-2 gap-4">
+						<InfoRow label="Project ID" value={provider.spec.gcp.projectID || 'N/A'} />
+						<InfoRow label="Region" value={provider.spec.gcp.region || 'N/A'} />
+						{provider.spec.gcp.zone && <InfoRow label="Zone" value={provider.spec.gcp.zone} />}
+						{provider.spec.gcp.network && <InfoRow label="Network" value={provider.spec.gcp.network} />}
+						{provider.spec.gcp.subnetwork && <InfoRow label="Subnetwork" value={provider.spec.gcp.subnetwork} />}
+						{provider.spec.gcp.machineType && <InfoRow label="Machine Type" value={provider.spec.gcp.machineType} />}
+						{provider.spec.gcp.imageProject && <InfoRow label="Image Project" value={provider.spec.gcp.imageProject} />}
+						{provider.spec.gcp.imageFamily && <InfoRow label="Image Family" value={provider.spec.gcp.imageFamily} />}
+						{provider.spec.gcp.image && <InfoRow label="Image" value={provider.spec.gcp.image} />}
+						{provider.spec.gcp.tags && provider.spec.gcp.tags.length > 0 && (
+							<InfoRow label="Tags" value={provider.spec.gcp.tags.join(', ')} />
+						)}
+					</div>
+				</div>
+			)}
+
 			{/* Network Configuration */}
 			{hasNetwork && (
 				<div>
@@ -553,6 +604,53 @@ function ProviderDetail({
 						{provider.status?.capacity?.estimatedTenants !== undefined && (
 							<InfoRow label="Estimated Tenants" value={String(provider.status.capacity.estimatedTenants)} />
 						)}
+					</div>
+				</div>
+			)}
+
+			{/* Conditions */}
+			{provider.status?.conditions && provider.status.conditions.length > 0 && (
+				<div>
+					<h4 className="text-sm font-medium text-neutral-400 mb-3">Conditions</h4>
+					<div className="space-y-2">
+						{provider.status.conditions.map((condition) => (
+							<div
+								key={condition.type}
+								className={`p-3 rounded-lg border ${
+									condition.status === 'True'
+										? 'bg-green-500/5 border-green-500/20'
+										: condition.status === 'False'
+										? 'bg-red-500/5 border-red-500/20'
+										: 'bg-neutral-800/50 border-neutral-700'
+								}`}
+							>
+								<div className="flex items-center justify-between">
+									<div className="flex items-center gap-2">
+										<span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+											condition.status === 'True'
+												? 'bg-green-500/10 text-green-400'
+												: condition.status === 'False'
+												? 'bg-red-500/10 text-red-400'
+												: 'bg-neutral-500/10 text-neutral-400'
+										}`}>
+											{condition.status}
+										</span>
+										<span className="text-sm font-medium text-neutral-200">{condition.type}</span>
+									</div>
+									{condition.reason && (
+										<span className="text-xs text-neutral-500">{condition.reason}</span>
+									)}
+								</div>
+								{condition.message && (
+									<p className="text-xs text-neutral-400 mt-1">{condition.message}</p>
+								)}
+								{condition.lastTransitionTime && (
+									<p className="text-xs text-neutral-500 mt-1">
+										{new Date(condition.lastTransitionTime).toLocaleString()}
+									</p>
+								)}
+							</div>
+						))}
 					</div>
 				</div>
 			)}
@@ -645,11 +743,19 @@ function EditProviderModal({
 					if (form.subscriptionId) data.azureSubscriptionId = form.subscriptionId
 					if (form.resourceGroup) data.azureResourceGroup = form.resourceGroup
 					if (form.location) data.azureLocation = form.location
+					if (form.vmSize) data.azureVmSize = form.vmSize
+					if (form.imageUrn) data.azureImageUrn = form.imageUrn
 					break
 				case 'gcp':
 					if (form.projectId) data.gcpProjectId = form.projectId
 					if (form.region) data.gcpRegion = form.region
 					if (form.serviceAccount) data.gcpServiceAccount = form.serviceAccount
+					if (form.zone) data.gcpZone = form.zone
+					if (form.machineType) data.gcpMachineType = form.machineType
+					if (form.imageProject) data.gcpImageProject = form.imageProject
+					if (form.imageFamily) data.gcpImageFamily = form.imageFamily
+					if (form.image) data.gcpImage = form.image
+					if (form.tags) data.gcpTags = form.tags.split(',').map(t => t.trim()).filter(Boolean)
 					break
 			}
 
@@ -710,6 +816,8 @@ function EditProviderModal({
 						<EditField label="Client Secret" placeholder="Leave blank to keep current" value={form.clientSecret || ''} onChange={v => setForm(prev => ({ ...prev, clientSecret: v }))} type="password" />
 						<EditField label="Resource Group" placeholder={provider.spec.azure?.resourceGroup || ''} value={form.resourceGroup || ''} onChange={v => setForm(prev => ({ ...prev, resourceGroup: v }))} />
 						<EditField label="Location" placeholder={provider.spec.azure?.location || ''} value={form.location || ''} onChange={v => setForm(prev => ({ ...prev, location: v }))} />
+						<EditField label="VM Size" placeholder={provider.spec.azure?.vmSize || 'e.g. Standard_D2s_v3'} value={form.vmSize || ''} onChange={v => setForm(prev => ({ ...prev, vmSize: v }))} />
+						<EditField label="Image URN" placeholder={provider.spec.azure?.imageURN || 'e.g. Canonical:...:latest'} value={form.imageUrn || ''} onChange={v => setForm(prev => ({ ...prev, imageUrn: v }))} />
 					</>
 				)
 			case 'gcp':
@@ -727,6 +835,12 @@ function EditProviderModal({
 								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm resize-none"
 							/>
 						</div>
+						<EditField label="Zone" placeholder={provider.spec.gcp?.zone || 'e.g. us-central1-a'} value={form.zone || ''} onChange={v => setForm(prev => ({ ...prev, zone: v }))} />
+						<EditField label="Machine Type" placeholder={provider.spec.gcp?.machineType || 'e.g. n2-standard-4'} value={form.machineType || ''} onChange={v => setForm(prev => ({ ...prev, machineType: v }))} />
+						<EditField label="Image Project" placeholder={provider.spec.gcp?.imageProject || 'e.g. ubuntu-os-cloud'} value={form.imageProject || ''} onChange={v => setForm(prev => ({ ...prev, imageProject: v }))} />
+						<EditField label="Image Family" placeholder={provider.spec.gcp?.imageFamily || 'e.g. ubuntu-2204-lts'} value={form.imageFamily || ''} onChange={v => setForm(prev => ({ ...prev, imageFamily: v }))} />
+						<EditField label="Image" placeholder={provider.spec.gcp?.image || 'Specific image (overrides family)'} value={form.image || ''} onChange={v => setForm(prev => ({ ...prev, image: v }))} />
+						<EditField label="Tags (comma-separated)" placeholder={provider.spec.gcp?.tags?.join(', ') || 'e.g. allow-ssh, allow-http'} value={form.tags || ''} onChange={v => setForm(prev => ({ ...prev, tags: v }))} />
 					</>
 				)
 			default:

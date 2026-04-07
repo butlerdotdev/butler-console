@@ -116,6 +116,7 @@ export function Sidebar() {
 			{ to: '/admin/identity-providers', label: 'Identity Providers', icon: IdentityProvidersIcon },
 			{ to: '/admin/observability', label: 'Observability', icon: ObservabilityIcon },
 			{ to: '/admin/audit', label: 'Audit Log', icon: AuditLogIcon },
+			{ to: '/admin/rbac', label: 'Access Control', icon: AccessControlIcon },
 		]
 	} else if (mode === 'team' && currentTeam) {
 		navItems = [
@@ -142,6 +143,7 @@ export function Sidebar() {
 			{ to: '/admin/identity-providers', label: 'Identity Providers', icon: IdentityProvidersIcon },
 			{ to: '/admin/observability', label: 'Observability', icon: ObservabilityIcon },
 			{ to: '/admin/audit', label: 'Audit Log', icon: AuditLogIcon },
+			{ to: '/admin/rbac', label: 'Access Control', icon: AccessControlIcon },
 		]
 	} else {
 		// Fallback - show minimal nav to get to a team or admin
@@ -417,6 +419,14 @@ function AddonsIcon({ className }: { className?: string }) {
 	return (
 		<svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
 			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+		</svg>
+	)
+}
+
+function AccessControlIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
 		</svg>
 	)
 }

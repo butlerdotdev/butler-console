@@ -22,6 +22,8 @@ export function ImagesPage() {
 	const [deleteTarget, setDeleteTarget] = useState<ImageSync | null>(null)
 	const [deleting, setDeleting] = useState(false)
 	const [editTarget, setEditTarget] = useState<ImageSync | null>(null)
+	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+	const [bulkDeleting, setBulkDeleting] = useState(false)
 
 	// Auto-refresh
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -80,6 +82,44 @@ export function ImagesPage() {
 		} finally {
 			setDeleting(false)
 		}
+	}
+
+	const toggleSelect = (id: string) => {
+		setSelectedIds(prev => {
+			const next = new Set(prev)
+			if (next.has(id)) next.delete(id)
+			else next.add(id)
+			return next
+		})
+	}
+
+	const toggleSelectAll = () => {
+		if (selectedIds.size === imageSyncs.length) {
+			setSelectedIds(new Set())
+		} else {
+			setSelectedIds(new Set(imageSyncs.map(i => i.metadata.uid || `${i.metadata.namespace}/${i.metadata.name}`)))
+		}
+	}
+
+	const handleBulkDelete = async () => {
+		if (selectedIds.size === 0) return
+		setBulkDeleting(true)
+		const toDelete = imageSyncs.filter(i =>
+			selectedIds.has(i.metadata.uid || `${i.metadata.namespace}/${i.metadata.name}`)
+		)
+		let deleted = 0
+		for (const img of toDelete) {
+			try {
+				await imagesApi.delete(img.metadata.namespace, img.metadata.name)
+				deleted++
+			} catch {
+				// Continue deleting the rest
+			}
+		}
+		success('Bulk Delete Complete', `${deleted} of ${toDelete.length} image syncs deleted`)
+		setSelectedIds(new Set())
+		setBulkDeleting(false)
+		loadImages()
 	}
 
 	if (loading) {
@@ -147,11 +187,35 @@ export function ImagesPage() {
 						<Button onClick={() => setShowCreateModal(true)}>Sync Image</Button>
 					</Card>
 				) : (
+					<>
+					{selectedIds.size > 0 && (
+						<Card className="p-3 flex items-center justify-between bg-blue-500/5 border border-blue-500/20">
+							<span className="text-sm text-neutral-200">
+								{selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''} selected
+							</span>
+							<div className="flex items-center gap-2">
+								<Button variant="secondary" size="sm" onClick={() => setSelectedIds(new Set())}>
+									Clear
+								</Button>
+								<Button variant="danger" size="sm" onClick={handleBulkDelete} disabled={bulkDeleting}>
+									{bulkDeleting ? 'Deleting...' : `Delete ${selectedIds.size}`}
+								</Button>
+							</div>
+						</Card>
+					)}
 					<Card className="overflow-hidden">
 						<div className="overflow-x-auto">
 							<table className="w-full">
 								<thead>
 									<tr className="border-b border-neutral-800">
+										<th className="w-10 px-4 py-3">
+											<input
+												type="checkbox"
+												checked={imageSyncs.length > 0 && selectedIds.size === imageSyncs.length}
+												onChange={toggleSelectAll}
+												className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 focus:ring-offset-0"
+											/>
+										</th>
 										<th className="text-left px-4 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wide">
 											Name
 										</th>
@@ -179,21 +243,24 @@ export function ImagesPage() {
 									</tr>
 								</thead>
 								<tbody className="divide-y divide-neutral-800">
-									{imageSyncs.map((img) => (
+									{imageSyncs.map((img) => {
+										const id = img.metadata.uid || `${img.metadata.namespace}/${img.metadata.name}`
+										return (
 										<ImageSyncRow
-											key={
-												img.metadata.uid ||
-												`${img.metadata.namespace}/${img.metadata.name}`
-											}
+											key={id}
 											imageSync={img}
 											onDelete={() => setDeleteTarget(img)}
 											onEdit={() => setEditTarget(img)}
+											selected={selectedIds.has(id)}
+											onToggleSelect={() => toggleSelect(id)}
 										/>
-									))}
+										)
+									})}
 								</tbody>
 							</table>
 						</div>
 					</Card>
+					</>
 				)}
 			</div>
 
@@ -289,9 +356,11 @@ interface ImageSyncRowProps {
 	imageSync: ImageSync
 	onDelete: () => void
 	onEdit: () => void
+	selected: boolean
+	onToggleSelect: () => void
 }
 
-function ImageSyncRow({ imageSync, onDelete, onEdit }: ImageSyncRowProps) {
+function ImageSyncRow({ imageSync, onDelete, onEdit, selected, onToggleSelect }: ImageSyncRowProps) {
 	const { metadata, spec, status } = imageSync
 	const phase = status?.phase || 'Unknown'
 	const factoryRef = spec.factoryRef
@@ -311,7 +380,15 @@ function ImageSyncRow({ imageSync, onDelete, onEdit }: ImageSyncRowProps) {
 		: '-'
 
 	return (
-		<tr className="hover:bg-neutral-800/30 transition-colors">
+		<tr className={`hover:bg-neutral-800/30 transition-colors ${selected ? 'bg-blue-500/5' : ''}`}>
+			<td className="w-10 px-4 py-3">
+				<input
+					type="checkbox"
+					checked={selected}
+					onChange={onToggleSelect}
+					className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 focus:ring-offset-0"
+				/>
+			</td>
 			<td className="px-4 py-3">
 				<div className="flex items-center gap-3">
 					<div className="w-8 h-8 rounded-lg bg-neutral-800 flex items-center justify-center flex-shrink-0">

@@ -15,6 +15,8 @@ export * from './certificates';
 export { observabilityApi } from './observability'
 export { imagesApi } from './images'
 export { configApi } from './config'
+export { stewardApi } from './steward'
+export type { TenantControlPlane, DataStore } from './steward'
 export type {
 	ButlerConfigResponse,
 	UpdateConfigRequest,

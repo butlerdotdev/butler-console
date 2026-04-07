@@ -42,6 +42,7 @@ import { TeamProvidersPage } from '@/pages/TeamProvidersPage'
 import { ObservabilityPage } from '@/pages/ObservabilityPage'
 import { ImagesPage } from '@/pages/ImagesPage'
 import { AddonCatalogPage } from '@/pages/AddonCatalogPage'
+import { AuditLogPage } from '@/pages/AuditLogPage'
 
 
 interface TeamRef {
@@ -145,6 +146,7 @@ export default function App() {
 					<Route path="admin/identity-providers/create" element={<RequireAdmin><CreateIdentityProviderPage /></RequireAdmin>} />
 					<Route path="admin/addons" element={<RequireAdmin><AddonCatalogPage /></RequireAdmin>} />
 					<Route path="admin/images" element={<RequireAdmin><ImagesPage /></RequireAdmin>} />
+					<Route path="admin/audit" element={<RequireAdmin><AuditLogPage /></RequireAdmin>} />
 					<Route path="admin/observability" element={<RequireAdmin><ObservabilityPage /></RequireAdmin>} />
 					<Route path="admin/settings" element={<RequireAdmin><SettingsPage /></RequireAdmin>} />
 

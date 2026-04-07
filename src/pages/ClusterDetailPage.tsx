@@ -6,7 +6,7 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { useTeamContext } from '@/hooks/useTeamContext'
 import { useAuth } from '@/hooks/useAuth'
-import { clustersApi, type Cluster, type Node, type Addon, type ClusterEvent, type MachineRequest, type LoadBalancerRequest } from '@/api'
+import { clustersApi, stewardApi, type Cluster, type TenantControlPlane, type Node, type Addon, type ClusterEvent, type MachineRequest, type LoadBalancerRequest } from '@/api'
 import { Card, Spinner, StatusBadge, Button, FadeIn } from '@/components/ui'
 import { ClusterTerminal } from '@/components/terminal'
 import { DeleteClusterModal } from '@/components/clusters/DeleteClusterModal'
@@ -28,7 +28,7 @@ interface ApiError {
 	message?: string
 }
 
-const TABS = ['overview', 'nodes', 'addons', 'gitops', 'events', 'certificates', 'observability', 'terminal'] as const
+const TABS = ['overview', 'control-plane', 'nodes', 'addons', 'gitops', 'events', 'certificates', 'observability', 'terminal'] as const
 
 type TabType = typeof TABS[number]
 
@@ -69,6 +69,17 @@ export function ClusterDetailPage() {
 	const [scaleTarget, setScaleTarget] = useState<number | null>(null)
 	const [loadBalancerRequests, setLoadBalancerRequests] = useState<LoadBalancerRequest[]>([])
 	const [machineRequests, setMachineRequests] = useState<MachineRequest[]>([])
+	const [tcp, setTcp] = useState<TenantControlPlane | null>(null)
+
+	const loadTCP = useCallback(async () => {
+		if (!namespace || !name) return
+		try {
+			const data = await stewardApi.getClusterTCP(namespace, name)
+			setTcp(data)
+		} catch {
+			// Non-fatal: TCP may not exist yet during provisioning
+		}
+	}, [namespace, name])
 
 	const loadCluster = useCallback(async (silent = false) => {
 		if (!namespace || !name) return
@@ -184,8 +195,10 @@ export function ClusterDetailPage() {
 		} else if (cluster && activeTab === 'overview') {
 			loadLoadBalancerRequests()
 			loadMachineRequests()
+		} else if (cluster && activeTab === 'control-plane') {
+			loadTCP()
 		}
-	}, [cluster, activeTab, loadNodes, loadAddons, loadEvents, loadLoadBalancerRequests, loadMachineRequests])
+	}, [cluster, activeTab, loadNodes, loadAddons, loadEvents, loadLoadBalancerRequests, loadMachineRequests, loadTCP])
 
 	const handleDelete = async () => {
 		if (!namespace || !name) return
@@ -371,7 +384,7 @@ export function ClusterDetailPage() {
 									}`}
 								disabled={tab === 'terminal' && phase !== 'Ready'}
 							>
-								{tab}
+								{tab === 'control-plane' ? 'Control Plane' : tab}
 							</button>
 						))}
 					</nav>
@@ -379,6 +392,7 @@ export function ClusterDetailPage() {
 
 				{/* Tab Content */}
 				{activeTab === 'overview' && <OverviewTab cluster={cluster} namespace={namespace!} name={name!} scaleTarget={scaleTarget} loadBalancerRequests={loadBalancerRequests} machineRequests={machineRequests} />}
+			{activeTab === 'control-plane' && <ControlPlaneTab tcp={tcp} />}
 			{activeTab === 'nodes' && <NodesTab nodes={nodes} />}
 				{activeTab === 'addons' && (
 					<AddonsTab
@@ -769,6 +783,108 @@ function OverviewTab({ cluster, namespace, name, scaleTarget, loadBalancerReques
 			)}
 
 			<NetworkAllocationsCard clusterName={name} clusterNamespace={namespace} />
+		</div>
+	)
+}
+
+function ControlPlaneTab({ tcp }: { tcp: TenantControlPlane | null }) {
+	if (!tcp) {
+		return (
+			<Card className="p-8 text-center">
+				<p className="text-neutral-400">Control plane information not available. The cluster may still be provisioning.</p>
+			</Card>
+		)
+	}
+
+	const s = tcp.status
+
+	return (
+		<div className="space-y-6">
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				<Card className="p-5">
+					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Control Plane</h3>
+					<dl className="space-y-3">
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">Phase</dt>
+							<dd><StatusBadge status={s.phase || 'Unknown'} /></dd>
+						</div>
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">API Server Version</dt>
+							<dd className="text-neutral-50 font-mono">{s.version || tcp.specVersion}</dd>
+						</div>
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">Endpoint</dt>
+							<dd className="text-neutral-50 font-mono text-sm">{s.controlPlaneEndpoint || 'N/A'}</dd>
+						</div>
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">Replicas</dt>
+							<dd className="text-neutral-50">{s.readyReplicas}/{s.replicas} ready</dd>
+						</div>
+						{s.loadBalancerIP && (
+							<div className="flex justify-between">
+								<dt className="text-neutral-400">LoadBalancer IP</dt>
+								<dd className="text-neutral-50 font-mono text-sm">{s.loadBalancerIP}</dd>
+							</div>
+						)}
+						{s.servicePort > 0 && (
+							<div className="flex justify-between">
+								<dt className="text-neutral-400">Service Port</dt>
+								<dd className="text-neutral-50 font-mono">{s.servicePort}</dd>
+							</div>
+						)}
+					</dl>
+				</Card>
+
+				<Card className="p-5">
+					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Backend</h3>
+					<dl className="space-y-3">
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">DataStore</dt>
+							<dd className="text-neutral-50">{s.dataStoreName || 'N/A'}</dd>
+						</div>
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">Driver</dt>
+							<dd className="text-neutral-50">{s.dataStoreDriver || 'N/A'}</dd>
+						</div>
+						<div className="flex justify-between">
+							<dt className="text-neutral-400">Konnectivity</dt>
+							<dd className="text-neutral-50">{s.konnectivityEnabled ? 'Enabled' : 'Disabled'}</dd>
+						</div>
+						{s.workerBootstrap?.provider && (
+							<>
+								<div className="flex justify-between">
+									<dt className="text-neutral-400">Bootstrap Provider</dt>
+									<dd className="text-neutral-50">{s.workerBootstrap.provider}</dd>
+								</div>
+								{s.workerBootstrap.endpoint && (
+									<div className="flex justify-between">
+										<dt className="text-neutral-400">Bootstrap Endpoint</dt>
+										<dd className="text-neutral-50 font-mono text-sm">{s.workerBootstrap.endpoint}</dd>
+									</div>
+								)}
+							</>
+						)}
+					</dl>
+				</Card>
+			</div>
+
+			<Card className="p-5">
+				<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-4">Resource Info</h3>
+				<dl className="space-y-3">
+					<div className="flex justify-between">
+						<dt className="text-neutral-400">TCP Name</dt>
+						<dd className="text-neutral-50 font-mono text-sm">{tcp.name}</dd>
+					</div>
+					<div className="flex justify-between">
+						<dt className="text-neutral-400">TCP Namespace</dt>
+						<dd className="text-neutral-50 font-mono text-sm">{tcp.namespace}</dd>
+					</div>
+					<div className="flex justify-between">
+						<dt className="text-neutral-400">Spec Version</dt>
+						<dd className="text-neutral-50 font-mono">{tcp.specVersion}</dd>
+					</div>
+				</dl>
+			</Card>
 		</div>
 	)
 }

@@ -47,6 +47,8 @@ export function ConnectCloudAccountModal({ isOpen, onClose, onConnected, teamNam
 	const [azureLocation, setAzureLocation] = useState('')
 	const [azureVnetName, setAzureVnetName] = useState('')
 	const [azureSubnetName, setAzureSubnetName] = useState('')
+	const [azureVmSize, setAzureVmSize] = useState('')
+	const [azureImageUrn, setAzureImageUrn] = useState('')
 
 	// GCP
 	const [gcpProjectId, setGcpProjectId] = useState('')
@@ -54,6 +56,12 @@ export function ConnectCloudAccountModal({ isOpen, onClose, onConnected, teamNam
 	const [gcpServiceAccount, setGcpServiceAccount] = useState('')
 	const [gcpNetwork, setGcpNetwork] = useState('')
 	const [gcpSubnetwork, setGcpSubnetwork] = useState('')
+	const [gcpZone, setGcpZone] = useState('')
+	const [gcpMachineType, setGcpMachineType] = useState('')
+	const [gcpImageProject, setGcpImageProject] = useState('')
+	const [gcpImageFamily, setGcpImageFamily] = useState('')
+	const [gcpImage, setGcpImage] = useState('')
+	const [gcpTags, setGcpTags] = useState<string[]>([''])
 
 	const resetForm = () => {
 		setStep('pick')
@@ -76,11 +84,19 @@ export function ConnectCloudAccountModal({ isOpen, onClose, onConnected, teamNam
 		setAzureLocation('')
 		setAzureVnetName('')
 		setAzureSubnetName('')
+		setAzureVmSize('')
+		setAzureImageUrn('')
 		setGcpProjectId('')
 		setGcpRegion('')
 		setGcpServiceAccount('')
 		setGcpNetwork('')
 		setGcpSubnetwork('')
+		setGcpZone('')
+		setGcpMachineType('')
+		setGcpImageProject('')
+		setGcpImageFamily('')
+		setGcpImage('')
+		setGcpTags([''])
 	}
 
 	const handleClose = () => {
@@ -130,6 +146,8 @@ export function ConnectCloudAccountModal({ isOpen, onClose, onConnected, teamNam
 					azureLocation: azureLocation || undefined,
 					azureVnetName: azureVnetName || undefined,
 					azureSubnetName: azureSubnetName || undefined,
+					azureVmSize: azureVmSize || undefined,
+					azureImageUrn: azureImageUrn || undefined,
 				}
 			case 'gcp':
 				if (!gcpProjectId || !gcpRegion || !gcpServiceAccount) return null
@@ -140,6 +158,12 @@ export function ConnectCloudAccountModal({ isOpen, onClose, onConnected, teamNam
 					gcpServiceAccount,
 					gcpNetwork: gcpNetwork || undefined,
 					gcpSubnetwork: gcpSubnetwork || undefined,
+					gcpZone: gcpZone || undefined,
+					gcpMachineType: gcpMachineType || undefined,
+					gcpImageProject: gcpImageProject || undefined,
+					gcpImageFamily: gcpImageFamily || undefined,
+					gcpImage: gcpImage || undefined,
+					gcpTags: gcpTags.filter(Boolean).length > 0 ? gcpTags.filter(Boolean) : undefined,
 				}
 		}
 	}
@@ -422,6 +446,26 @@ export function ConnectCloudAccountModal({ isOpen, onClose, onConnected, teamNam
 										className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-green-500"
 									/>
 								</FormField>
+
+								<div className="text-xs font-medium text-neutral-500 uppercase tracking-wide pt-2">Compute Defaults</div>
+								<FormField label="VM Size">
+									<input
+										type="text"
+										value={azureVmSize}
+										onChange={(e) => setAzureVmSize(e.target.value)}
+										className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-green-500"
+										placeholder="Standard_D2s_v3"
+									/>
+								</FormField>
+								<FormField label="Image URN">
+									<input
+										type="text"
+										value={azureImageUrn}
+										onChange={(e) => setAzureImageUrn(e.target.value)}
+										className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-green-500 font-mono"
+										placeholder="Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest"
+									/>
+								</FormField>
 							</>
 						)}
 
@@ -491,6 +535,83 @@ export function ConnectCloudAccountModal({ isOpen, onClose, onConnected, teamNam
 										onChange={(e) => setGcpSubnetwork(e.target.value)}
 										className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-green-500"
 									/>
+								</FormField>
+
+								<div className="text-xs font-medium text-neutral-500 uppercase tracking-wide pt-2">Compute Defaults</div>
+								<FormField label="Zone">
+									<input
+										type="text"
+										value={gcpZone}
+										onChange={(e) => setGcpZone(e.target.value)}
+										className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-green-500"
+										placeholder="us-central1-a"
+									/>
+								</FormField>
+								<FormField label="Machine Type">
+									<input
+										type="text"
+										value={gcpMachineType}
+										onChange={(e) => setGcpMachineType(e.target.value)}
+										className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-green-500"
+										placeholder="n2-standard-4"
+									/>
+								</FormField>
+								<FormField label="Image Project">
+									<input
+										type="text"
+										value={gcpImageProject}
+										onChange={(e) => setGcpImageProject(e.target.value)}
+										className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-green-500"
+										placeholder="ubuntu-os-cloud"
+									/>
+								</FormField>
+								<FormField label="Image Family">
+									<input
+										type="text"
+										value={gcpImageFamily}
+										onChange={(e) => setGcpImageFamily(e.target.value)}
+										className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-green-500"
+										placeholder="ubuntu-2204-lts"
+									/>
+								</FormField>
+								<FormField label="Image">
+									<input
+										type="text"
+										value={gcpImage}
+										onChange={(e) => setGcpImage(e.target.value)}
+										className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-green-500"
+										placeholder="ubuntu-2204-jammy-v20240101"
+									/>
+									<p className="text-xs text-neutral-500 mt-1">Takes precedence over Image Family if specified</p>
+								</FormField>
+								<FormField label="Network Tags">
+									{gcpTags.map((tag, i) => (
+										<div key={i} className="flex gap-2 mb-2">
+											<input
+												type="text"
+												value={tag}
+												onChange={(e) => updateListItem(gcpTags, setGcpTags, i, e.target.value)}
+												className="flex-1 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-green-500"
+												placeholder="allow-ssh"
+											/>
+											{gcpTags.length > 1 && (
+												<button
+													type="button"
+													onClick={() => removeListItem(gcpTags, setGcpTags, i)}
+													className="text-neutral-500 hover:text-red-400 px-2"
+												>
+													&times;
+												</button>
+											)}
+										</div>
+									))}
+									<button
+										type="button"
+										onClick={() => addListItem(gcpTags, setGcpTags)}
+										className="text-xs text-green-400 hover:text-green-300"
+									>
+										+ Add Tag
+									</button>
 								</FormField>
 							</>
 						)}

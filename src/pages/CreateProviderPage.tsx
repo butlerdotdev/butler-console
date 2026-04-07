@@ -63,6 +63,8 @@ export function CreateProviderPage() {
 	const [azureLocation, setAzureLocation] = useState('')
 	const [azureVnetName, setAzureVnetName] = useState('')
 	const [azureSubnetName, setAzureSubnetName] = useState('')
+	const [azureVmSize, setAzureVmSize] = useState('')
+	const [azureImageUrn, setAzureImageUrn] = useState('')
 
 	// GCP credentials
 	const [gcpProjectId, setGcpProjectId] = useState('')
@@ -70,6 +72,12 @@ export function CreateProviderPage() {
 	const [gcpServiceAccount, setGcpServiceAccount] = useState('')
 	const [gcpNetwork, setGcpNetwork] = useState('')
 	const [gcpSubnetwork, setGcpSubnetwork] = useState('')
+	const [gcpZone, setGcpZone] = useState('')
+	const [gcpMachineType, setGcpMachineType] = useState('')
+	const [gcpImageProject, setGcpImageProject] = useState('')
+	const [gcpImageFamily, setGcpImageFamily] = useState('')
+	const [gcpImage, setGcpImage] = useState('')
+	const [gcpTags, setGcpTags] = useState<string[]>([''])
 
 	// Network configuration
 	const [networkMode, setNetworkMode] = useState<'ipam' | 'cloud' | ''>('')
@@ -191,12 +199,21 @@ export function CreateProviderPage() {
 			if (azureLocation) request.azureLocation = azureLocation
 			if (azureVnetName) request.azureVnetName = azureVnetName
 			if (azureSubnetName) request.azureSubnetName = azureSubnetName
+			if (azureVmSize) request.azureVmSize = azureVmSize
+			if (azureImageUrn) request.azureImageUrn = azureImageUrn
 		} else if (providerType === 'gcp') {
 			request.gcpProjectId = gcpProjectId
 			request.gcpRegion = gcpRegion
 			request.gcpServiceAccount = gcpServiceAccount
 			if (gcpNetwork) request.gcpNetwork = gcpNetwork
 			if (gcpSubnetwork) request.gcpSubnetwork = gcpSubnetwork
+			if (gcpZone) request.gcpZone = gcpZone
+			if (gcpMachineType) request.gcpMachineType = gcpMachineType
+			if (gcpImageProject) request.gcpImageProject = gcpImageProject
+			if (gcpImageFamily) request.gcpImageFamily = gcpImageFamily
+			if (gcpImage) request.gcpImage = gcpImage
+			const filteredTags = gcpTags.filter(t => t.trim())
+			if (filteredTags.length > 0) request.gcpTags = filteredTags
 		}
 
 		// Network configuration
@@ -450,6 +467,8 @@ export function CreateProviderPage() {
 								location={azureLocation} setLocation={setAzureLocation}
 								vnetName={azureVnetName} setVnetName={setAzureVnetName}
 								subnetName={azureSubnetName} setSubnetName={setAzureSubnetName}
+								vmSize={azureVmSize} setVmSize={setAzureVmSize}
+								imageUrn={azureImageUrn} setImageUrn={setAzureImageUrn}
 							/>
 						)}
 
@@ -460,6 +479,12 @@ export function CreateProviderPage() {
 								serviceAccount={gcpServiceAccount} setServiceAccount={(v) => { setGcpServiceAccount(v); setTestResult(null) }}
 								network={gcpNetwork} setNetwork={setGcpNetwork}
 								subnetwork={gcpSubnetwork} setSubnetwork={setGcpSubnetwork}
+								zone={gcpZone} setZone={setGcpZone}
+								machineType={gcpMachineType} setMachineType={setGcpMachineType}
+								imageProject={gcpImageProject} setImageProject={setGcpImageProject}
+								imageFamily={gcpImageFamily} setImageFamily={setGcpImageFamily}
+								image={gcpImage} setImage={setGcpImage}
+								tags={gcpTags} setTags={setGcpTags}
 							/>
 						)}
 
@@ -1345,7 +1370,7 @@ function AWSCredentials({ region, setRegion, accessKeyId, setAccessKeyId, secret
 	)
 }
 
-function AzureCredentials({ subscriptionId, setSubscriptionId, tenantId, setTenantId, clientId, setClientId, clientSecret, setClientSecret, resourceGroup, setResourceGroup, location, setLocation, vnetName, setVnetName, subnetName, setSubnetName }: {
+function AzureCredentials({ subscriptionId, setSubscriptionId, tenantId, setTenantId, clientId, setClientId, clientSecret, setClientSecret, resourceGroup, setResourceGroup, location, setLocation, vnetName, setVnetName, subnetName, setSubnetName, vmSize, setVmSize, imageUrn, setImageUrn }: {
 	subscriptionId: string; setSubscriptionId: (v: string) => void
 	tenantId: string; setTenantId: (v: string) => void
 	clientId: string; setClientId: (v: string) => void
@@ -1354,6 +1379,8 @@ function AzureCredentials({ subscriptionId, setSubscriptionId, tenantId, setTena
 	location: string; setLocation: (v: string) => void
 	vnetName: string; setVnetName: (v: string) => void
 	subnetName: string; setSubnetName: (v: string) => void
+	vmSize: string; setVmSize: (v: string) => void
+	imageUrn: string; setImageUrn: (v: string) => void
 }) {
 	return (
 		<div>
@@ -1407,17 +1434,36 @@ function AzureCredentials({ subscriptionId, setSubscriptionId, tenantId, setTena
 							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
 					</div>
 				</div>
+				<div className="text-xs font-medium text-neutral-500 uppercase tracking-wide pt-2">Compute Defaults</div>
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">VM Size</label>
+						<input type="text" value={vmSize} onChange={(e) => setVmSize(e.target.value)} placeholder="Standard_D2s_v3"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Image URN</label>
+						<input type="text" value={imageUrn} onChange={(e) => setImageUrn(e.target.value)} placeholder="Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+				</div>
 			</div>
 		</div>
 	)
 }
 
-function GCPCredentials({ projectId, setProjectId, region, setRegion, serviceAccount, setServiceAccount, network, setNetwork, subnetwork, setSubnetwork }: {
+function GCPCredentials({ projectId, setProjectId, region, setRegion, serviceAccount, setServiceAccount, network, setNetwork, subnetwork, setSubnetwork, zone, setZone, machineType, setMachineType, imageProject, setImageProject, imageFamily, setImageFamily, image, setImage, tags, setTags }: {
 	projectId: string; setProjectId: (v: string) => void
 	region: string; setRegion: (v: string) => void
 	serviceAccount: string; setServiceAccount: (v: string) => void
 	network: string; setNetwork: (v: string) => void
 	subnetwork: string; setSubnetwork: (v: string) => void
+	zone: string; setZone: (v: string) => void
+	machineType: string; setMachineType: (v: string) => void
+	imageProject: string; setImageProject: (v: string) => void
+	imageFamily: string; setImageFamily: (v: string) => void
+	image: string; setImage: (v: string) => void
+	tags: string[]; setTags: (v: string[]) => void
 }) {
 	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0]
@@ -1474,6 +1520,38 @@ function GCPCredentials({ projectId, setProjectId, region, setRegion, serviceAcc
 							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
 					</div>
 				</div>
+				<div className="text-xs font-medium text-neutral-500 uppercase tracking-wide pt-2">Compute Defaults</div>
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Zone</label>
+						<input type="text" value={zone} onChange={(e) => setZone(e.target.value)} placeholder="us-central1-a"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Machine Type</label>
+						<input type="text" value={machineType} onChange={(e) => setMachineType(e.target.value)} placeholder="n2-standard-4"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+				</div>
+				<div className="grid grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Image Project</label>
+						<input type="text" value={imageProject} onChange={(e) => setImageProject(e.target.value)} placeholder="ubuntu-os-cloud"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Image Family</label>
+						<input type="text" value={imageFamily} onChange={(e) => setImageFamily(e.target.value)} placeholder="ubuntu-2204-lts"
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					</div>
+				</div>
+				<div>
+					<label className="block text-sm font-medium text-neutral-400 mb-1">Image</label>
+					<input type="text" value={image} onChange={(e) => setImage(e.target.value)} placeholder="ubuntu-2204-jammy-v20240101"
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500" />
+					<p className="text-xs text-neutral-500 mt-1">Takes precedence over Image Family if specified</p>
+				</div>
+				<DynamicListField label="Network Tags" values={tags} setValues={setTags} placeholder="allow-ssh" />
 			</div>
 		</div>
 	)

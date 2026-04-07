@@ -1,10 +1,34 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useState, useCallback } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useTeamContext } from '@/hooks/useTeamContext'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
+
+function useCollapsedSections() {
+	const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+		try {
+			const stored = localStorage.getItem('butler-sidebar-collapsed')
+			return stored ? new Set(JSON.parse(stored)) : new Set()
+		} catch {
+			return new Set()
+		}
+	})
+
+	const toggle = useCallback((label: string) => {
+		setCollapsed(prev => {
+			const next = new Set(prev)
+			if (next.has(label)) next.delete(label)
+			else next.add(label)
+			localStorage.setItem('butler-sidebar-collapsed', JSON.stringify([...next]))
+			return next
+		})
+	}, [])
+
+	return { collapsed, toggle }
+}
 
 interface NavItem {
 	to: string
@@ -13,11 +37,17 @@ interface NavItem {
 	end?: boolean
 }
 
+interface NavSection {
+	label?: string
+	items: NavItem[]
+}
+
 export function Sidebar() {
 	const { mode, currentTeam, currentTeamDisplayName, buildPath, isAdminMode, canAccessAdmin, isTeamAdmin } = useTeamContext()
 	const { user } = useAuth()
 	const location = useLocation()
 	const navigate = useNavigate()
+	const { collapsed, toggle: toggleSection } = useCollapsedSections()
 	const isSettingsRoute = location.pathname.startsWith('/settings')
 
 	// Settings sidebar
@@ -98,70 +128,87 @@ export function Sidebar() {
 		location.pathname !== '/overview'
 
 	// For legacy routes, show admin nav if user is admin, otherwise show team nav for first team
-	let navItems: NavItem[] = []
+	let navSections: NavSection[] = []
 	let showTeamLabel = false
 	let teamLabel = ''
 	let effectiveAdminMode = isAdminMode
 
+	const adminSections: NavSection[] = [
+		{
+			items: [
+				{ to: '/admin', label: 'Overview', icon: DashboardIcon, end: true },
+				{ to: '/admin/clusters', label: 'All Clusters', icon: ClustersIcon },
+			],
+		},
+		{
+			label: 'Organization',
+			items: [
+				{ to: '/admin/teams', label: 'Teams', icon: TeamsIcon },
+				{ to: '/admin/users', label: 'Users', icon: UsersIcon },
+			],
+		},
+		{
+			label: 'Infrastructure',
+			items: [
+				{ to: '/admin/providers', label: 'Providers', icon: ProvidersIcon },
+				{ to: '/admin/images', label: 'Images', icon: ImagesIcon },
+				{ to: '/admin/networks', label: 'Network Pools', icon: NetworkPoolsIcon },
+			],
+		},
+		{
+			label: 'Platform',
+			items: [
+				{ to: '/admin/addons', label: 'Addon Catalog', icon: AddonsIcon },
+				{ to: '/admin/identity-providers', label: 'Identity Providers', icon: IdentityProvidersIcon },
+				{ to: '/admin/observability', label: 'Observability', icon: ObservabilityIcon },
+			],
+		},
+		{
+			label: 'Security',
+			items: [
+				{ to: '/admin/rbac', label: 'Access Control', icon: AccessControlIcon },
+				{ to: '/admin/audit', label: 'Audit Log', icon: AuditLogIcon },
+			],
+		},
+	]
+
 	if (mode === 'admin') {
-		navItems = [
-			{ to: '/admin', label: 'Overview', icon: DashboardIcon, end: true },
-			{ to: '/admin/clusters', label: 'All Clusters', icon: ClustersIcon },
-			{ to: '/admin/teams', label: 'Teams', icon: TeamsIcon },
-			{ to: '/admin/users', label: 'Users', icon: UsersIcon },
-			{ to: '/admin/providers', label: 'Providers', icon: ProvidersIcon },
-			{ to: '/admin/addons', label: 'Addon Catalog', icon: AddonsIcon },
-			{ to: '/admin/images', label: 'Images', icon: ImagesIcon },
-		{ to: '/admin/networks', label: 'Network Pools', icon: NetworkPoolsIcon },
-			{ to: '/admin/identity-providers', label: 'Identity Providers', icon: IdentityProvidersIcon },
-			{ to: '/admin/observability', label: 'Observability', icon: ObservabilityIcon },
-			{ to: '/admin/audit', label: 'Audit Log', icon: AuditLogIcon },
-			{ to: '/admin/rbac', label: 'Access Control', icon: AccessControlIcon },
-		]
+		navSections = adminSections
 	} else if (mode === 'team' && currentTeam) {
-		navItems = [
-			{ to: buildPath(''), label: 'Dashboard', icon: DashboardIcon, end: true },
-			{ to: buildPath('/clusters'), label: 'Clusters', icon: ClustersIcon },
-			{ to: buildPath('/providers'), label: 'Providers', icon: ProvidersIcon },
-			{ to: buildPath('/members'), label: 'Members', icon: UsersIcon },
-		]
+		navSections = [{
+			items: [
+				{ to: buildPath(''), label: 'Dashboard', icon: DashboardIcon, end: true },
+				{ to: buildPath('/clusters'), label: 'Clusters', icon: ClustersIcon },
+				{ to: buildPath('/providers'), label: 'Providers', icon: ProvidersIcon },
+				{ to: buildPath('/members'), label: 'Members', icon: UsersIcon },
+			],
+		}]
 		showTeamLabel = true
 		teamLabel = currentTeamDisplayName || currentTeam
 	} else if (isLegacyRoute) {
-		// On legacy routes - show admin nav (legacy routes are for admins)
-		// Anyone viewing legacy routes should see admin nav to get back
 		effectiveAdminMode = true
-		navItems = [
-			{ to: '/admin', label: 'Overview', icon: DashboardIcon, end: true },
-			{ to: '/admin/clusters', label: 'All Clusters', icon: ClustersIcon },
-			{ to: '/admin/teams', label: 'Teams', icon: TeamsIcon },
-			{ to: '/admin/users', label: 'Users', icon: UsersIcon },
-			{ to: '/admin/providers', label: 'Providers', icon: ProvidersIcon },
-			{ to: '/admin/addons', label: 'Addon Catalog', icon: AddonsIcon },
-			{ to: '/admin/images', label: 'Images', icon: ImagesIcon },
-		{ to: '/admin/networks', label: 'Network Pools', icon: NetworkPoolsIcon },
-			{ to: '/admin/identity-providers', label: 'Identity Providers', icon: IdentityProvidersIcon },
-			{ to: '/admin/observability', label: 'Observability', icon: ObservabilityIcon },
-			{ to: '/admin/audit', label: 'Audit Log', icon: AuditLogIcon },
-			{ to: '/admin/rbac', label: 'Access Control', icon: AccessControlIcon },
-		]
+		navSections = adminSections
 	} else {
 		// Fallback - show minimal nav to get to a team or admin
 		const firstTeam = user?.teams?.[0]
 		const teamName = firstTeam?.name || firstTeam?.metadata?.name
 		if (teamName) {
-			navItems = [
-				{ to: `/t/${teamName}`, label: 'Dashboard', icon: DashboardIcon, end: true },
-				{ to: `/t/${teamName}/clusters`, label: 'Clusters', icon: ClustersIcon },
-			]
+			navSections = [{
+				items: [
+					{ to: `/t/${teamName}`, label: 'Dashboard', icon: DashboardIcon, end: true },
+					{ to: `/t/${teamName}/clusters`, label: 'Clusters', icon: ClustersIcon },
+				],
+			}]
 			showTeamLabel = true
 			teamLabel = firstTeam?.displayName || firstTeam?.spec?.displayName || teamName
 		} else if (canAccessAdmin) {
 			effectiveAdminMode = true
-			navItems = [
-				{ to: '/admin', label: 'Overview', icon: DashboardIcon, end: true },
-				{ to: '/admin/clusters', label: 'All Clusters', icon: ClustersIcon },
-			]
+			navSections = [{
+				items: [
+					{ to: '/admin', label: 'Overview', icon: DashboardIcon, end: true },
+					{ to: '/admin/clusters', label: 'All Clusters', icon: ClustersIcon },
+				],
+			}]
 		}
 	}
 
@@ -202,25 +249,61 @@ export function Sidebar() {
 			)}
 
 			{/* Primary Navigation */}
-			<nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-				{navItems.map((item) => (
-					<NavLink
-						key={item.to}
-						to={item.to}
-						end={item.end}
-						className={({ isActive }) =>
-							cn(
-								'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-								isActive
-									? accentClass
-									: 'text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800'
-							)
-						}
-					>
-						<item.icon className="w-5 h-5 flex-shrink-0" />
-						{item.label}
-					</NavLink>
-				))}
+			<nav className="flex-1 px-3 py-2 overflow-y-auto">
+				{navSections.map((section, sectionIdx) => {
+					// Auto-expand sections containing the active route
+					const containsActiveRoute = section.items.some(item =>
+						item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)
+					)
+					const isCollapsed = section.label ? (collapsed.has(section.label) && !containsActiveRoute) : false
+					return (
+					<div key={section.label || sectionIdx} className={sectionIdx > 0 ? 'mt-5' : ''}>
+						{section.label && (
+							<button
+								onClick={() => toggleSection(section.label!)}
+								className="w-full flex items-center justify-between px-3 py-1 mb-0.5 rounded hover:bg-neutral-800/30 group"
+							>
+								<span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider group-hover:text-neutral-400">
+									{section.label}
+								</span>
+								<svg
+									className={cn(
+										'w-3 h-3 text-neutral-600 group-hover:text-neutral-400 transition-transform duration-200',
+										isCollapsed && '-rotate-90'
+									)}
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+								</svg>
+							</button>
+						)}
+						{!isCollapsed && (
+						<div className="space-y-0.5">
+							{section.items.map((item) => (
+								<NavLink
+									key={item.to}
+									to={item.to}
+									end={item.end}
+									className={({ isActive }) =>
+										cn(
+											'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+											isActive
+												? accentClass
+												: 'text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800'
+										)
+									}
+								>
+									<item.icon className="w-5 h-5 flex-shrink-0" />
+									{item.label}
+								</NavLink>
+							))}
+						</div>
+						)}
+					</div>
+					)
+				})}
 			</nav>
 
 			{/* Settings at bottom */}

@@ -227,15 +227,13 @@ export function UsersPage() {
 	const handleBulkDeleteUsers = async () => {
 		if (selectedUsers.size === 0) return
 		setBulkDeleting(true)
-		let deleted = 0
 		for (const username of selectedUsers) {
 			if (username === currentUser?.email) continue
 			try {
-				const response = await fetch(`/api/admin/users/${username}`, {
+				await fetch(`/api/admin/users/${username}`, {
 					method: 'DELETE',
 					credentials: 'include',
 				})
-				if (response.ok) deleted++
 			} catch {
 				// Continue with remaining
 			}

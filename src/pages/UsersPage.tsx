@@ -52,6 +52,10 @@ export function UsersPage() {
 	const [userToDelete, setUserToDelete] = useState<string | null>(null)
 	const [deleting, setDeleting] = useState(false)
 
+	// Bulk selection
+	const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
+	const [bulkDeleting, setBulkDeleting] = useState(false)
+
 	const fetchUsers = useCallback(async () => {
 		try {
 			const response = await fetch('/api/users', {
@@ -201,6 +205,46 @@ export function UsersPage() {
 		}
 	}
 
+	const internalUsers = users.filter(u => u.authType === 'internal')
+
+	const toggleSelectUser = (username: string) => {
+		setSelectedUsers(prev => {
+			const next = new Set(prev)
+			if (next.has(username)) next.delete(username)
+			else next.add(username)
+			return next
+		})
+	}
+
+	const toggleSelectAllUsers = () => {
+		if (selectedUsers.size === internalUsers.length) {
+			setSelectedUsers(new Set())
+		} else {
+			setSelectedUsers(new Set(internalUsers.map(u => u.username)))
+		}
+	}
+
+	const handleBulkDeleteUsers = async () => {
+		if (selectedUsers.size === 0) return
+		setBulkDeleting(true)
+		let deleted = 0
+		for (const username of selectedUsers) {
+			if (username === currentUser?.email) continue
+			try {
+				const response = await fetch(`/api/admin/users/${username}`, {
+					method: 'DELETE',
+					credentials: 'include',
+				})
+				if (response.ok) deleted++
+			} catch {
+				// Continue with remaining
+			}
+		}
+		setSelectedUsers(new Set())
+		setBulkDeleting(false)
+		fetchUsers()
+	}
+
 	const getStatusBadge = (phase: string, disabled: boolean) => {
 		if (disabled) {
 			return (
@@ -278,12 +322,39 @@ export function UsersPage() {
 				</div>
 			)}
 
+			{/* Bulk Action Bar */}
+			{isAdmin && selectedUsers.size > 0 && (
+				<Card className="p-3 flex items-center justify-between bg-blue-500/5 border border-blue-500/20">
+					<span className="text-sm text-neutral-200">
+						{selectedUsers.size} user{selectedUsers.size !== 1 ? 's' : ''} selected
+					</span>
+					<div className="flex items-center gap-2">
+						<Button variant="secondary" size="sm" onClick={() => setSelectedUsers(new Set())}>
+							Clear
+						</Button>
+						<Button variant="danger" size="sm" onClick={handleBulkDeleteUsers} disabled={bulkDeleting}>
+							{bulkDeleting ? 'Deleting...' : `Delete ${selectedUsers.size}`}
+						</Button>
+					</div>
+				</Card>
+			)}
+
 			{/* Users Table */}
 			<Card className="overflow-hidden">
 				<div className="overflow-x-auto">
 					<table className="w-full">
 						<thead>
 							<tr className="border-b border-neutral-800">
+								{isAdmin && internalUsers.length > 0 && (
+								<th className="w-10 py-3 px-4">
+									<input
+										type="checkbox"
+										checked={selectedUsers.size === internalUsers.length}
+										onChange={toggleSelectAllUsers}
+										className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 focus:ring-offset-0"
+									/>
+								</th>
+								)}
 								<th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 uppercase tracking-wider">
 									User
 								</th>
@@ -307,13 +378,27 @@ export function UsersPage() {
 						<tbody className="divide-y divide-neutral-800">
 							{users.length === 0 ? (
 								<tr>
-									<td colSpan={6} className="py-8 text-center text-neutral-500">
+									<td colSpan={isAdmin && internalUsers.length > 0 ? 7 : 6} className="py-8 text-center text-neutral-500">
 										No users found. Create your first user or add members to teams.
 									</td>
 								</tr>
 							) : (
 								users.map((user) => (
-									<tr key={user.username} className="hover:bg-neutral-800/50">
+									<tr key={user.username} className={`hover:bg-neutral-800/50 ${selectedUsers.has(user.username) ? 'bg-blue-500/5' : ''}`}>
+										{isAdmin && internalUsers.length > 0 && (
+										<td className="w-10 py-3 px-4">
+											{user.authType === 'internal' ? (
+												<input
+													type="checkbox"
+													checked={selectedUsers.has(user.username)}
+													onChange={() => toggleSelectUser(user.username)}
+													className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 focus:ring-offset-0"
+												/>
+											) : (
+												<span />
+											)}
+										</td>
+										)}
 										<td className="py-3 px-4">
 											<div className="flex items-center gap-3">
 												<div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center">

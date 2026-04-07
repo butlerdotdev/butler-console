@@ -8,7 +8,6 @@ import type {
 	CreateImageSyncRequest,
 	UpdateImageSyncRequest,
 	FactoryCatalogEntry,
-	FactoryCatalogResponse,
 } from '@/types/imagesync'
 
 export const imagesApi = {

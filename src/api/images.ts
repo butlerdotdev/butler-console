@@ -6,6 +6,7 @@ import type {
 	ImageSync,
 	ImageSyncListResponse,
 	CreateImageSyncRequest,
+	UpdateImageSyncRequest,
 	FactoryCatalogEntry,
 	FactoryCatalogResponse,
 } from '@/types/imagesync'
@@ -38,9 +39,15 @@ export const imagesApi = {
 		return apiClient.delete(`/image-syncs/${namespace}/${name}`)
 	},
 
+	async update(namespace: string, name: string, data: UpdateImageSyncRequest): Promise<ImageSync> {
+		return apiClient.put<ImageSync>(`/image-syncs/${namespace}/${name}`, data)
+	},
+
 	async getFactoryCatalog(): Promise<FactoryCatalogEntry[]> {
-		const response = await apiClient.get<FactoryCatalogResponse>('/image-factory/catalog')
-		return response.entries || []
+		const response = await apiClient.get<Record<string, unknown>>('/image-factory/catalog')
+		// Factory returns { os: [...] } — handle both shapes
+		const entries = (response as { os?: FactoryCatalogEntry[]; entries?: FactoryCatalogEntry[] })
+		return entries.os || entries.entries || []
 	},
 
 	async getFactorySchematic(id: string): Promise<Record<string, unknown>> {

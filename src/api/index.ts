@@ -70,6 +70,7 @@ export type {
 	ImageSync,
 	ImageSyncListResponse,
 	CreateImageSyncRequest,
+	UpdateImageSyncRequest,
 	FactoryCatalogEntry,
 } from '@/types/imagesync'
 

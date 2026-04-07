@@ -14,6 +14,7 @@ export interface ButlerConfigResponse {
 	defaultTeamLimits?: TeamLimitsInfo
 	defaultControlPlaneResources?: CPResourcesInfo
 	imageFactory?: ImageFactoryInfo
+	audit?: AuditInfo
 	sshAuthorizedKey?: string
 	status: ConfigStatusInfo
 }
@@ -74,6 +75,12 @@ export interface ImageFactoryInfo {
 	autoSync?: boolean
 }
 
+export interface AuditInfo {
+	enabled?: boolean
+	webhookURL?: string
+	bufferSize?: number
+}
+
 export interface ConfigStatusInfo {
 	teamCount: number
 	clusterCount: number
@@ -92,6 +99,7 @@ export interface UpdateConfigRequest {
 	defaultTeamLimits?: TeamLimitsInfo
 	defaultControlPlaneResources?: CPResourcesInfo
 	imageFactory?: ImageFactoryInfo
+	audit?: AuditInfo
 	sshAuthorizedKey?: string
 }
 

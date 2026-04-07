@@ -14,6 +14,7 @@ export { networksApi } from './networks'
 export * from './certificates';
 export { observabilityApi } from './observability'
 export { imagesApi } from './images'
+export { auditApi } from './audit'
 export { configApi } from './config'
 export { stewardApi } from './steward'
 export type { TenantControlPlane, DataStore } from './steward'
@@ -73,6 +74,12 @@ export type {
 	UpdateImageSyncRequest,
 	FactoryCatalogEntry,
 } from '@/types/imagesync'
+
+export type {
+	AuditEntry,
+	AuditListResponse,
+	AuditFilters,
+} from './audit'
 
 // Backwards compatible aliases
 export type { ManagementCluster as ManagementClusterInfo } from './clusters'

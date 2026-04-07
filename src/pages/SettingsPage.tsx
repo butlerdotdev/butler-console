@@ -32,6 +32,7 @@ export function SettingsPage() {
 	const [savingResources, setSavingResources] = useState(false)
 	const [savingFactory, setSavingFactory] = useState(false)
 	const [savingSSH, setSavingSSH] = useState(false)
+	const [savingAudit, setSavingAudit] = useState(false)
 
 	// Editable form state
 	const [multiTenancyMode, setMultiTenancyMode] = useState('')
@@ -55,6 +56,10 @@ export function SettingsPage() {
 	const [factorySchematicID, setFactorySchematicID] = useState('')
 	const [factoryAutoSync, setFactoryAutoSync] = useState(true)
 
+	const [auditEnabled, setAuditEnabled] = useState(true)
+	const [auditWebhookURL, setAuditWebhookURL] = useState('')
+	const [auditBufferSize, setAuditBufferSize] = useState(10000)
+
 	const [sshKey, setSSHKey] = useState('')
 
 	const populateFormState = useCallback((data: ButlerConfigResponse) => {
@@ -76,6 +81,10 @@ export function SettingsPage() {
 		setFactoryCredRef(data.imageFactory?.credentialsRef || '')
 		setFactorySchematicID(data.imageFactory?.defaultSchematicID || '')
 		setFactoryAutoSync(data.imageFactory?.autoSync !== false)
+
+		setAuditEnabled(data.audit?.enabled !== false)
+		setAuditWebhookURL(data.audit?.webhookURL || '')
+		setAuditBufferSize(data.audit?.bufferSize || 10000)
 
 		setSSHKey(data.sshAuthorizedKey || '')
 	}, [])
@@ -546,6 +555,70 @@ export function SettingsPage() {
 								/>
 								<div className="w-11 h-6 bg-neutral-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600" />
 							</label>
+						</div>
+					</div>
+				</Card>
+
+				{/* Audit Log */}
+				<Card className="p-6">
+					<div className="flex items-center justify-between mb-4">
+						<h2 className="text-lg font-medium text-neutral-50">Audit Log</h2>
+						<Button
+							size="sm"
+							onClick={() =>
+								saveSection(
+									{ audit: { enabled: auditEnabled, webhookURL: auditWebhookURL || undefined, bufferSize: auditBufferSize } },
+									setSavingAudit,
+									'Audit configuration'
+								)
+							}
+							disabled={savingAudit}
+						>
+							{savingAudit ? 'Saving...' : 'Save'}
+						</Button>
+					</div>
+					<p className="text-xs text-neutral-500 mb-4">
+						Configure audit event recording. Events are always emitted as structured logs.
+						Optionally forward to an external system via webhook.
+					</p>
+					<div className="space-y-4">
+						<div className="flex items-center justify-between">
+							<div>
+								<p className="text-sm font-medium text-neutral-200">Enabled</p>
+								<p className="text-xs text-neutral-500">Record audit events for mutations and auth actions</p>
+							</div>
+							<label className="relative inline-flex items-center cursor-pointer">
+								<input
+									type="checkbox"
+									checked={auditEnabled}
+									onChange={(e) => setAuditEnabled(e.target.checked)}
+									className="sr-only peer"
+								/>
+								<div className="w-11 h-6 bg-neutral-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600" />
+							</label>
+						</div>
+						<div>
+							<label className="block text-sm font-medium text-neutral-400 mb-1">Webhook URL</label>
+							<Input
+								value={auditWebhookURL}
+								onChange={(e) => setAuditWebhookURL(e.target.value)}
+								placeholder="https://siem.company.com/api/v1/audit"
+							/>
+							<p className="text-xs text-neutral-500 mt-1">
+								POST audit events to this URL for external integration (SIEM, log aggregator, etc). Leave empty to disable.
+							</p>
+						</div>
+						<div>
+							<label className="block text-sm font-medium text-neutral-400 mb-1">Buffer Size</label>
+							<Input
+								type="number"
+								value={String(auditBufferSize)}
+								onChange={(e) => setAuditBufferSize(parseInt(e.target.value) || 10000)}
+								placeholder="10000"
+							/>
+							<p className="text-xs text-neutral-500 mt-1">
+								In-memory ring buffer capacity for recent audit queries in the console. Default 10,000.
+							</p>
 						</div>
 					</div>
 				</Card>

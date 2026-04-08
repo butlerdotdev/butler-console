@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
+import { usePreferences } from '@/contexts/PreferencesContext'
 import 'xterm/css/xterm.css'
 
 interface TerminalProps {
@@ -15,6 +16,7 @@ interface TerminalProps {
 }
 
 export function ClusterTerminal({ type, namespace, cluster, pod, container }: TerminalProps) {
+	const { preferences } = usePreferences()
 	const terminalRef = useRef<HTMLDivElement>(null)
 	const termRef = useRef<Terminal | null>(null)
 	const wsRef = useRef<WebSocket | null>(null)
@@ -87,7 +89,7 @@ export function ClusterTerminal({ type, namespace, cluster, pod, container }: Te
 
 		const term = new Terminal({
 			cursorBlink: true,
-			fontSize: 14,
+			fontSize: preferences.terminalFontSize,
 			fontFamily: '"JetBrains Mono", "Fira Code", monospace',
 			theme: {
 				background: '#0a0a0a',

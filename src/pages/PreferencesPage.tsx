@@ -5,11 +5,14 @@ import { useDocumentTitle } from '@/hooks'
 import { Card, Button, FadeIn } from '@/components/ui'
 import { usePreferences } from '@/contexts/PreferencesContext'
 import type { Preferences } from '@/contexts/PreferencesContext'
+import { useTheme } from '@/contexts/ThemeContext'
+import type { ThemeMode, ColorMode } from '@/contexts/ThemeContext'
 
 export function PreferencesPage() {
 	useDocumentTitle('Preferences')
 
 	const { preferences, updatePreference, resetPreferences } = usePreferences()
+	const { theme, colorMode, setTheme, setColorMode } = useTheme()
 
 	return (
 		<FadeIn>
@@ -22,6 +25,54 @@ export function PreferencesPage() {
 				</div>
 
 				<div className="space-y-6">
+					{/* Appearance */}
+					<Card className="p-6">
+						<div className="flex items-center gap-2 mb-4">
+							<PaletteIcon className="w-5 h-5 text-neutral-400" />
+							<h3 className="text-lg font-medium text-neutral-50">Appearance</h3>
+						</div>
+						<div className="space-y-4">
+							<div>
+								<label className="block text-sm font-medium text-neutral-300 mb-2">
+									Theme
+								</label>
+								<div className="flex gap-2">
+									{(['dark', 'light'] as ThemeMode[]).map((mode) => (
+										<button
+											key={mode}
+											onClick={() => setTheme(mode)}
+											className={`flex-1 px-4 py-2 rounded-lg border transition-colors capitalize ${
+												theme === mode
+													? 'border-green-500 bg-green-500/10 text-green-400'
+													: 'border-neutral-700 bg-neutral-800 text-neutral-400 hover:border-neutral-600'
+											}`}
+										>
+											{mode}
+										</button>
+									))}
+								</div>
+							</div>
+							<div>
+								<label className="block text-sm font-medium text-neutral-300 mb-2">
+									Color Vision
+								</label>
+								<select
+									value={colorMode}
+									onChange={(e) => setColorMode(e.target.value as ColorMode)}
+									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+								>
+									<option value="default">Default</option>
+									<option value="deuteranopia">Deuteranopia (red-green)</option>
+									<option value="protanopia">Protanopia (red-blind)</option>
+									<option value="tritanopia">Tritanopia (blue-yellow)</option>
+								</select>
+								<p className="text-xs text-neutral-500 mt-1">
+									Adjusts accent colors for color vision accessibility
+								</p>
+							</div>
+						</div>
+					</Card>
+
 					{/* Display */}
 					<Card className="p-6">
 						<div className="flex items-center gap-2 mb-4">
@@ -158,6 +209,19 @@ export function PreferencesPage() {
 }
 
 // Icons
+function PaletteIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<path
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth={2}
+				d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+			/>
+		</svg>
+	)
+}
+
 function LayoutIcon({ className }: { className?: string }) {
 	return (
 		<svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -5,35 +5,424 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme system: CSS custom properties for every Tailwind color used in the app.
+ * Dark theme = :root defaults. Light theme = .light overrides.
+ * Colorblind modes override accent colors only.
+ *
+ * Component code still uses the original Tailwind classes (bg-neutral-900, text-green-400, etc.)
+ * but those classes now resolve to these CSS variables, which flip between themes.
+ */
+
 :root {
-	--color-bg: #0a0a0a;
-	--color-bg-secondary: #171717;
-	--color-bg-tertiary: #262626;
-	--color-text: #fafafa;
-	--color-text-muted: #a3a3a3;
-	--color-border: #404040;
-	--color-brand: #22c55e;
+	/* ── Neutral palette (dark) ── */
+	--bc-neutral-50: 250 250 250;
+	--bc-neutral-100: 245 245 245;
+	--bc-neutral-200: 229 229 229;
+	--bc-neutral-300: 212 212 212;
+	--bc-neutral-400: 163 163 163;
+	--bc-neutral-500: 115 115 115;
+	--bc-neutral-600: 82 82 82;
+	--bc-neutral-700: 64 64 64;
+	--bc-neutral-800: 38 38 38;
+	--bc-neutral-900: 23 23 23;
+	--bc-neutral-950: 10 10 10;
+
+	/* ── Green palette ── */
+	--bc-green-200: 187 247 208;
+	--bc-green-300: 134 239 172;
+	--bc-green-400: 74 222 128;
+	--bc-green-500: 34 197 94;
+	--bc-green-600: 22 163 74;
+	--bc-green-700: 21 128 61;
+	--bc-green-900: 20 83 45;
+
+	/* ── Red palette ── */
+	--bc-red-200: 254 202 202;
+	--bc-red-300: 252 165 165;
+	--bc-red-400: 248 113 113;
+	--bc-red-500: 239 68 68;
+	--bc-red-600: 220 38 38;
+	--bc-red-700: 185 28 28;
+	--bc-red-900: 127 29 29;
+
+	/* ── Blue palette ── */
+	--bc-blue-200: 191 219 254;
+	--bc-blue-300: 147 197 253;
+	--bc-blue-400: 96 165 250;
+	--bc-blue-500: 59 130 246;
+	--bc-blue-600: 37 99 235;
+	--bc-blue-800: 30 64 175;
+	--bc-blue-900: 30 58 138;
+
+	/* ── Yellow palette ── */
+	--bc-yellow-50: 254 252 232;
+	--bc-yellow-200: 254 240 138;
+	--bc-yellow-300: 253 224 71;
+	--bc-yellow-400: 250 204 21;
+	--bc-yellow-500: 234 179 8;
+	--bc-yellow-600: 202 138 4;
+	--bc-yellow-800: 133 77 14;
+	--bc-yellow-900: 113 63 18;
+
+	/* ── Amber palette ── */
+	--bc-amber-200: 253 230 138;
+	--bc-amber-300: 252 211 77;
+	--bc-amber-400: 251 191 36;
+	--bc-amber-500: 245 158 11;
+	--bc-amber-700: 180 83 9;
+	--bc-amber-900: 120 53 15;
+
+	/* ── Violet palette ── */
+	--bc-violet-300: 196 181 253;
+	--bc-violet-400: 167 139 250;
+	--bc-violet-500: 139 92 246;
+	--bc-violet-600: 124 58 237;
+	--bc-violet-900: 76 29 149;
+
+	/* ── Teal palette ── */
+	--bc-teal-300: 94 234 212;
+	--bc-teal-400: 45 212 191;
+	--bc-teal-500: 20 184 166;
+	--bc-teal-600: 13 148 136;
+
+	/* ── Emerald palette ── */
+	--bc-emerald-400: 52 211 153;
+	--bc-emerald-500: 16 185 129;
+	--bc-emerald-600: 5 150 105;
+	--bc-emerald-700: 4 120 87;
+	--bc-emerald-900: 6 78 59;
+
+	/* ── Orange palette ── */
+	--bc-orange-400: 251 146 60;
+	--bc-orange-500: 249 115 22;
 }
 
+/* ── Light theme ─────────────────────────────────────────────── */
+.light {
+	/*
+	 * Text shades (50-300): dark on light bg, each step lighter.
+	 * Muted shades (400-600): medium grays for secondary/subtle text.
+	 * Surface shades (700-950): light backgrounds and borders.
+	 *
+	 * Contrast on white: 50=16:1, 100=14:1, 200=9.5:1, 300=7:1, 400=5:1, 500=4:1
+	 */
+	--bc-neutral-50: 9 9 11;            /* primary text — near-black, 19:1 */
+	--bc-neutral-100: 24 24 27;        /* primary text alt — zinc-900, 16:1 */
+	--bc-neutral-200: 39 39 42;        /* secondary text — zinc-800, 14:1 */
+	--bc-neutral-300: 63 63 70;        /* tertiary text — zinc-700, 9.5:1 */
+	/* 400 and 500 intentionally collapse to the same value in light mode.
+	   In dark mode they differ (163 vs 115) but both need high contrast on white.
+	   Distinct lighter values would fail WCAG AA for small uppercase section headers. */
+	--bc-neutral-400: 63 63 70;        /* muted nav items — zinc-700, 9.5:1 */
+	--bc-neutral-500: 63 63 70;        /* section headers, placeholders — zinc-700, 9.5:1 */
+	--bc-neutral-600: 113 113 122;     /* decorative, very subtle — zinc-500, 4.7:1 */
+	--bc-neutral-700: 228 228 231;     /* borders — zinc-200 */
+	--bc-neutral-800: 244 244 245;     /* input bg, card borders — zinc-100 */
+	--bc-neutral-900: 250 250 251;     /* cards, sidebar — zinc-50 */
+	--bc-neutral-950: 255 255 255;     /* page background — white */
+
+	/* Darken accent shades for contrast on light backgrounds.
+	   200 shades stay as subtle tints (used for bg-green-200 card backgrounds).
+	   300+ shades darken to -600/-700 equivalents for text readability. */
+	--bc-green-200: 187 247 208;       /* keep original — used for tinted backgrounds */
+	--bc-green-300: 22 163 74;         /* green-600 */
+	--bc-green-400: 22 163 74;         /* green-600 */
+	--bc-green-500: 21 128 61;         /* green-700 */
+	--bc-green-600: 22 101 52;         /* green-800 */
+	--bc-green-700: 20 83 45;          /* green-900 */
+	--bc-red-200: 254 202 202;         /* keep original — tinted backgrounds */
+	--bc-red-300: 220 38 38;           /* red-600 */
+	--bc-red-400: 220 38 38;           /* red-600 */
+	--bc-red-500: 185 28 28;           /* red-700 */
+	--bc-blue-200: 191 219 254;        /* keep original — tinted backgrounds */
+	--bc-blue-300: 37 99 235;          /* blue-600 */
+	--bc-blue-400: 37 99 235;          /* blue-600 */
+	--bc-blue-500: 29 78 216;          /* blue-700 */
+	--bc-violet-300: 76 29 149;         /* violet-900 — admin banner text */
+	--bc-violet-400: 91 33 182;        /* violet-800 */
+	--bc-violet-500: 109 40 217;       /* violet-700 */
+	--bc-teal-300: 17 94 89;           /* teal-800 — team admin banner text */
+	--bc-teal-400: 15 118 110;         /* teal-700 */
+	--bc-teal-500: 13 148 136;         /* teal-600 */
+	--bc-yellow-200: 254 240 138;      /* keep original — tinted backgrounds */
+	--bc-yellow-300: 202 138 4;        /* yellow-600 */
+	--bc-yellow-400: 202 138 4;        /* yellow-600 */
+	--bc-amber-200: 253 230 138;       /* keep original — tinted backgrounds */
+	--bc-amber-300: 217 119 6;         /* amber-600 */
+	--bc-amber-400: 217 119 6;         /* amber-600 */
+	--bc-amber-500: 180 83 9;          /* amber-700 */
+}
+
+/* ── Colorblind: Deuteranopia (red-green, most common) ─────── */
+.colorblind-deuteranopia {
+	/* Green → Blue */
+	--bc-green-200: 191 219 254;
+	--bc-green-300: 147 197 253;
+	--bc-green-400: 96 165 250;
+	--bc-green-500: 59 130 246;
+	--bc-green-600: 37 99 235;
+	--bc-green-700: 29 78 216;
+	--bc-green-900: 30 58 138;
+	--bc-emerald-400: 96 165 250;
+	--bc-emerald-500: 59 130 246;
+	--bc-emerald-600: 37 99 235;
+	--bc-emerald-700: 29 78 216;
+	--bc-emerald-900: 30 58 138;
+	/* Blue → Purple */
+	--bc-blue-200: 221 214 254;
+	--bc-blue-300: 196 181 253;
+	--bc-blue-400: 192 132 252;
+	--bc-blue-500: 168 85 247;
+	--bc-blue-600: 147 51 234;
+	--bc-blue-800: 107 33 168;
+	--bc-blue-900: 88 28 135;
+	/* Role: Violet → Pink (admin) */
+	--bc-violet-300: 249 168 212;
+	--bc-violet-400: 244 114 182;
+	--bc-violet-500: 236 72 153;
+	--bc-violet-600: 219 39 119;
+	--bc-violet-900: 131 24 67;
+	/* Role: Teal → Orange (team admin) */
+	--bc-teal-300: 253 186 116;
+	--bc-teal-400: 251 146 60;
+	--bc-teal-500: 249 115 22;
+	--bc-teal-600: 234 88 12;
+}
+
+/* ── Colorblind: Protanopia (red-blind) ────────────────────── */
+/* Can't see red (appears black). Blue and yellow are clear. */
+.colorblind-protanopia {
+	/* Green → Indigo (blue-ish, no red) */
+	--bc-green-200: 199 210 254;
+	--bc-green-300: 165 180 252;
+	--bc-green-400: 129 140 248;
+	--bc-green-500: 99 102 241;
+	--bc-green-600: 79 70 229;
+	--bc-green-700: 67 56 202;
+	--bc-green-900: 49 46 129;
+	--bc-emerald-400: 129 140 248;
+	--bc-emerald-500: 99 102 241;
+	--bc-emerald-600: 79 70 229;
+	--bc-emerald-700: 67 56 202;
+	--bc-emerald-900: 49 46 129;
+	/* Red → Amber (yellow-ish, no red) */
+	--bc-red-200: 253 230 138;
+	--bc-red-300: 252 211 77;
+	--bc-red-400: 251 191 36;
+	--bc-red-500: 245 158 11;
+	--bc-red-600: 217 119 6;
+	--bc-red-700: 180 83 9;
+	--bc-red-900: 120 53 15;
+	/* Role: Violet → Cyan/Sky (admin — no red component, distinct from indigo accent) */
+	--bc-violet-300: 125 211 252;
+	--bc-violet-400: 56 189 248;
+	--bc-violet-500: 14 165 233;
+	--bc-violet-600: 2 132 199;
+	--bc-violet-900: 12 74 110;
+	/* Role: Teal → Yellow/Gold (team admin — clearly visible, no red/green) */
+	--bc-teal-300: 253 224 71;
+	--bc-teal-400: 250 204 21;
+	--bc-teal-500: 234 179 8;
+	--bc-teal-600: 202 138 4;
+}
+
+/* ── Colorblind: Tritanopia (blue-yellow blind, very rare) ── */
+/* Can't see blue or yellow. Red and green are clear. */
+.colorblind-tritanopia {
+	/* Green → Rose (red-ish, clearly visible) */
+	--bc-green-200: 254 205 211;
+	--bc-green-300: 253 164 175;
+	--bc-green-400: 251 113 133;
+	--bc-green-500: 244 63 94;
+	--bc-green-600: 225 29 72;
+	--bc-green-700: 190 18 60;
+	--bc-green-900: 136 19 55;
+	--bc-emerald-400: 251 113 133;
+	--bc-emerald-500: 244 63 94;
+	--bc-emerald-600: 225 29 72;
+	--bc-emerald-700: 190 18 60;
+	--bc-emerald-900: 136 19 55;
+	/* Yellow → Pink/Fuchsia (no yellow/blue, visible as red-ish) */
+	--bc-yellow-50: 253 244 255;
+	--bc-yellow-200: 245 208 254;
+	--bc-yellow-300: 240 171 252;
+	--bc-yellow-400: 232 121 249;
+	--bc-yellow-500: 217 70 239;
+	--bc-yellow-600: 192 38 211;
+	--bc-yellow-800: 134 25 143;
+	--bc-yellow-900: 112 26 117;
+	--bc-amber-200: 245 208 254;
+	--bc-amber-300: 240 171 252;
+	--bc-amber-400: 232 121 249;
+	--bc-amber-500: 217 70 239;
+	--bc-amber-700: 134 25 143;
+	--bc-amber-900: 112 26 117;
+	/* Blue → Amber (no blue, yellow-ish is partially visible via red channel) */
+	--bc-blue-200: 253 230 138;
+	--bc-blue-300: 252 211 77;
+	--bc-blue-400: 251 191 36;
+	--bc-blue-500: 245 158 11;
+	--bc-blue-600: 217 119 6;
+	--bc-blue-800: 146 64 14;
+	--bc-blue-900: 120 53 15;
+	/* Role: Violet → Red/Magenta (admin — no blue component, clearly visible) */
+	--bc-violet-300: 252 165 165;
+	--bc-violet-400: 248 113 113;
+	--bc-violet-500: 239 68 68;
+	--bc-violet-600: 220 38 38;
+	--bc-violet-900: 127 29 29;
+	/* Role: Teal → Orange (team admin — no blue/yellow issue, distinct from red) */
+	--bc-teal-300: 253 186 116;
+	--bc-teal-400: 251 146 60;
+	--bc-teal-500: 249 115 22;
+	--bc-teal-600: 234 88 12;
+}
+
+/* ── Light + Colorblind compound overrides ─────────────────── */
+/* These darken the colorblind-remapped colors for light backgrounds */
+
+.light.colorblind-deuteranopia {
+	/* Green was remapped to Blue — darken for light bg */
+	--bc-green-200: 29 78 216;
+	--bc-green-300: 30 64 175;
+	--bc-green-400: 37 99 235;
+	--bc-green-500: 29 78 216;
+	--bc-green-600: 30 64 175;         /* blue-700 */
+	--bc-green-700: 30 58 138;
+	--bc-green-900: 23 37 84;          /* blue-950 */
+	--bc-emerald-400: 37 99 235;
+	--bc-emerald-500: 29 78 216;
+	--bc-emerald-600: 30 64 175;
+	--bc-emerald-700: 30 58 138;
+	--bc-emerald-900: 23 37 84;
+	/* Blue was remapped to Purple — darken for light bg */
+	--bc-blue-200: 107 33 168;
+	--bc-blue-300: 88 28 135;
+	--bc-blue-400: 126 34 206;
+	--bc-blue-500: 107 33 168;
+	--bc-blue-600: 88 28 135;
+	--bc-blue-800: 59 7 100;           /* fuchsia-950 */
+	--bc-blue-900: 59 7 100;
+	/* Violet was remapped to Pink — darken for light bg */
+	--bc-violet-300: 131 24 67;
+	--bc-violet-400: 157 23 77;
+	--bc-violet-500: 190 24 93;
+	--bc-violet-600: 219 39 119;
+	--bc-violet-900: 80 7 36;          /* pink-950 */
+	/* Teal was remapped to Orange — darken for light bg */
+	--bc-teal-300: 154 52 18;
+	--bc-teal-400: 194 65 12;
+	--bc-teal-500: 234 88 12;
+	--bc-teal-600: 194 65 12;
+}
+
+.light.colorblind-protanopia {
+	/* Green was remapped to Indigo — darken */
+	--bc-green-200: 55 48 163;
+	--bc-green-300: 49 46 129;
+	--bc-green-400: 67 56 202;
+	--bc-green-500: 55 48 163;
+	--bc-green-600: 49 46 129;         /* indigo-900 */
+	--bc-green-700: 49 46 129;
+	--bc-green-900: 30 27 75;          /* indigo-950 */
+	--bc-emerald-400: 67 56 202;
+	--bc-emerald-500: 55 48 163;
+	--bc-emerald-600: 49 46 129;
+	--bc-emerald-700: 49 46 129;
+	--bc-emerald-900: 30 27 75;
+	/* Red was remapped to Amber — darken */
+	--bc-red-200: 146 64 14;
+	--bc-red-300: 120 53 15;
+	--bc-red-400: 180 83 9;
+	--bc-red-500: 146 64 14;
+	--bc-red-600: 120 53 15;
+	--bc-red-700: 120 53 15;           /* amber-900 */
+	--bc-red-900: 69 26 3;             /* amber-950 */
+	/* Violet was remapped to Cyan/Sky — darken */
+	--bc-violet-300: 12 74 110;
+	--bc-violet-400: 3 105 161;
+	--bc-violet-500: 2 132 199;
+	--bc-violet-600: 2 132 199;
+	--bc-violet-900: 8 47 73;          /* sky-950 */
+	/* Teal was remapped to Yellow/Gold — darken */
+	--bc-teal-300: 133 77 14;
+	--bc-teal-400: 161 98 7;
+	--bc-teal-500: 202 138 4;
+	--bc-teal-600: 161 98 7;
+}
+
+.light.colorblind-tritanopia {
+	/* Green was remapped to Rose — darken */
+	--bc-green-200: 159 18 57;
+	--bc-green-300: 136 19 55;
+	--bc-green-400: 190 18 60;
+	--bc-green-500: 159 18 57;
+	--bc-green-600: 136 19 55;         /* rose-900 */
+	--bc-green-700: 136 19 55;
+	--bc-green-900: 76 5 25;           /* rose-950 */
+	--bc-emerald-400: 190 18 60;
+	--bc-emerald-500: 159 18 57;
+	--bc-emerald-600: 136 19 55;
+	--bc-emerald-700: 136 19 55;
+	--bc-emerald-900: 76 5 25;
+	/* Yellow was remapped to Pink/Fuchsia — darken */
+	--bc-yellow-50: 253 244 255;       /* keep light tint */
+	--bc-yellow-200: 112 26 117;
+	--bc-yellow-300: 134 25 143;
+	--bc-yellow-400: 162 28 175;
+	--bc-yellow-500: 134 25 143;
+	--bc-yellow-600: 112 26 117;       /* fuchsia-900 */
+	--bc-yellow-800: 74 4 78;          /* fuchsia-950 */
+	--bc-yellow-900: 74 4 78;
+	--bc-amber-200: 112 26 117;
+	--bc-amber-300: 134 25 143;
+	--bc-amber-400: 162 28 175;
+	--bc-amber-500: 134 25 143;
+	--bc-amber-700: 74 4 78;
+	--bc-amber-900: 74 4 78;
+	/* Blue was remapped to Amber — darken */
+	--bc-blue-200: 146 64 14;
+	--bc-blue-300: 120 53 15;
+	--bc-blue-400: 180 83 9;
+	--bc-blue-500: 146 64 14;
+	--bc-blue-600: 120 53 15;
+	--bc-blue-800: 69 26 3;            /* amber-950 */
+	--bc-blue-900: 69 26 3;
+	/* Violet was remapped to Red/Magenta — darken */
+	--bc-violet-300: 127 29 29;
+	--bc-violet-400: 153 27 27;
+	--bc-violet-500: 185 28 28;
+	--bc-violet-600: 185 28 28;
+	--bc-violet-900: 69 10 10;         /* red-950 */
+	/* Teal was remapped to Orange — darken */
+	--bc-teal-300: 154 52 18;
+	--bc-teal-400: 194 65 12;
+	--bc-teal-500: 234 88 12;
+	--bc-teal-600: 194 65 12;
+}
+
+/* ── Body defaults ─────────────────────────────────────────── */
 body {
-	background-color: var(--color-bg);
-	color: var(--color-text);
+	background-color: rgb(var(--bc-neutral-950));
+	color: rgb(var(--bc-neutral-50));
 }
 
+/* ── Scrollbar ─────────────────────────────────────────────── */
 ::-webkit-scrollbar {
 	width: 8px;
 	height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-	background: var(--color-bg-secondary);
+	background: rgb(var(--bc-neutral-900));
 }
 
 ::-webkit-scrollbar-thumb {
-	background: var(--color-border);
+	background: rgb(var(--bc-neutral-700));
 	border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: #525252;
+	background: rgb(var(--bc-neutral-600));
 }

@@ -5,10 +5,12 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export function UserMenu() {
 	const { user, logout, refreshPermissions } = useAuth()
 	const toast = useToast()
+	const { theme, setTheme } = useTheme()
 	const navigate = useNavigate()
 	const [isOpen, setIsOpen] = useState(false)
 	const [isRefreshing, setIsRefreshing] = useState(false)
@@ -159,15 +161,16 @@ export function UserMenu() {
 							<span className="text-sm text-neutral-400">Theme</span>
 							<div className="flex items-center gap-1 bg-neutral-800 rounded-lg p-1">
 								<button
-									className="p-1.5 rounded-md bg-neutral-700 text-neutral-200"
-									title="Dark mode (active)"
+									onClick={() => setTheme('dark')}
+									className={`p-1.5 rounded-md transition-colors ${theme === 'dark' ? 'bg-neutral-700 text-neutral-200' : 'text-neutral-500 hover:text-neutral-300'}`}
+									title="Dark mode"
 								>
 									<MoonIcon className="w-4 h-4" />
 								</button>
 								<button
-									className="p-1.5 rounded-md text-neutral-500 hover:text-neutral-300"
-									title="Light mode (coming soon)"
-									disabled
+									onClick={() => setTheme('light')}
+									className={`p-1.5 rounded-md transition-colors ${theme === 'light' ? 'bg-neutral-700 text-neutral-200' : 'text-neutral-500 hover:text-neutral-300'}`}
+									title="Light mode"
 								>
 									<SunIcon className="w-4 h-4" />
 								</button>

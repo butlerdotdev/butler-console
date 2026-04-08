@@ -3,8 +3,12 @@
 
 import type { Config } from 'tailwindcss'
 
+// Uses --bc- prefix (butler-console) to avoid collision with Tailwind's internal --tw-* vars.
+// IMPORTANT: Only shades listed here are theme-aware. If you use a new shade (e.g., red-100)
+// in a component, add it here AND define it in src/index.css (:root, .light, colorblind blocks).
+// Un-overridden shades fall through to Tailwind's hardcoded defaults and won't flip with theme.
 function v(name: string) {
-	return `rgb(var(--tw-${name}) / <alpha-value>)`
+	return `rgb(var(--bc-${name}) / <alpha-value>)`
 }
 
 export default {

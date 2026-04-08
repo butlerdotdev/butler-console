@@ -6,7 +6,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useTeamContext } from '@/hooks/useTeamContext'
 import { useToast } from '@/hooks/useToast'
-import { useTheme } from '@/contexts/ThemeContext'
 import { TeamSwitcher } from './TeamSwitcher'
 import { NotificationBell } from './NotificationBell'
 
@@ -15,7 +14,6 @@ export function Header() {
 	const { isConnected } = useWebSocket()
 	const { isAdminMode } = useTeamContext()
 	const toast = useToast()
-	const { theme, setTheme } = useTheme()
 	const [showUserMenu, setShowUserMenu] = useState(false)
 	const [showHelpMenu, setShowHelpMenu] = useState(false)
 	const [isRefreshing, setIsRefreshing] = useState(false)

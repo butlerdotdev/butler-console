@@ -11,6 +11,7 @@ import {
 	RequireAdmin,
 } from '@/contexts/TeamProvider'
 import { useAuth } from '@/hooks/useAuth'
+import { PreferencesProvider, usePreferences } from '@/contexts/PreferencesContext'
 
 import { LoginPage } from '@/pages/LoginPage'
 import { ClusterDetailPage } from '@/pages/ClusterDetailPage'
@@ -57,6 +58,7 @@ interface TeamRef {
  */
 function SmartRedirect() {
 	const { user, isLoading } = useAuth()
+	const { preferences } = usePreferences()
 
 	if (isLoading) {
 		return (
@@ -76,12 +78,23 @@ function SmartRedirect() {
 			return teamName === 'platform-team' && role === 'admin'
 		})
 
-	// If platform admin, go to admin dashboard
+	// Respect default view preference
+	if (preferences.defaultView === 'admin' && isPlatformAdmin) {
+		return <Navigate to="/admin" replace />
+	}
+	if (preferences.defaultView === 'team') {
+		const firstTeam = user?.teams?.[0]
+		const teamName = firstTeam?.name || firstTeam?.metadata?.name
+		if (teamName) {
+			return <Navigate to={`/t/${teamName}`} replace />
+		}
+	}
+
+	// Default: "last" behavior (same as original logic)
 	if (isPlatformAdmin) {
 		return <Navigate to="/admin" replace />
 	}
 
-	// Get first team
 	const firstTeam = user?.teams?.[0]
 	const teamName = firstTeam?.name || firstTeam?.metadata?.name
 
@@ -89,12 +102,12 @@ function SmartRedirect() {
 		return <Navigate to={`/t/${teamName}`} replace />
 	}
 
-	// No teams - go to overview
 	return <Navigate to="/overview" replace />
 }
 
 export default function App() {
 	return (
+		<PreferencesProvider>
 		<ToastProvider>
 			<Routes>
 				{/* Public routes */}
@@ -168,5 +181,6 @@ export default function App() {
 				<Route path="*" element={<Navigate to="/" replace />} />
 			</Routes>
 		</ToastProvider>
+		</PreferencesProvider>
 	)
 }

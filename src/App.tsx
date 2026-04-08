@@ -12,6 +12,7 @@ import {
 } from '@/contexts/TeamProvider'
 import { useAuth } from '@/hooks/useAuth'
 import { PreferencesProvider, usePreferences } from '@/contexts/PreferencesContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 
 import { LoginPage } from '@/pages/LoginPage'
 import { ClusterDetailPage } from '@/pages/ClusterDetailPage'
@@ -107,6 +108,7 @@ function SmartRedirect() {
 
 export default function App() {
 	return (
+		<ThemeProvider>
 		<PreferencesProvider>
 		<ToastProvider>
 			<Routes>
@@ -182,5 +184,6 @@ export default function App() {
 			</Routes>
 		</ToastProvider>
 		</PreferencesProvider>
+		</ThemeProvider>
 	)
 }

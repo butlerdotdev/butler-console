@@ -7,6 +7,7 @@ import { useWebSocket } from '@/hooks/useWebSocket'
 import { useTeamContext } from '@/hooks/useTeamContext'
 import { useToast } from '@/hooks/useToast'
 import { TeamSwitcher } from './TeamSwitcher'
+import { NotificationBell } from './NotificationBell'
 
 export function Header() {
 	const { user, logout, refreshPermissions } = useAuth()
@@ -191,6 +192,9 @@ export function Header() {
 						</div>
 					)}
 				</div>
+
+				{/* Notification Bell */}
+				<NotificationBell />
 
 				{/* Team Switcher */}
 				<TeamSwitcher />

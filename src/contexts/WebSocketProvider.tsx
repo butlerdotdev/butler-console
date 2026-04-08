@@ -1,12 +1,13 @@
 // Copyright 2025 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { TenantCluster } from '@/types'
+import type { Notification, NotificationSeverity, NotificationCategory, ResourceRef } from '@/types/notifications'
 import { WebSocketContext } from './WebSocketContext'
 
 interface WebSocketMessage {
-	type: 'cluster_update' | 'cluster_delete' | 'ping' | 'pong' | 'error'
+	type: 'cluster_update' | 'cluster_delete' | 'notification' | 'ping' | 'pong' | 'error'
 	payload?: unknown
 }
 
@@ -19,15 +20,44 @@ interface ClusterDeletePayload {
 	namespace: string
 }
 
+interface NotificationPayload {
+	id: string
+	title: string
+	message: string
+	severity?: string
+	category?: string
+	timestamp?: string
+	resourceRef?: ResourceRef
+}
+
 export function WebSocketProvider({ children }: { children: ReactNode }) {
 	const [isConnected, setIsConnected] = useState(false)
 	const [lastClusterUpdate, setLastClusterUpdate] = useState<TenantCluster | null>(null)
 	const [lastClusterDelete, setLastClusterDelete] = useState<{ name: string; namespace: string } | null>(null)
+	const [notifications, setNotifications] = useState<Notification[]>([])
+	const [unreadCount, setUnreadCount] = useState(0)
 	const wsRef = useRef<WebSocket | null>(null)
 	const reconnectTimeoutRef = useRef<number | null>(null)
 	const reconnectAttempts = useRef(0)
 	const maxReconnectAttempts = 5
 	const connectRef = useRef<() => void>(() => { })
+
+	const markAsRead = useCallback((id: string) => {
+		setNotifications(prev =>
+			prev.map(n => n.id === id ? { ...n, read: true } : n)
+		)
+		setUnreadCount(prev => Math.max(0, prev - 1))
+	}, [])
+
+	const markAllAsRead = useCallback(() => {
+		setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+		setUnreadCount(0)
+	}, [])
+
+	const clearNotifications = useCallback(() => {
+		setNotifications([])
+		setUnreadCount(0)
+	}, [])
 
 	useEffect(() => {
 		const connect = () => {
@@ -84,6 +114,24 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 								}
 								break
 							}
+							case 'notification': {
+								const payload = message.payload as NotificationPayload
+								if (payload?.id && payload?.title) {
+									const notification: Notification = {
+										id: payload.id,
+										title: payload.title,
+										message: payload.message,
+										severity: (payload.severity || 'info') as NotificationSeverity,
+										category: (payload.category || 'cluster') as NotificationCategory,
+										timestamp: payload.timestamp || new Date().toISOString(),
+										resourceRef: payload.resourceRef,
+										read: false,
+									}
+									setNotifications(prev => [notification, ...prev].slice(0, 50))
+									setUnreadCount(prev => prev + 1)
+								}
+								break
+							}
 							case 'ping':
 								if (ws.readyState === WebSocket.OPEN) {
 									ws.send(JSON.stringify({ type: 'pong' }))
@@ -115,7 +163,16 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 	}, [])
 
 	return (
-		<WebSocketContext.Provider value={{ isConnected, lastClusterUpdate, lastClusterDelete }}>
+		<WebSocketContext.Provider value={{
+			isConnected,
+			lastClusterUpdate,
+			lastClusterDelete,
+			notifications,
+			unreadCount,
+			markAsRead,
+			markAllAsRead,
+			clearNotifications,
+		}}>
 			{children}
 		</WebSocketContext.Provider>
 	)

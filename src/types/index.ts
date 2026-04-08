@@ -268,3 +268,4 @@ export interface ApiError {
 export * from './gitops'
 export * from './networks'
 export * from './imagesync'
+export * from './notifications'

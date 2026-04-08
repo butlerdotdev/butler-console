@@ -15,6 +15,7 @@ export interface ButlerConfigResponse {
 	defaultControlPlaneResources?: CPResourcesInfo
 	imageFactory?: ImageFactoryInfo
 	audit?: AuditInfo
+	notifications?: NotificationsInfo
 	sshAuthorizedKey?: string
 	status: ConfigStatusInfo
 }
@@ -81,6 +82,10 @@ export interface AuditInfo {
 	bufferSize?: number
 }
 
+export interface NotificationsInfo {
+	webhookURL?: string
+}
+
 export interface ConfigStatusInfo {
 	teamCount: number
 	clusterCount: number
@@ -100,6 +105,7 @@ export interface UpdateConfigRequest {
 	defaultControlPlaneResources?: CPResourcesInfo
 	imageFactory?: ImageFactoryInfo
 	audit?: AuditInfo
+	notifications?: NotificationsInfo
 	sshAuthorizedKey?: string
 }
 

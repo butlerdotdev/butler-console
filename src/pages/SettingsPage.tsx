@@ -33,6 +33,7 @@ export function SettingsPage() {
 	const [savingFactory, setSavingFactory] = useState(false)
 	const [savingSSH, setSavingSSH] = useState(false)
 	const [savingAudit, setSavingAudit] = useState(false)
+	const [savingNotifications, setSavingNotifications] = useState(false)
 
 	// Editable form state
 	const [multiTenancyMode, setMultiTenancyMode] = useState('')
@@ -55,6 +56,8 @@ export function SettingsPage() {
 	const [factoryCredRef, setFactoryCredRef] = useState('')
 	const [factorySchematicID, setFactorySchematicID] = useState('')
 	const [factoryAutoSync, setFactoryAutoSync] = useState(true)
+
+	const [notificationWebhookURL, setNotificationWebhookURL] = useState('')
 
 	const [auditEnabled, setAuditEnabled] = useState(true)
 	const [auditWebhookURL, setAuditWebhookURL] = useState('')
@@ -81,6 +84,8 @@ export function SettingsPage() {
 		setFactoryCredRef(data.imageFactory?.credentialsRef || '')
 		setFactorySchematicID(data.imageFactory?.defaultSchematicID || '')
 		setFactoryAutoSync(data.imageFactory?.autoSync !== false)
+
+		setNotificationWebhookURL(data.notifications?.webhookURL || '')
 
 		setAuditEnabled(data.audit?.enabled !== false)
 		setAuditWebhookURL(data.audit?.webhookURL || '')
@@ -620,6 +625,40 @@ export function SettingsPage() {
 								In-memory ring buffer capacity for recent audit queries in the console. Default 10,000.
 							</p>
 						</div>
+					</div>
+				</Card>
+
+				{/* Notifications */}
+				<Card className="p-6">
+					<div className="flex items-center justify-between mb-4">
+						<h2 className="text-lg font-medium text-neutral-50">Notifications</h2>
+						<Button
+							size="sm"
+							onClick={() =>
+								saveSection(
+									{ notifications: { webhookURL: notificationWebhookURL || undefined } },
+									setSavingNotifications,
+									'Notification configuration'
+								)
+							}
+							disabled={savingNotifications}
+						>
+							{savingNotifications ? 'Saving...' : 'Save'}
+						</Button>
+					</div>
+					<p className="text-xs text-neutral-500 mb-4">
+						Forward real-time notifications to external systems (Slack, PagerDuty, Microsoft Teams, etc).
+					</p>
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">Webhook URL</label>
+						<Input
+							value={notificationWebhookURL}
+							onChange={(e) => setNotificationWebhookURL(e.target.value)}
+							placeholder="https://hooks.slack.com/services/..."
+						/>
+						<p className="text-xs text-neutral-500 mt-1">
+							POST notifications to this URL. Leave empty to disable.
+						</p>
 					</div>
 				</Card>
 

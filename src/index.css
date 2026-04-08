@@ -288,22 +288,28 @@
 	--bc-green-300: 30 64 175;
 	--bc-green-400: 37 99 235;
 	--bc-green-500: 29 78 216;
+	--bc-green-600: 30 64 175;         /* blue-700 */
 	--bc-green-700: 30 58 138;
+	--bc-green-900: 23 37 84;          /* blue-950 */
 	--bc-emerald-400: 37 99 235;
 	--bc-emerald-500: 29 78 216;
 	--bc-emerald-600: 30 64 175;
 	--bc-emerald-700: 30 58 138;
+	--bc-emerald-900: 23 37 84;
 	/* Blue was remapped to Purple — darken for light bg */
 	--bc-blue-200: 107 33 168;
 	--bc-blue-300: 88 28 135;
 	--bc-blue-400: 126 34 206;
 	--bc-blue-500: 107 33 168;
 	--bc-blue-600: 88 28 135;
+	--bc-blue-800: 59 7 100;           /* fuchsia-950 */
+	--bc-blue-900: 59 7 100;
 	/* Violet was remapped to Pink — darken for light bg */
 	--bc-violet-300: 131 24 67;
 	--bc-violet-400: 157 23 77;
 	--bc-violet-500: 190 24 93;
 	--bc-violet-600: 219 39 119;
+	--bc-violet-900: 80 7 36;          /* pink-950 */
 	/* Teal was remapped to Orange — darken for light bg */
 	--bc-teal-300: 154 52 18;
 	--bc-teal-400: 194 65 12;
@@ -317,22 +323,28 @@
 	--bc-green-300: 49 46 129;
 	--bc-green-400: 67 56 202;
 	--bc-green-500: 55 48 163;
+	--bc-green-600: 49 46 129;         /* indigo-900 */
 	--bc-green-700: 49 46 129;
+	--bc-green-900: 30 27 75;          /* indigo-950 */
 	--bc-emerald-400: 67 56 202;
 	--bc-emerald-500: 55 48 163;
 	--bc-emerald-600: 49 46 129;
 	--bc-emerald-700: 49 46 129;
+	--bc-emerald-900: 30 27 75;
 	/* Red was remapped to Amber — darken */
 	--bc-red-200: 146 64 14;
 	--bc-red-300: 120 53 15;
 	--bc-red-400: 180 83 9;
 	--bc-red-500: 146 64 14;
 	--bc-red-600: 120 53 15;
+	--bc-red-700: 120 53 15;           /* amber-900 */
+	--bc-red-900: 69 26 3;             /* amber-950 */
 	/* Violet was remapped to Cyan/Sky — darken */
 	--bc-violet-300: 12 74 110;
 	--bc-violet-400: 3 105 161;
 	--bc-violet-500: 2 132 199;
 	--bc-violet-600: 2 132 199;
+	--bc-violet-900: 8 47 73;          /* sky-950 */
 	/* Teal was remapped to Yellow/Gold — darken */
 	--bc-teal-300: 133 77 14;
 	--bc-teal-400: 161 98 7;
@@ -346,31 +358,43 @@
 	--bc-green-300: 136 19 55;
 	--bc-green-400: 190 18 60;
 	--bc-green-500: 159 18 57;
+	--bc-green-600: 136 19 55;         /* rose-900 */
 	--bc-green-700: 136 19 55;
+	--bc-green-900: 76 5 25;           /* rose-950 */
 	--bc-emerald-400: 190 18 60;
 	--bc-emerald-500: 159 18 57;
 	--bc-emerald-600: 136 19 55;
 	--bc-emerald-700: 136 19 55;
+	--bc-emerald-900: 76 5 25;
 	/* Yellow was remapped to Pink/Fuchsia — darken */
+	--bc-yellow-50: 253 244 255;       /* keep light tint */
 	--bc-yellow-200: 112 26 117;
 	--bc-yellow-300: 134 25 143;
 	--bc-yellow-400: 162 28 175;
 	--bc-yellow-500: 134 25 143;
+	--bc-yellow-600: 112 26 117;       /* fuchsia-900 */
+	--bc-yellow-800: 74 4 78;          /* fuchsia-950 */
+	--bc-yellow-900: 74 4 78;
 	--bc-amber-200: 112 26 117;
 	--bc-amber-300: 134 25 143;
 	--bc-amber-400: 162 28 175;
 	--bc-amber-500: 134 25 143;
+	--bc-amber-700: 74 4 78;
+	--bc-amber-900: 74 4 78;
 	/* Blue was remapped to Amber — darken */
 	--bc-blue-200: 146 64 14;
 	--bc-blue-300: 120 53 15;
 	--bc-blue-400: 180 83 9;
 	--bc-blue-500: 146 64 14;
 	--bc-blue-600: 120 53 15;
+	--bc-blue-800: 69 26 3;            /* amber-950 */
+	--bc-blue-900: 69 26 3;
 	/* Violet was remapped to Red/Magenta — darken */
 	--bc-violet-300: 127 29 29;
 	--bc-violet-400: 153 27 27;
 	--bc-violet-500: 185 28 28;
 	--bc-violet-600: 185 28 28;
+	--bc-violet-900: 69 10 10;         /* red-950 */
 	/* Teal was remapped to Orange — darken */
 	--bc-teal-300: 154 52 18;
 	--bc-teal-400: 194 65 12;

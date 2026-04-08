@@ -45,6 +45,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 		localStorage.setItem(COLOR_MODE_KEY, mode)
 	}
 
+	// No cleanup needed — classList add/remove are idempotent.
 	useEffect(() => {
 		const root = document.documentElement
 

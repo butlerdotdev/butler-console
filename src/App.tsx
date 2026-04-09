@@ -34,6 +34,7 @@ import { TeamMembersPage } from '@/pages/TeamMembersPage'
 import { TeamSettingsPage } from '@/pages/TeamSettingsPage'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { SetPasswordPage } from '@/pages/SetPasswordsPage'
+import { DeviceAuthPage } from '@/pages/DeviceAuthPage'
 import { ProfileSettingsPage } from '@/pages/ProfileSettingsPage'
 import { PreferencesPage } from '@/pages/PreferencesPage'
 import { IdentityProvidersPage } from '@/pages/IdentityProvidersPage'
@@ -116,6 +117,7 @@ export default function App() {
 				<Route path="/login" element={<LoginPage />} />
 				<Route path="/invite/:token" element={<LoginPage />} />
 				<Route path="/set-password" element={<SetPasswordPage />} />
+				<Route path="/auth/device" element={<DeviceAuthPage />} />
 
 				{/* Protected routes */}
 				<Route

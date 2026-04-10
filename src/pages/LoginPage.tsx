@@ -73,7 +73,10 @@ export function LoginPage() {
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
 
-	const from = (location.state as { from?: Location })?.from?.pathname || '/dashboard'
+	// Check for redirect query param (used by DeviceAuthPage), then location state, then default
+	const params = new URLSearchParams(location.search)
+	const redirectParam = params.get('redirect')
+	const from = redirectParam || (location.state as { from?: Location })?.from?.pathname || '/dashboard'
 
 	// Check for OAuth error in URL
 	useEffect(() => {

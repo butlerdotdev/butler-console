@@ -43,15 +43,9 @@ export function DeviceAuthPage() {
 			const data = await res.json()
 			setDeviceInfo({ deviceCode: data.device_code, expiresIn: data.expires_in })
 
-			if (!isAuthenticated) {
-				// Store device code, redirect to login, come back after
-				sessionStorage.setItem('butler_device_code', data.device_code)
-				sessionStorage.setItem('butler_user_code', userCode.toUpperCase().trim())
-				window.location.href = `/login?redirect=${encodeURIComponent('/auth/device')}`
-				return
-			}
-
-			// Already authenticated, approve directly
+			// Try to approve directly. The approve endpoint requires a session
+			// cookie. If the user is logged in to the console, this succeeds.
+			// If not, we get a 401 and ask them to log in first.
 			await handleApprove(data.device_code)
 		} catch {
 			setError('Failed to verify code. Please try again.')

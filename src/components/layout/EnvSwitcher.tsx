@@ -4,6 +4,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEnvContext } from '@/hooks/useEnvContext'
 import { useTeamContext } from '@/hooks/useTeamContext'
+import { envAccent } from '@/lib/envColor'
+import { cn } from '@/lib/utils'
 
 // EnvSwitcher renders alongside TeamSwitcher. It only appears when the
 // user is in team mode AND the current team defines at least one
@@ -31,6 +33,7 @@ export function EnvSwitcher() {
 	}
 
 	const currentLabel = currentEnv ?? 'All environments'
+	const triggerAccent = currentEnv ? envAccent(currentEnv) : null
 
 	const handleSelect = (env: string | null) => {
 		setCurrentEnv(env)
@@ -43,14 +46,18 @@ export function EnvSwitcher() {
 				onClick={() => setIsOpen(!isOpen)}
 				className="flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-colors duration-150 bg-neutral-800 text-neutral-200 hover:bg-neutral-700 border border-neutral-700"
 			>
-				<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path
-						strokeLinecap="round"
-						strokeLinejoin="round"
-						strokeWidth={2}
-						d="M9 17v-2a4 4 0 014-4h4m0 0l-3-3m3 3l-3 3M5 21V5a2 2 0 012-2h10a2 2 0 012 2v10"
-					/>
-				</svg>
+				{triggerAccent ? (
+					<span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', triggerAccent.dot)} />
+				) : (
+					<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							strokeWidth={2}
+							d="M9 17v-2a4 4 0 014-4h4m0 0l-3-3m3 3l-3 3M5 21V5a2 2 0 012-2h10a2 2 0 012 2v10"
+						/>
+					</svg>
+				)}
 				<span className="max-w-[160px] truncate">{currentLabel}</span>
 				<svg
 					className={`w-4 h-4 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
@@ -114,34 +121,36 @@ export function EnvSwitcher() {
 					<div className="max-h-64 overflow-y-auto p-2 space-y-1">
 						{availableEnvs.map((env) => {
 							const selected = env.name === currentEnv
+							const accent = envAccent(env.name)
 							return (
 								<button
 									key={env.name}
 									onClick={() => handleSelect(env.name)}
-									className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150 ${
-										selected
-											? 'bg-green-500/20 text-green-300'
-											: 'text-neutral-300 hover:bg-neutral-800'
-									}`}
+									className={cn(
+										'w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150',
+										selected ? cn(accent.pillBg, accent.pillText) : 'text-neutral-300 hover:bg-neutral-800'
+									)}
 								>
 									<div
-										className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold ${
-											selected
-												? 'bg-green-500/30 text-green-300'
-												: 'bg-neutral-700 text-neutral-400'
-										}`}
+										className={cn(
+											'w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold',
+											selected ? cn(accent.iconBg, accent.iconText) : 'bg-neutral-700 text-neutral-400'
+										)}
 									>
 										{env.name.charAt(0).toUpperCase()}
 									</div>
 									<div className="flex-1 text-left min-w-0">
-										<div className="font-medium truncate">{env.name}</div>
+										<div className="flex items-center gap-2">
+											<span className={cn('w-2 h-2 rounded-full flex-shrink-0', accent.dot)} />
+											<span className="font-medium truncate">{env.name}</span>
+										</div>
 										<div className="text-xs text-neutral-500 truncate">
 											{formatLimits(env.limits)}
 										</div>
 									</div>
 									{selected && (
 										<svg
-											className="w-4 h-4 text-green-400"
+											className={cn('w-4 h-4', accent.pillText)}
 											fill="none"
 											viewBox="0 0 24 24"
 											stroke="currentColor"

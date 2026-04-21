@@ -9,6 +9,8 @@ import { useDocumentTitle } from '@/hooks'
 import { clustersApi, type Cluster } from '@/api'
 import { ENVIRONMENT_LABEL, type TeamEnvironment } from '@/types/environments'
 import { Card, Spinner, StatusBadge, FadeIn, Button } from '@/components/ui'
+import { envAccent, NEUTRAL_ACCENT, type EnvAccent } from '@/lib/envColor'
+import { cn } from '@/lib/utils'
 
 interface ManagementClusterInfo {
 	kubernetesVersion: string
@@ -23,6 +25,32 @@ const PHASE_ORDER = ['Pending', 'Provisioning', 'Installing', 'Ready', 'Failed',
 
 const UNLABELED_SECTION_KEY = '__unlabeled__'
 
+// localStorage key scoped per team so collapse preferences persist
+// across navigation and reload but do not leak between teams.
+function collapseStorageKey(team: string | null): string {
+	return `butler-console.clusters.collapse.${team ?? 'global'}`
+}
+
+function loadCollapsedSections(team: string | null): Set<string> {
+	try {
+		const raw = localStorage.getItem(collapseStorageKey(team))
+		if (!raw) return new Set()
+		const arr = JSON.parse(raw)
+		if (Array.isArray(arr)) return new Set(arr.filter((v): v is string => typeof v === 'string'))
+	} catch {
+		// Ignore parse errors; fall back to an empty set (all expanded).
+	}
+	return new Set()
+}
+
+function saveCollapsedSections(team: string | null, collapsed: Set<string>) {
+	try {
+		localStorage.setItem(collapseStorageKey(team), JSON.stringify([...collapsed]))
+	} catch {
+		// Quota or privacy mode; the feature degrades to session-only.
+	}
+}
+
 export function ClustersPage() {
 	const { currentTeam, currentTeamDisplayName, buildPath, isAdminMode } = useTeamContext()
 	const { currentEnv, availableEnvs } = useEnvContext()
@@ -34,6 +62,26 @@ export function ClustersPage() {
 	const [error, setError] = useState<string | null>(null)
 	const [search, setSearch] = useState('')
 	const [phaseFilter, setPhaseFilter] = useState<Set<string>>(new Set())
+	const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsedSections(currentTeam))
+
+	// Re-hydrate collapse state when the active team changes so each
+	// team carries its own layout preference.
+	useEffect(() => {
+		setCollapsed(loadCollapsedSections(currentTeam))
+	}, [currentTeam])
+
+	const toggleCollapsed = useCallback(
+		(key: string) => {
+			setCollapsed((prev) => {
+				const next = new Set(prev)
+				if (next.has(key)) next.delete(key)
+				else next.add(key)
+				saveCollapsedSections(currentTeam, next)
+				return next
+			})
+		},
+		[currentTeam]
+	)
 
 	const loadClusters = useCallback(async () => {
 		try {
@@ -81,9 +129,9 @@ export function ClustersPage() {
 		return searchFilteredClusters.filter((c) => phaseFilter.has(c.status?.phase || 'Unknown'))
 	}, [searchFilteredClusters, phaseFilter])
 
-	// Available phase options (only phases actually present in the
-	// result set before the phase filter applies, so the control does
-	// not advertise options that would match nothing).
+	// Only advertise phase filter options that actually exist in the
+	// pre-phase result set, so the control never shows a chip that
+	// would match nothing.
 	const availablePhases = useMemo(() => {
 		const present = new Set<string>()
 		for (const c of searchFilteredClusters) {
@@ -109,27 +157,48 @@ export function ClustersPage() {
 			if (envLabel && byEnv.has(envLabel)) {
 				byEnv.get(envLabel)!.push(c)
 			} else if (envLabel) {
-				// Cluster carries an env label that is not in the team spec
-				// (stale after env deletion, or race during migration).
-				// Thread it into its own section so it does not vanish.
 				if (!byEnv.has(envLabel)) byEnv.set(envLabel, [])
 				byEnv.get(envLabel)!.push(c)
 			} else {
 				unlabeled.push(c)
 			}
 		}
-		const sections: { key: string; env?: TeamEnvironment; label: string; clusters: Cluster[] }[] = []
+		const sections: {
+			key: string
+			env?: TeamEnvironment
+			label: string
+			clusters: Cluster[]
+			accent: EnvAccent
+			kind: 'env' | 'orphan' | 'unlabeled'
+		}[] = []
 		for (const env of envSorted) {
-			sections.push({ key: env.name, env, label: env.name, clusters: byEnv.get(env.name) || [] })
+			sections.push({
+				key: env.name,
+				env,
+				label: env.name,
+				clusters: byEnv.get(env.name) || [],
+				accent: envAccent(env.name),
+				kind: 'env',
+			})
 		}
-		// Any orphan labels (not in the team env spec) render below the
-		// defined envs with a "stale" tag via the env prop left undefined.
 		for (const [name, list] of byEnv) {
 			if (envSorted.some((e) => e.name === name)) continue
-			sections.push({ key: `orphan:${name}`, label: name, clusters: list })
+			sections.push({
+				key: `orphan:${name}`,
+				label: name,
+				clusters: list,
+				accent: envAccent(name),
+				kind: 'orphan',
+			})
 		}
 		if (unlabeled.length > 0) {
-			sections.push({ key: UNLABELED_SECTION_KEY, label: 'No environment', clusters: unlabeled })
+			sections.push({
+				key: UNLABELED_SECTION_KEY,
+				label: 'No environment',
+				clusters: unlabeled,
+				accent: NEUTRAL_ACCENT,
+				kind: 'unlabeled',
+			})
 		}
 		return sections
 	}, [shouldGroup, availableEnvs, visibleClusters])
@@ -140,9 +209,8 @@ export function ClustersPage() {
 		? `Showing ${visibleClusters.length} of ${clusters.length} clusters`
 		: null
 
-	// Conditional ENV column for the flat layouts (ungrouped-team OR
-	// env-scoped). The grouped layout renders env via the section header
-	// and hides the per-card ENV column for readability.
+	// Conditional ENV column for flat layouts only. The grouped layout
+	// already surfaces env identity via section header + card accent.
 	const showEnvColumnInFlat = useMemo(() => {
 		if (shouldGroup) return false
 		if (currentEnv) return true
@@ -171,6 +239,8 @@ export function ClustersPage() {
 		)
 	}
 
+	const flatActiveEnvAccent = currentEnv ? envAccent(currentEnv) : null
+
 	return (
 		<FadeIn>
 			<div className="space-y-6">
@@ -183,7 +253,7 @@ export function ClustersPage() {
 								: 'Manage your Kubernetes clusters'}
 						</p>
 					</div>
-					<Link to={buildPath('/clusters/new')}>
+					<Link to={buildPath(currentEnv ? `/clusters/new?env=${encodeURIComponent(currentEnv)}` : '/clusters/new')}>
 						<Button>
 							<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -204,30 +274,31 @@ export function ClustersPage() {
 					/>
 				)}
 
-				<div className="grid gap-4">
+				<div className="space-y-6">
 					{showManagement && <ManagementClusterCard info={management} />}
 
 					{groupSections ? (
-						groupSections.length === 0 ? null : (
-							groupSections.map((section) => (
-								<GroupSection
-									key={section.key}
-									label={section.label}
-									env={section.env}
-									clusters={section.clusters}
-									buildPath={buildPath}
-								/>
-							))
-						)
-					) : (
-						visibleClusters.map((cluster) => (
-							<ClusterCard
-								key={cluster.metadata.uid || `${cluster.metadata.namespace}/${cluster.metadata.name}`}
-								cluster={cluster}
+						groupSections.map((section) => (
+							<GroupSection
+								key={section.key}
+								section={section}
 								buildPath={buildPath}
-								showEnv={showEnvColumnInFlat}
+								collapsed={collapsed.has(section.key)}
+								onToggle={() => toggleCollapsed(section.key)}
 							/>
 						))
+					) : (
+						<div className="grid gap-4">
+							{visibleClusters.map((cluster) => (
+								<ClusterCard
+									key={cluster.metadata.uid || `${cluster.metadata.namespace}/${cluster.metadata.name}`}
+									cluster={cluster}
+									buildPath={buildPath}
+									showEnv={showEnvColumnInFlat}
+									accent={flatActiveEnvAccent ?? undefined}
+								/>
+							))}
+						</div>
 					)}
 
 					{!showManagement && clusters.length === 0 && (
@@ -345,67 +416,141 @@ function ClusterListToolbar({
 	)
 }
 
+// Inline quota bar sized for a section header. Uses the same color
+// bands as ResourceUsageBar (green / amber / red at 80 / 90 %).
+function QuotaBar({ used, limit }: { used: number; limit: number }) {
+	const pct = limit > 0 ? Math.round((used / limit) * 100) : 0
+	const barColor =
+		pct >= 90 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
+	const textColor =
+		pct >= 90 ? 'text-red-300' : pct >= 80 ? 'text-amber-300' : 'text-neutral-400'
+	return (
+		<div className="flex items-center gap-2 min-w-[140px]">
+			<div className="flex-1 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+				<div
+					className={cn('h-full rounded-full transition-all', barColor)}
+					style={{ width: `${Math.min(pct, 100)}%` }}
+				/>
+			</div>
+			<span className={cn('text-xs font-mono tabular-nums', textColor)}>
+				{used}/{limit}
+			</span>
+		</div>
+	)
+}
+
 function GroupSection({
-	label,
-	env,
-	clusters,
+	section,
 	buildPath,
+	collapsed,
+	onToggle,
 }: {
-	label: string
-	env?: TeamEnvironment
-	clusters: Cluster[]
+	section: {
+		key: string
+		env?: TeamEnvironment
+		label: string
+		clusters: Cluster[]
+		accent: EnvAccent
+		kind: 'env' | 'orphan' | 'unlabeled'
+	}
 	buildPath: (path: string) => string
+	collapsed: boolean
+	onToggle: () => void
 }) {
+	const { env, label, clusters, accent, kind } = section
 	const count = clusters.length
 	const maxClusters = env?.limits?.maxClusters
 	const maxPerMember = env?.limits?.maxClustersPerMember
-	const isUnlabeled = !env && label === 'No environment'
-	const isOrphan = !env && !isUnlabeled
 	return (
-		<div className="space-y-3">
-			<div className="flex items-center justify-between border-b border-neutral-800 pb-2">
-				<div className="flex items-center gap-3">
-					<h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-300">
-						{label}
-					</h2>
-					<span className="text-xs text-neutral-500">
-						{count} {count === 1 ? 'cluster' : 'clusters'}
-						{maxClusters ? ` of ${maxClusters}` : ''}
+		<section className="space-y-3">
+			<button
+				type="button"
+				onClick={onToggle}
+				aria-expanded={!collapsed}
+				className={cn(
+					'w-full sticky top-0 z-10 flex items-center gap-3 px-3 py-2 rounded-lg border border-neutral-800 backdrop-blur',
+					'bg-neutral-900/90 hover:bg-neutral-900',
+					'transition-colors text-left',
+					accent.headerTint
+				)}
+			>
+				<svg
+					className={cn(
+						'w-4 h-4 text-neutral-500 transition-transform',
+						collapsed ? '-rotate-90' : ''
+					)}
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+				>
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+				</svg>
+				<span className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', accent.dot)} />
+				<span className="text-sm font-semibold text-neutral-100">{label}</span>
+				<span className="text-xs text-neutral-500">
+					{count} {count === 1 ? 'cluster' : 'clusters'}
+				</span>
+				{maxPerMember ? (
+					<span className={cn('px-2 py-0.5 rounded text-xs', accent.pillBg, accent.pillText)}>
+						{maxPerMember} per member
 					</span>
-					{maxPerMember ? (
-						<span className="px-2 py-0.5 rounded text-xs bg-neutral-800 text-neutral-300">
-							{maxPerMember} per member
-						</span>
-					) : null}
-					{isOrphan ? (
-						<span className="px-2 py-0.5 rounded text-xs bg-amber-500/10 text-amber-300 border border-amber-500/20">
-							stale label
-						</span>
-					) : null}
-					{isUnlabeled ? (
-						<span className="px-2 py-0.5 rounded text-xs bg-neutral-800 text-neutral-400">
-							pre-migration
-						</span>
-					) : null}
-				</div>
-			</div>
-			{count === 0 ? (
-				<p className="text-sm text-neutral-500 italic pl-1">
-					No clusters in this environment.
-				</p>
-			) : (
-				<div className="grid gap-3">
-					{clusters.map((cluster) => (
-						<ClusterCard
-							key={cluster.metadata.uid || `${cluster.metadata.namespace}/${cluster.metadata.name}`}
-							cluster={cluster}
-							buildPath={buildPath}
-							showEnv={false}
-						/>
-					))}
-				</div>
+				) : null}
+				{kind === 'orphan' ? (
+					<span className="px-2 py-0.5 rounded text-xs bg-amber-500/10 text-amber-300 border border-amber-500/20">
+						stale label
+					</span>
+				) : null}
+				{kind === 'unlabeled' ? (
+					<span className="px-2 py-0.5 rounded text-xs bg-neutral-800 text-neutral-400">
+						pre-migration
+					</span>
+				) : null}
+				<div className="flex-1" />
+				{maxClusters ? <QuotaBar used={count} limit={maxClusters} /> : null}
+			</button>
+
+			{!collapsed && (
+				count === 0 ? (
+					kind === 'env' && env ? (
+						<Card className="p-4 text-center border-dashed border-neutral-800 bg-neutral-900/30">
+							<p className="text-sm text-neutral-400 mb-2">
+								No clusters in <span className="text-neutral-200 font-medium">{env.name}</span> yet.
+							</p>
+							<Link
+								to={buildPath(`/clusters/new?env=${encodeURIComponent(env.name)}`)}
+								className={cn(
+									'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium',
+									accent.pillBg,
+									accent.pillText,
+									'hover:opacity-90 transition-opacity'
+								)}
+							>
+								<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+								</svg>
+								Create cluster in {env.name}
+							</Link>
+						</Card>
+					) : (
+						<p className="text-sm text-neutral-500 italic pl-1">
+							No clusters in this section.
+						</p>
+					)
+				) : (
+					<div className="grid gap-3">
+						{clusters.map((cluster) => (
+							<ClusterCard
+								key={cluster.metadata.uid || `${cluster.metadata.namespace}/${cluster.metadata.name}`}
+								cluster={cluster}
+								buildPath={buildPath}
+								showEnv={false}
+								accent={accent}
+							/>
+						))}
+					</div>
+				)
 			)}
-		</div>
+		</section>
 	)
 }
 
@@ -456,10 +601,12 @@ function ClusterCard({
 	cluster,
 	buildPath,
 	showEnv,
+	accent,
 }: {
 	cluster: Cluster
 	buildPath: (path: string) => string
 	showEnv: boolean
+	accent?: EnvAccent
 }) {
 	const name = cluster.metadata.name
 	const namespace = cluster.metadata.namespace
@@ -486,7 +633,12 @@ function ClusterCard({
 
 	return (
 		<Link to={buildPath(`/clusters/${namespace}/${name}`)}>
-			<Card className="p-5 hover:bg-neutral-800/50 transition-colors cursor-pointer">
+			<Card
+				className={cn(
+					'p-5 hover:bg-neutral-800/50 transition-colors cursor-pointer',
+					accent ? cn('border-l-4', accent.border) : ''
+				)}
+			>
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-4">
 						<div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">

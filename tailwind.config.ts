@@ -98,6 +98,19 @@ export default {
 					400: v('orange-400'),
 					500: v('orange-500'),
 				},
+				// Environment accent palette sourced from the Okabe-Ito
+				// colorblind-safe palette (Okabe & Ito, 2008). These
+				// accents are arbitrary "tell N envs apart" markers,
+				// not semantic roles, so they sit outside the --bc-*
+				// theme-variable system and stay fixed across default,
+				// light, and all colorblind modes. Adding per-mode
+				// remaps would defeat Okabe-Ito's distinguishability
+				// property by design.
+				'env-1': { 300: '#8FD0F0', 500: '#56B4E9' }, // Sky Blue
+				'env-2': { 300: '#4FC3A0', 500: '#009E73' }, // Bluish Green
+				'env-3': { 300: '#F0BD4E', 500: '#E69F00' }, // Orange
+				'env-4': { 300: '#6CA8D4', 500: '#0072B2' }, // Blue
+				'env-5': { 300: '#DFA8C5', 500: '#CC79A7' }, // Reddish Purple
 			},
 			gridTemplateColumns: {
 				'16': 'repeat(16, minmax(0, 1fr))',

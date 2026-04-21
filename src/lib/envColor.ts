@@ -4,14 +4,20 @@
 // Deterministic per-env accent palette. The same env name always maps
 // to the same color across every surface that uses it (section
 // headers, cluster-card left borders, EnvSwitcher dropdown dots) so
-// operators pick up the association without thinking. The palette is
-// intentionally narrow — five colors cycle via a simple character-sum
-// hash — because more than ~5 simultaneous color accents on one page
-// becomes noise rather than signal.
+// operators pick up the association without thinking.
 //
-// Tailwind classes are emitted as literal strings (not built from
-// template literals) so Tailwind's content scan picks them up at
-// build time.
+// Palette is the Okabe-Ito colorblind-safe set (Okabe & Ito, 2008).
+// Five hues chosen to stay mutually distinguishable under normal
+// vision AND under all three common colorblindness types
+// (deuteranopia / protanopia / tritanopia). Because the set is
+// already colorblind-safe by construction, these accents sit outside
+// the --bc-* theme-variable system and are NOT remapped per
+// colorblind mode — adding mode-specific remaps would break the
+// distinguishability property the palette was engineered for.
+//
+// The palette is deliberately narrow — five colors cycle via a
+// simple character-sum hash — because more than ~5 simultaneous
+// color accents on one page becomes noise rather than signal.
 
 export interface EnvAccent {
 	// Small solid-fill dot (section header pip, dropdown indicator).
@@ -29,55 +35,63 @@ export interface EnvAccent {
 }
 
 const PALETTE: EnvAccent[] = [
+	// Sky Blue
 	{
-		dot: 'bg-blue-500',
-		border: 'border-l-blue-500',
-		pillBg: 'bg-blue-500/20',
-		pillText: 'text-blue-300',
-		iconBg: 'bg-blue-500/30',
-		iconText: 'text-blue-300',
-		headerTint: 'bg-blue-500/5',
+		dot: 'bg-env-1-500',
+		border: 'border-l-env-1-500',
+		pillBg: 'bg-env-1-500/20',
+		pillText: 'text-env-1-300',
+		iconBg: 'bg-env-1-500/30',
+		iconText: 'text-env-1-300',
+		headerTint: 'bg-env-1-500/5',
 	},
+	// Bluish Green
 	{
-		dot: 'bg-emerald-500',
-		border: 'border-l-emerald-500',
-		pillBg: 'bg-emerald-500/20',
-		pillText: 'text-emerald-300',
-		iconBg: 'bg-emerald-500/30',
-		iconText: 'text-emerald-300',
-		headerTint: 'bg-emerald-500/5',
+		dot: 'bg-env-2-500',
+		border: 'border-l-env-2-500',
+		pillBg: 'bg-env-2-500/20',
+		pillText: 'text-env-2-300',
+		iconBg: 'bg-env-2-500/30',
+		iconText: 'text-env-2-300',
+		headerTint: 'bg-env-2-500/5',
 	},
+	// Orange
 	{
-		dot: 'bg-violet-500',
-		border: 'border-l-violet-500',
-		pillBg: 'bg-violet-500/20',
-		pillText: 'text-violet-300',
-		iconBg: 'bg-violet-500/30',
-		iconText: 'text-violet-300',
-		headerTint: 'bg-violet-500/5',
+		dot: 'bg-env-3-500',
+		border: 'border-l-env-3-500',
+		pillBg: 'bg-env-3-500/20',
+		pillText: 'text-env-3-300',
+		iconBg: 'bg-env-3-500/30',
+		iconText: 'text-env-3-300',
+		headerTint: 'bg-env-3-500/5',
 	},
+	// Blue
 	{
-		dot: 'bg-amber-500',
-		border: 'border-l-amber-500',
-		pillBg: 'bg-amber-500/20',
-		pillText: 'text-amber-300',
-		iconBg: 'bg-amber-500/30',
-		iconText: 'text-amber-300',
-		headerTint: 'bg-amber-500/5',
+		dot: 'bg-env-4-500',
+		border: 'border-l-env-4-500',
+		pillBg: 'bg-env-4-500/20',
+		pillText: 'text-env-4-300',
+		iconBg: 'bg-env-4-500/30',
+		iconText: 'text-env-4-300',
+		headerTint: 'bg-env-4-500/5',
 	},
+	// Reddish Purple
 	{
-		dot: 'bg-rose-500',
-		border: 'border-l-rose-500',
-		pillBg: 'bg-rose-500/20',
-		pillText: 'text-rose-300',
-		iconBg: 'bg-rose-500/30',
-		iconText: 'text-rose-300',
-		headerTint: 'bg-rose-500/5',
+		dot: 'bg-env-5-500',
+		border: 'border-l-env-5-500',
+		pillBg: 'bg-env-5-500/20',
+		pillText: 'text-env-5-300',
+		iconBg: 'bg-env-5-500/30',
+		iconText: 'text-env-5-300',
+		headerTint: 'bg-env-5-500/5',
 	},
 ]
 
 // Neutral accent for "No environment" / orphan sections so the group
 // is visually distinct from real envs without pulling a palette slot.
+// Uses the theme-variable neutral-* scale so it participates in
+// light / dark mode but does not need colorblind remaps (gray is
+// safe in all modes).
 export const NEUTRAL_ACCENT: EnvAccent = {
 	dot: 'bg-neutral-500',
 	border: 'border-l-neutral-700',

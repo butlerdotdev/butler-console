@@ -175,14 +175,19 @@ export function Sidebar() {
 	if (mode === 'admin') {
 		navSections = adminSections
 	} else if (mode === 'team' && currentTeam) {
-		navSections = [{
-			items: [
-				{ to: buildPath(''), label: 'Dashboard', icon: DashboardIcon, end: true },
-				{ to: buildPath('/clusters'), label: 'Clusters', icon: ClustersIcon },
-				{ to: buildPath('/providers'), label: 'Providers', icon: ProvidersIcon },
-				{ to: buildPath('/members'), label: 'Members', icon: UsersIcon },
-			],
-		}]
+		const teamItems: NavItem[] = [
+			{ to: buildPath(''), label: 'Dashboard', icon: DashboardIcon, end: true },
+			{ to: buildPath('/clusters'), label: 'Clusters', icon: ClustersIcon },
+			{ to: buildPath('/providers'), label: 'Providers', icon: ProvidersIcon },
+			{ to: buildPath('/members'), label: 'Members', icon: UsersIcon },
+		]
+		// Environments is a team-admin surface. Hidden from operators
+		// and viewers; page itself also renders an access-denied card
+		// if someone navigates directly.
+		if (isTeamAdmin || canAccessAdmin) {
+			teamItems.push({ to: buildPath('/environments'), label: 'Environments', icon: EnvironmentsIcon })
+		}
+		navSections = [{ items: teamItems }]
 		showTeamLabel = true
 		teamLabel = currentTeamDisplayName || currentTeam
 	} else if (isLegacyRoute) {
@@ -510,6 +515,14 @@ function AccessControlIcon({ className }: { className?: string }) {
 	return (
 		<svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
 			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+		</svg>
+	)
+}
+
+function EnvironmentsIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2a4 4 0 014-4h4m0 0l-3-3m3 3l-3 3M5 21V5a2 2 0 012-2h10a2 2 0 012 2v10" />
 		</svg>
 	)
 }

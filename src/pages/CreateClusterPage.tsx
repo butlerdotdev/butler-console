@@ -4,12 +4,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { clustersApi, providersApi, type Provider, type ImageInfo, type NetworkInfo, isCloudProvider, getProviderRegion, getProviderNetwork } from '@/api'
+import { clustersApi, providersApi, apiClient, type Provider, type ImageInfo, type NetworkInfo, isCloudProvider, getProviderRegion, getProviderNetwork } from '@/api'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
 import { parseQuantity } from '@/components/ui/ResourceUsageBar'
 import { useToast } from '@/hooks/useToast'
 import { useTeamContext } from '@/hooks/useTeamContext'
+import { useEnvContext } from '@/hooks/useEnvContext'
 import { SUPPORTED_K8S_VERSIONS } from '@/lib/versions'
+import { extractWebhookDenial } from '@/lib/webhookError'
 
 interface TeamResourceLimits {
 	maxClusters?: number
@@ -41,6 +43,7 @@ export function CreateClusterPage() {
 	const returnTo = searchParams.get('returnTo')
 	const { success, error: showError } = useToast()
 	const { currentTeam, currentTeamNamespace, currentTeamDisplayName, buildPath } = useTeamContext()
+	const { currentEnv, availableEnvs } = useEnvContext()
 
 	// Providers
 	const [providers, setProviders] = useState<Provider[]>([])
@@ -105,8 +108,27 @@ export function CreateClusterPage() {
 	})
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [envFieldError, setEnvFieldError] = useState<string | null>(null)
 	const [useManualIPs, setUseManualIPs] = useState(false)
 	const [showAdvancedCP, setShowAdvancedCP] = useState(false)
+
+	// Environment selector state. Required when the team defines any env;
+	// hidden otherwise. Default is the current env from the switcher if
+	// set, else the first alphabetical env on the team. availableEnvs is
+	// already sorted alphabetically by EnvProvider.
+	const [selectedEnv, setSelectedEnv] = useState<string>('')
+	useEffect(() => {
+		if (availableEnvs.length === 0) {
+			setSelectedEnv('')
+			return
+		}
+		if (currentEnv && availableEnvs.some((e) => e.name === currentEnv)) {
+			setSelectedEnv(currentEnv)
+			return
+		}
+		setSelectedEnv((prev) => (prev && availableEnvs.some((e) => e.name === prev) ? prev : availableEnvs[0].name))
+	}, [availableEnvs, currentEnv])
+	const envRequired = availableEnvs.length > 0
 
 	// Resource quota state
 	const [resourceUsage, setResourceUsage] = useState<TeamResourceUsage | null>(null)
@@ -393,6 +415,7 @@ export function CreateClusterPage() {
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
 		setError(null)
+		setEnvFieldError(null)
 
 		if (!form.name) {
 			setError('Cluster name is required')
@@ -400,6 +423,10 @@ export function CreateClusterPage() {
 		}
 		if (!form.providerConfigRef) {
 			setError('Provider is required')
+			return
+		}
+		if (envRequired && !selectedEnv) {
+			setEnvFieldError('Environment is required')
 			return
 		}
 		// Validate LB IPs based on networking mode
@@ -537,7 +564,19 @@ export function CreateClusterPage() {
 				payload.schematicID = form.schematicID
 			}
 
-			await clustersApi.create(payload as unknown as Parameters<typeof clustersApi.create>[0])
+			// Ensure the X-Butler-Environment header carries the form's env
+			// choice on this request even if the URL does not. Restore the
+			// context-driven env after the call so the switcher stays the
+			// source of truth for subsequent reads.
+			const priorEnv = apiClient.getEnvironment()
+			if (envRequired) {
+				apiClient.setEnvironment(selectedEnv)
+			}
+			try {
+				await clustersApi.create(payload as unknown as Parameters<typeof clustersApi.create>[0])
+			} finally {
+				apiClient.setEnvironment(priorEnv)
+			}
 			success('Cluster Created', `${form.name} is being provisioned`)
 			if (returnTo) {
 				navigate(`${returnTo}?newCluster=${encodeURIComponent(`${form.namespace}/${form.name}`)}`)
@@ -545,9 +584,22 @@ export function CreateClusterPage() {
 				navigate(buildPath(`/clusters/${form.namespace}/${form.name}`))
 			}
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to create cluster'
-			setError(message)
-			showError('Creation Failed', message)
+			const denial = extractWebhookDenial(err)
+			if (denial) {
+				// Per step-7 spec: if the webhook denial references the env
+				// label/env surface, render inline on the env field;
+				// otherwise render inline near the submit button.
+				const f = denial.field.toLowerCase()
+				if (f.includes('environment')) {
+					setEnvFieldError(denial.message)
+				} else {
+					setError(denial.message)
+				}
+			} else {
+				const message = err instanceof Error ? err.message : 'Failed to create cluster'
+				setError(message)
+				showError('Creation Failed', message)
+			}
 		} finally {
 			setLoading(false)
 		}
@@ -646,6 +698,47 @@ export function CreateClusterPage() {
 								</div>
 							</div>
 						</div>
+
+						{/* Environment (only when the team defines envs) */}
+						{envRequired && (
+							<div>
+								<h3 className="text-lg font-medium text-neutral-50 mb-4">Environment</h3>
+								<div>
+									<label className="block text-sm font-medium text-neutral-400 mb-1">
+										Target environment *
+									</label>
+									<select
+										value={selectedEnv}
+										onChange={(e) => {
+											setSelectedEnv(e.target.value)
+											setEnvFieldError(null)
+										}}
+										className={`w-full px-3 py-2 bg-neutral-800 border rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 ${
+											envFieldError ? 'border-red-500' : 'border-neutral-700'
+										}`}
+									>
+										<option value="">Select an environment</option>
+										{availableEnvs.map((env) => (
+											<option key={env.name} value={env.name}>
+												{env.name}
+												{env.limits?.maxClusters != null ? ` (max ${env.limits.maxClusters})` : ''}
+												{env.limits?.maxClustersPerMember != null
+													? `, ${env.limits.maxClustersPerMember}/member`
+													: ''}
+											</option>
+										))}
+									</select>
+									<p className="text-xs text-neutral-500 mt-1">
+										Env-level quota applies on top of the team total. See ADR-009.
+									</p>
+									{envFieldError && (
+										<div className="mt-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+											<p className="text-red-400 text-sm whitespace-pre-wrap">{envFieldError}</p>
+										</div>
+									)}
+								</div>
+							</div>
+						)}
 
 						{/* Provider-specific Infrastructure Settings */}
 						{selectedProvider && (

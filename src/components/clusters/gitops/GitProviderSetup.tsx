@@ -161,7 +161,7 @@ export function GitProviderSetup({ onConfigured }: GitProviderSetupProps) {
 									<>
 										Requires <code className="text-neutral-400">api</code> scope.{' '}
 										<a
-											href="https://gitlab.com/-/profile/personal_access_tokens"
+											href={`${url.trim() || 'https://gitlab.com'}/-/profile/personal_access_tokens`}
 											target="_blank"
 											rel="noopener noreferrer"
 											className="text-orange-400 hover:underline"
@@ -173,21 +173,19 @@ export function GitProviderSetup({ onConfigured }: GitProviderSetupProps) {
 							</p>
 						</div>
 
-						{/* Custom URL for Enterprise */}
-						{providerType === 'github' && (
-							<div>
-								<label className="block text-sm font-medium text-neutral-300 mb-1">
-									GitHub URL <span className="text-neutral-500">(optional)</span>
-								</label>
-								<input
-									type="url"
-									value={url}
-									onChange={(e) => setUrl(e.target.value)}
-									placeholder="https://github.example.com (for GitHub Enterprise)"
-									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-								/>
-							</div>
-						)}
+						{/* Custom URL */}
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">
+								{providerType === 'github' ? 'GitHub' : 'GitLab'} URL <span className="text-neutral-500">(optional)</span>
+							</label>
+							<input
+								type="url"
+								value={url}
+								onChange={(e) => setUrl(e.target.value)}
+								placeholder={providerType === 'github' ? 'https://github.example.com' : 'https://gitlab.example.com'}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+							/>
+						</div>
 
 						{/* Actions */}
 						<div className="flex justify-end gap-3 pt-2">

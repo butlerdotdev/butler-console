@@ -7,6 +7,7 @@ import { useDocumentTitle } from '@/hooks'
 import { useTeamContext } from '@/hooks/useTeamContext'
 import { useAuth } from '@/hooks/useAuth'
 import { clustersApi, stewardApi, type Cluster, type TenantControlPlane, type Node, type Addon, type ClusterEvent, type MachineRequest, type LoadBalancerRequest } from '@/api'
+import { ENVIRONMENT_LABEL } from '@/types/environments'
 import { Card, Spinner, StatusBadge, Button, FadeIn } from '@/components/ui'
 import { ClusterTerminal } from '@/components/terminal'
 import { DeleteClusterModal } from '@/components/clusters/DeleteClusterModal'
@@ -518,6 +519,14 @@ function OverviewTab({ cluster, namespace, name, scaleTarget, loadBalancerReques
 								</Link>
 							</dd>
 						</div>
+						{cluster.metadata.labels?.[ENVIRONMENT_LABEL] && (
+							<div className="flex justify-between">
+								<dt className="text-neutral-400">Environment</dt>
+								<dd className="text-neutral-50 font-mono">
+									{cluster.metadata.labels[ENVIRONMENT_LABEL]}
+								</dd>
+							</div>
+						)}
 						<div className="flex justify-between">
 							<dt className="text-neutral-400">Workers</dt>
 							<dd className="text-neutral-50">

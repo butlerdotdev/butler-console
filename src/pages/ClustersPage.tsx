@@ -1,11 +1,13 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useTeamContext } from '@/hooks/useTeamContext'
+import { useEnvContext } from '@/hooks/useEnvContext'
 import { useDocumentTitle } from '@/hooks'
 import { clustersApi, type Cluster } from '@/api'
+import { ENVIRONMENT_LABEL } from '@/types/environments'
 import { Card, Spinner, StatusBadge, FadeIn, Button } from '@/components/ui'
 
 interface ManagementClusterInfo {
@@ -17,12 +19,21 @@ interface ManagementClusterInfo {
 
 export function ClustersPage() {
 	const { currentTeam, currentTeamDisplayName, buildPath, isAdminMode } = useTeamContext()
+	const { currentEnv } = useEnvContext()
 	useDocumentTitle(currentTeamDisplayName ? `${currentTeamDisplayName} Clusters` : 'Clusters')
 
 	const [management, setManagement] = useState<ManagementClusterInfo | null>(null)
 	const [clusters, setClusters] = useState<Cluster[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
+
+	// Show the ENV column when an env is explicitly selected OR at
+	// least one cluster in the result set carries the env label. Mirrors
+	// the butleradm cluster-list conditional-by-default shape.
+	const showEnvColumn = useMemo(() => {
+		if (currentEnv) return true
+		return clusters.some((c) => !!c.metadata?.labels?.[ENVIRONMENT_LABEL])
+	}, [currentEnv, clusters])
 
 	const loadClusters = useCallback(async () => {
 		try {
@@ -103,6 +114,7 @@ export function ClustersPage() {
 							key={cluster.metadata.uid || `${cluster.metadata.namespace}/${cluster.metadata.name}`}
 							cluster={cluster}
 							buildPath={buildPath}
+							showEnv={showEnvColumn}
 						/>
 					))}
 
@@ -178,10 +190,12 @@ function ManagementClusterCard({ info }: { info: ManagementClusterInfo }) {
 
 function ClusterCard({
 	cluster,
-	buildPath
+	buildPath,
+	showEnv,
 }: {
 	cluster: Cluster
 	buildPath: (path: string) => string
+	showEnv: boolean
 }) {
 	const name = cluster.metadata.name
 	const namespace = cluster.metadata.namespace
@@ -189,6 +203,8 @@ function ClusterCard({
 	const version = cluster.spec.kubernetesVersion || 'Unknown'
 	const workers = cluster.spec.workers?.replicas || 0
 	const provider = cluster.spec.providerConfigRef?.name || 'Default'
+	// Plain hyphen, not em-dash, for "not set" display.
+	const envLabel = cluster.metadata.labels?.[ENVIRONMENT_LABEL] || '-'
 
 	const createdAt = cluster.metadata.creationTimestamp
 	let age = 'Unknown'
@@ -227,6 +243,12 @@ function ClusterCard({
 							<p className="text-xs text-neutral-500 uppercase tracking-wide">Provider</p>
 							<p className="text-sm text-neutral-200">{provider}</p>
 						</div>
+						{showEnv && (
+							<div className="text-right">
+								<p className="text-xs text-neutral-500 uppercase tracking-wide">Env</p>
+								<p className="text-sm text-neutral-200">{envLabel}</p>
+							</div>
+						)}
 						<div className="text-right">
 							<p className="text-xs text-neutral-500 uppercase tracking-wide">Version</p>
 							<p className="text-sm text-neutral-200">{version}</p>

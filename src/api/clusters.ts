@@ -10,6 +10,8 @@ export interface Cluster {
 		uid?: string
 		resourceVersion?: string
 		creationTimestamp?: string
+		labels?: Record<string, string>
+		annotations?: Record<string, string>
 	}
 	spec: {
 		kubernetesVersion: string

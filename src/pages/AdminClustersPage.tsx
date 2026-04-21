@@ -5,8 +5,10 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { useTeamContext } from '@/hooks/useTeamContext'
+import { useEnvContext } from '@/hooks/useEnvContext'
 import { useAuth } from '@/hooks/useAuth'
 import { clustersApi, type Cluster } from '@/api'
+import { ENVIRONMENT_LABEL } from '@/types/environments'
 import { Card, StatusBadge, Spinner, FadeIn, Modal, ModalHeader, ModalBody, ModalFooter, Button } from '@/components/ui'
 
 interface ManagementClusterInfo {
@@ -32,6 +34,7 @@ type SortDirection = 'asc' | 'desc'
 export function AdminClustersPage() {
 	useDocumentTitle('All Clusters')
 	const { buildPath } = useTeamContext()
+	const { currentEnv } = useEnvContext()
 	const { user } = useAuth()
 	const navigate = useNavigate()
 
@@ -98,6 +101,14 @@ export function AdminClustersPage() {
 		const unique = [...new Set(clusters.map((c) => c.metadata.namespace))]
 		return unique.sort()
 	}, [clusters])
+
+	// Show the ENV column when an env is selected OR at least one
+	// cluster in the result set carries the env label. Matches
+	// ClustersPage behavior and the CLI's conditional-by-default shape.
+	const showEnvColumn = useMemo(() => {
+		if (currentEnv) return true
+		return clusters.some((c) => !!c.metadata.labels?.[ENVIRONMENT_LABEL])
+	}, [currentEnv, clusters])
 
 	// Get unique statuses for filter dropdown
 	const statuses = useMemo(() => {
@@ -376,6 +387,14 @@ export function AdminClustersPage() {
 											<p className="text-xs text-neutral-500 uppercase tracking-wide">Provider</p>
 											<p className="text-sm text-neutral-200">{cluster.spec.providerConfigRef?.name || 'Default'}</p>
 										</div>
+										{showEnvColumn && (
+											<div className="text-right">
+												<p className="text-xs text-neutral-500 uppercase tracking-wide">Env</p>
+												<p className="text-sm text-neutral-200">
+													{cluster.metadata.labels?.[ENVIRONMENT_LABEL] || '-'}
+												</p>
+											</div>
+										)}
 										<div className="text-right">
 											<p className="text-xs text-neutral-500 uppercase tracking-wide">Version</p>
 											<p className="text-sm text-neutral-200">{cluster.spec.kubernetesVersion}</p>

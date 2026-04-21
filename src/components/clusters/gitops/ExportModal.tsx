@@ -13,6 +13,7 @@ import type { DiscoveredRelease, Repository, Branch } from '@/types/gitops';
 interface ExportModalProps {
 	release: DiscoveredRelease;
 	repositories: Repository[];
+	loadingRepos?: boolean;
 	clusterNamespace: string;
 	clusterName: string;
 	configuredRepository?: string;
@@ -23,6 +24,7 @@ interface ExportModalProps {
 export function ExportModal({
 	release,
 	repositories,
+	loadingRepos,
 	clusterNamespace,
 	clusterName,
 	onClose,
@@ -199,7 +201,7 @@ export function ExportModal({
 							onChange={(e) => setRepository(e.target.value)}
 							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
 						>
-							<option value="">Select a repository...</option>
+							<option value="">{loadingRepos ? 'Loading repositories...' : 'Select a repository...'}</option>
 							{repositories.map((repo) => (
 								<option key={repo.fullName} value={repo.fullName}>
 									{repo.fullName}

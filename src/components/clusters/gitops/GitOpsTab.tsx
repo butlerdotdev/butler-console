@@ -29,6 +29,7 @@ export function GitOpsTab() {
 	const [gitConfig, setGitConfig] = useState<GitProviderConfig | null>(null);
 	const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
 	const [repositories, setRepositories] = useState<Repository[]>([]);
+	const [loadingRepos, setLoadingRepos] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [discovering, setDiscovering] = useState(false);
 	const [disabling, setDisabling] = useState(false);
@@ -38,6 +39,7 @@ export function GitOpsTab() {
 	const [exportRelease, setExportRelease] = useState<DiscoveredRelease | null>(null);
 	const [showMigrateAll, setShowMigrateAll] = useState(false);
 	const [showEnableModal, setShowEnableModal] = useState(false);
+	const [reconfiguring, setReconfiguring] = useState(false);
 	const [showDisableConfirm, setShowDisableConfirm] = useState(false);
 
 	// Load Git provider config
@@ -46,14 +48,13 @@ export function GitOpsTab() {
 			const config = await gitopsApi.getConfig();
 			setGitConfig(config);
 
-			// If configured, also load repositories
+			// Load repositories in the background
 			if (config.configured) {
-				try {
-					const repos = await gitopsApi.listRepositories();
-					setRepositories(repos);
-				} catch (err) {
-					console.warn('Failed to load repositories:', err);
-				}
+				setLoadingRepos(true);
+				gitopsApi.listRepositories()
+					.then(repos => setRepositories(repos))
+					.catch(err => console.warn('Failed to load repositories:', err))
+					.finally(() => setLoadingRepos(false));
 			}
 		} catch (err) {
 			console.error('Failed to load GitOps config:', err);
@@ -78,12 +79,11 @@ export function GitOpsTab() {
 		}
 	}, [namespace, name, showError]);
 
-	// Initial load
+	// Initial load — config and discover run in parallel, repos load in background
 	useEffect(() => {
 		const load = async () => {
 			setLoading(true);
-			await loadGitConfig();
-			await discoverReleases();
+			await Promise.all([loadGitConfig(), discoverReleases()]);
 			setLoading(false);
 		};
 		load();
@@ -153,9 +153,12 @@ export function GitOpsTab() {
 	}
 
 	// No Git provider configured
-	if (!gitConfig?.configured) {
+	if (!gitConfig?.configured || reconfiguring) {
 		return (
-			<GitProviderSetup onConfigured={handleGitConfigured} />
+			<GitProviderSetup onConfigured={() => {
+				setReconfiguring(false);
+				handleGitConfigured();
+			}} />
 		);
 	}
 
@@ -302,16 +305,25 @@ export function GitOpsTab() {
 							</p>
 						</div>
 					</div>
-					{isGitOpsInstalled && (
+					<div className="flex items-center gap-2">
 						<Button
 							variant="secondary"
 							size="sm"
-							onClick={() => setShowMigrateAll(true)}
-							disabled={allReleases.length === 0}
+							onClick={() => setReconfiguring(true)}
 						>
-							Export All to GitOps
+							Reconfigure
 						</Button>
-					)}
+						{isGitOpsInstalled && (
+							<Button
+								variant="secondary"
+								size="sm"
+								onClick={() => setShowMigrateAll(true)}
+								disabled={allReleases.length === 0}
+							>
+								Export All to GitOps
+							</Button>
+						)}
+					</div>
 				</div>
 			</Card>
 
@@ -389,6 +401,7 @@ export function GitOpsTab() {
 				<ExportModal
 					release={exportRelease}
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					clusterNamespace={namespace!}
 					clusterName={name!}
 					configuredRepository={gitopsEngine?.repository}
@@ -402,6 +415,7 @@ export function GitOpsTab() {
 				<MigrateAllModal
 					releases={allReleases}
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					clusterNamespace={namespace!}
 					clusterName={name!}
 					configuredRepository={gitopsEngine?.repository}
@@ -416,6 +430,7 @@ export function GitOpsTab() {
 					clusterNamespace={namespace!}
 					clusterName={name!}
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					onClose={() => setShowEnableModal(false)}
 					onSuccess={handleEnableSuccess}
 				/>

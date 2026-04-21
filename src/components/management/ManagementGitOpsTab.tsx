@@ -38,6 +38,7 @@ export function ManagementGitOpsTab() {
 	const [gitConfig, setGitConfig] = useState<GitProviderConfig | null>(null);
 	const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
 	const [repositories, setRepositories] = useState<Repository[]>([]);
+	const [loadingRepos, setLoadingRepos] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [discovering, setDiscovering] = useState(false);
 	const [disabling, setDisabling] = useState(false);
@@ -48,6 +49,7 @@ export function ManagementGitOpsTab() {
 	const [showEnableModal, setShowEnableModal] = useState(false);
 	const [showDisableConfirm, setShowDisableConfirm] = useState(false);
 	const [showMigrateAll, setShowMigrateAll] = useState(false);
+	const [reconfiguring, setReconfiguring] = useState(false);
 
 	// Load Git provider config
 	const loadGitConfig = useCallback(async () => {
@@ -55,14 +57,13 @@ export function ManagementGitOpsTab() {
 			const config = await gitopsApi.getConfig();
 			setGitConfig(config);
 
-			// If configured, also load repositories
+			// Load repositories in the background
 			if (config.configured) {
-				try {
-					const repos = await gitopsApi.listRepositories();
-					setRepositories(repos);
-				} catch (err) {
-					console.warn('Failed to load repositories:', err);
-				}
+				setLoadingRepos(true);
+				gitopsApi.listRepositories()
+					.then(repos => setRepositories(repos))
+					.catch(err => console.warn('Failed to load repositories:', err))
+					.finally(() => setLoadingRepos(false));
 			}
 		} catch (err) {
 			console.error('Failed to load GitOps config:', err);
@@ -85,12 +86,11 @@ export function ManagementGitOpsTab() {
 		}
 	}, [showError]);
 
-	// Initial load
+	// Initial load — config and discover run in parallel, repos load in background
 	useEffect(() => {
 		const load = async () => {
 			setLoading(true);
-			await loadGitConfig();
-			await discoverReleases();
+			await Promise.all([loadGitConfig(), discoverReleases()]);
 			setLoading(false);
 		};
 		load();
@@ -135,10 +135,13 @@ export function ManagementGitOpsTab() {
 		);
 	}
 
-	// No Git provider configured
-	if (!gitConfig?.configured) {
+	// No Git provider configured, or user wants to reconfigure
+	if (!gitConfig?.configured || reconfiguring) {
 		return (
-			<GitProviderSetup onConfigured={handleGitConfigured} />
+			<GitProviderSetup onConfigured={() => {
+				setReconfiguring(false);
+				handleGitConfigured();
+			}} />
 		);
 	}
 
@@ -285,14 +288,23 @@ export function ManagementGitOpsTab() {
 							</p>
 						</div>
 					</div>
-					<Button
-						variant="secondary"
-						size="sm"
-						onClick={() => setShowMigrateAll(true)}
-						disabled={discovering || allReleases.length === 0}
-					>
-						Export All to GitOps
-					</Button>
+					<div className="flex items-center gap-2">
+						<Button
+							variant="secondary"
+							size="sm"
+							onClick={() => setReconfiguring(true)}
+						>
+							Reconfigure
+						</Button>
+						<Button
+							variant="secondary"
+							size="sm"
+							onClick={() => setShowMigrateAll(true)}
+							disabled={discovering || allReleases.length === 0}
+						>
+							Export All to GitOps
+						</Button>
+					</div>
 				</div>
 			</Card>
 
@@ -369,6 +381,7 @@ export function ManagementGitOpsTab() {
 			{showEnableModal && (
 				<EnableManagementGitOpsModal
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					onClose={() => setShowEnableModal(false)}
 					onSuccess={handleEnableSuccess}
 				/>
@@ -388,6 +401,7 @@ export function ManagementGitOpsTab() {
 				<ManagementExportModal
 					release={exportRelease}
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					configuredRepository={gitopsEngine?.repository}
 					onClose={() => setExportRelease(null)}
 					onSuccess={(result) => {
@@ -406,6 +420,7 @@ export function ManagementGitOpsTab() {
 				<ManagementMigrateAllModal
 					releases={allReleases}
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					configuredRepository={gitopsEngine?.repository}
 					onClose={() => setShowMigrateAll(false)}
 					onSuccess={(result) => {
@@ -426,12 +441,14 @@ export function ManagementGitOpsTab() {
 // Enable Management GitOps Modal Component
 interface EnableManagementGitOpsModalProps {
 	repositories: Repository[];
+	loadingRepos?: boolean;
 	onClose: () => void;
 	onSuccess: () => void;
 }
 
 function EnableManagementGitOpsModal({
 	repositories,
+	loadingRepos,
 	onClose,
 	onSuccess,
 }: EnableManagementGitOpsModalProps) {
@@ -514,9 +531,10 @@ function EnableManagementGitOpsModal({
 							<select
 								value={repository}
 								onChange={(e) => setRepository(e.target.value)}
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+								disabled={loadingRepos}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50"
 							>
-								<option value="">Select a repository...</option>
+								<option value="">{loadingRepos ? 'Loading repositories...' : 'Select a repository...'}</option>
 								{repositories.map((repo) => (
 									<option key={repo.fullName} value={repo.fullName}>
 										{repo.fullName} {repo.private ? '(private)' : ''}
@@ -728,6 +746,7 @@ function DisableManagementGitOpsModal({ disabling, onClose, onConfirm }: Disable
 interface ManagementExportModalProps {
 	release: DiscoveredRelease;
 	repositories: Repository[];
+	loadingRepos?: boolean;
 	configuredRepository?: string; // owner/repo format - auto-select this if provided
 	onClose: () => void;
 	onSuccess: (result: { prUrl?: string; commitUrl?: string }) => void;
@@ -736,6 +755,7 @@ interface ManagementExportModalProps {
 function ManagementExportModal({
 	release,
 	repositories,
+	loadingRepos,
 	configuredRepository,
 	onClose,
 	onSuccess,
@@ -900,7 +920,7 @@ function ManagementExportModal({
 								onChange={(e) => setRepository(e.target.value)}
 								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
 							>
-								<option value="">Select a repository...</option>
+								<option value="">{loadingRepos ? 'Loading repositories...' : 'Select a repository...'}</option>
 								{repositories.map((repo) => (
 									<option key={repo.fullName} value={repo.fullName}>
 										{repo.fullName} {repo.fullName === configuredRepository ? '✓' : ''} {repo.private ? '(private)' : ''}
@@ -1054,6 +1074,7 @@ function ManagementExportModal({
 interface ManagementMigrateAllModalProps {
 	releases: DiscoveredRelease[];
 	repositories: Repository[];
+	loadingRepos?: boolean;
 	configuredRepository?: string;
 	onClose: () => void;
 	onSuccess: (result: { prUrl?: string }) => void;
@@ -1062,6 +1083,7 @@ interface ManagementMigrateAllModalProps {
 function ManagementMigrateAllModal({
 	releases,
 	repositories,
+	loadingRepos,
 	configuredRepository,
 	onClose,
 	onSuccess,
@@ -1225,7 +1247,7 @@ function ManagementMigrateAllModal({
 									onChange={(e) => setRepository(e.target.value)}
 									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
 								>
-									<option value="">Select a repository...</option>
+									<option value="">{loadingRepos ? 'Loading repositories...' : 'Select a repository...'}</option>
 									{repositories.map((repo) => (
 										<option key={repo.fullName} value={repo.fullName}>
 											{repo.fullName} {repo.fullName === configuredRepository ? '✓' : ''} {repo.private ? '(private)' : ''}

@@ -6,14 +6,27 @@
 // headers, cluster-card left borders, EnvSwitcher dropdown dots) so
 // operators pick up the association without thinking.
 //
-// Palette is the Okabe-Ito colorblind-safe set (Okabe & Ito, 2008).
-// Five hues chosen to stay mutually distinguishable under normal
-// vision AND under all three common colorblindness types
-// (deuteranopia / protanopia / tritanopia). Because the set is
-// already colorblind-safe by construction, these accents sit outside
-// the --bc-* theme-variable system and are NOT remapped per
-// colorblind mode — adding mode-specific remaps would break the
-// distinguishability property the palette was engineered for.
+// Palette is Paul Tol's "bright" qualitative scheme — canonical
+// reference: https://personal.sron.nl/~pault/ . Tol's bright was
+// designed for three properties simultaneously: distinguishable
+// under normal vision, CVD-safe (deuteranopia / protanopia /
+// tritanopia), AND approximately luminance-balanced so the colors
+// read as equally weighted on a page.
+//
+// Five of Tol's six bright colors are live; the sixth (purple
+// #AA3377) is reserved and documented in tailwind.config.ts as
+// available-if-needed with a note on its lower luminance. An
+// earlier iteration used the Okabe-Ito palette; swapped to Tol
+// bright when deuteranopia review surfaced Okabe-Ito's intentional
+// luminance variation as perceived unevenness. Both palettes are
+// CVD-safe; Tol trades a marginally narrower gamut for the
+// luminance-balance property.
+//
+// Because the set is colorblind-safe by construction, these
+// accents sit outside the --bc-* theme-variable system and are NOT
+// remapped per colorblind mode — adding mode-specific remaps would
+// break the distinguishability property the palette was engineered
+// for.
 //
 // The palette is deliberately narrow — five colors cycle via a
 // simple character-sum hash — because more than ~5 simultaneous
@@ -35,7 +48,7 @@ export interface EnvAccent {
 }
 
 const PALETTE: EnvAccent[] = [
-	// Sky Blue
+	// Tol bright: blue
 	{
 		dot: 'bg-env-1-500',
 		border: 'border-l-env-1-500',
@@ -45,7 +58,7 @@ const PALETTE: EnvAccent[] = [
 		iconText: 'text-env-1-300',
 		headerTint: 'bg-env-1-500/5',
 	},
-	// Bluish Green
+	// Tol bright: cyan
 	{
 		dot: 'bg-env-2-500',
 		border: 'border-l-env-2-500',
@@ -55,7 +68,7 @@ const PALETTE: EnvAccent[] = [
 		iconText: 'text-env-2-300',
 		headerTint: 'bg-env-2-500/5',
 	},
-	// Orange
+	// Tol bright: green
 	{
 		dot: 'bg-env-3-500',
 		border: 'border-l-env-3-500',
@@ -65,7 +78,7 @@ const PALETTE: EnvAccent[] = [
 		iconText: 'text-env-3-300',
 		headerTint: 'bg-env-3-500/5',
 	},
-	// Blue
+	// Tol bright: yellow
 	{
 		dot: 'bg-env-4-500',
 		border: 'border-l-env-4-500',
@@ -75,7 +88,7 @@ const PALETTE: EnvAccent[] = [
 		iconText: 'text-env-4-300',
 		headerTint: 'bg-env-4-500/5',
 	},
-	// Reddish Purple
+	// Tol bright: red/pink
 	{
 		dot: 'bg-env-5-500',
 		border: 'border-l-env-5-500',

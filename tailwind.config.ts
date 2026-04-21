@@ -98,19 +98,34 @@ export default {
 					400: v('orange-400'),
 					500: v('orange-500'),
 				},
-				// Environment accent palette sourced from the Okabe-Ito
-				// colorblind-safe palette (Okabe & Ito, 2008). These
-				// accents are arbitrary "tell N envs apart" markers,
-				// not semantic roles, so they sit outside the --bc-*
-				// theme-variable system and stay fixed across default,
-				// light, and all colorblind modes. Adding per-mode
-				// remaps would defeat Okabe-Ito's distinguishability
-				// property by design.
-				'env-1': { 300: '#8FD0F0', 500: '#56B4E9' }, // Sky Blue
-				'env-2': { 300: '#4FC3A0', 500: '#009E73' }, // Bluish Green
-				'env-3': { 300: '#F0BD4E', 500: '#E69F00' }, // Orange
-				'env-4': { 300: '#6CA8D4', 500: '#0072B2' }, // Blue
-				'env-5': { 300: '#DFA8C5', 500: '#CC79A7' }, // Reddish Purple
+				// Environment accent palette sourced from Paul Tol's "bright"
+				// qualitative color scheme (https://personal.sron.nl/~pault/).
+				// Tol's bright was designed with three explicit goals:
+				// distinguishable under normal vision, CVD-safe
+				// (deuteranopia / protanopia / tritanopia), AND
+				// approximately luminance-balanced so the colors read as
+				// equally weighted on a page.
+				//
+				// These accents are arbitrary "tell N envs apart"
+				// markers, not semantic roles, so they sit outside the
+				// --bc-* theme-variable system and stay fixed across
+				// default, light, and all colorblind modes. Per-mode
+				// remaps would defeat Tol's distinguishability property
+				// by design.
+				//
+				// Five of Tol's six bright colors are live. The sixth
+				// (purple #AA3377) is omitted here because its
+				// luminance sits noticeably below the other five and
+				// reintroduces the unevenness the switch to Tol was
+				// meant to fix. Available if a 6th env slot is ever
+				// needed, acknowledging the minor luminance drop.
+				'env-1': { 300: '#86A7C8', 500: '#4477AA' }, // blue
+				'env-2': { 300: '#9CDEF4', 500: '#66CCEE' }, // cyan
+				'env-3': { 300: '#6FB27A', 500: '#228833' }, // green
+				'env-4': { 300: '#DED385', 500: '#CCBB44' }, // yellow
+				'env-5': { 300: '#F49CA7', 500: '#EE6677' }, // red/pink
+				// Reserved 6th: #AA3377 (purple) — lower luminance, use
+				// only if a 6th env slot is needed.
 			},
 			gridTemplateColumns: {
 				'16': 'repeat(16, minmax(0, 1fr))',

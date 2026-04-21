@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, Spinner, Button } from '@/components/ui';
+import { Card, Spinner, Button, SearchableSelect } from '@/components/ui';
 import { useToast } from '@/hooks/useToast';
 import { gitopsApi } from '@/api/gitops';
 import type {
@@ -528,19 +528,20 @@ function EnableManagementGitOpsModal({
 							<label className="block text-sm font-medium text-neutral-300 mb-1">
 								Target Repository
 							</label>
-							<select
+							<SearchableSelect
 								value={repository}
-								onChange={(e) => setRepository(e.target.value)}
+								onChange={setRepository}
+								options={repositories.map((repo) => ({
+									value: repo.fullName,
+									label: repo.fullName,
+									suffix: repo.private ? '(private)' : undefined,
+								}))}
+								placeholder="Select a repository..."
+								loading={loadingRepos}
+								loadingText="Loading repositories..."
 								disabled={loadingRepos}
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:opacity-50"
-							>
-								<option value="">{loadingRepos ? 'Loading repositories...' : 'Select a repository...'}</option>
-								{repositories.map((repo) => (
-									<option key={repo.fullName} value={repo.fullName}>
-										{repo.fullName} {repo.private ? '(private)' : ''}
-									</option>
-								))}
-							</select>
+								focusRingColor="focus-within:ring-violet-500"
+							/>
 						</div>
 
 						{/* Branch and Path */}
@@ -915,18 +916,22 @@ function ManagementExportModal({
 									<span className="ml-2 text-xs text-violet-400">(GitOps configured)</span>
 								)}
 							</label>
-							<select
+							<SearchableSelect
 								value={repository}
-								onChange={(e) => setRepository(e.target.value)}
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-							>
-								<option value="">{loadingRepos ? 'Loading repositories...' : 'Select a repository...'}</option>
-								{repositories.map((repo) => (
-									<option key={repo.fullName} value={repo.fullName}>
-										{repo.fullName} {repo.fullName === configuredRepository ? '✓' : ''} {repo.private ? '(private)' : ''}
-									</option>
-								))}
-							</select>
+								onChange={setRepository}
+								options={repositories.map((repo) => ({
+									value: repo.fullName,
+									label: repo.fullName,
+									suffix: [
+										repo.fullName === configuredRepository ? '✓' : '',
+										repo.private ? '(private)' : '',
+									].filter(Boolean).join(' ') || undefined,
+								}))}
+								placeholder="Select a repository..."
+								loading={loadingRepos}
+								loadingText="Loading repositories..."
+								focusRingColor="focus-within:ring-violet-500"
+							/>
 						</div>
 
 						{/* Branch and Path */}
@@ -1242,18 +1247,22 @@ function ManagementMigrateAllModal({
 										<span className="ml-2 text-xs text-violet-400">(GitOps configured)</span>
 									)}
 								</label>
-								<select
+								<SearchableSelect
 									value={repository}
-									onChange={(e) => setRepository(e.target.value)}
-									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-								>
-									<option value="">{loadingRepos ? 'Loading repositories...' : 'Select a repository...'}</option>
-									{repositories.map((repo) => (
-										<option key={repo.fullName} value={repo.fullName}>
-											{repo.fullName} {repo.fullName === configuredRepository ? '✓' : ''} {repo.private ? '(private)' : ''}
-										</option>
-									))}
-								</select>
+									onChange={setRepository}
+									options={repositories.map((repo) => ({
+										value: repo.fullName,
+										label: repo.fullName,
+										suffix: [
+											repo.fullName === configuredRepository ? '✓' : '',
+											repo.private ? '(private)' : '',
+										].filter(Boolean).join(' ') || undefined,
+									}))}
+									placeholder="Select a repository..."
+									loading={loadingRepos}
+									loadingText="Loading repositories..."
+									focusRingColor="focus-within:ring-violet-500"
+								/>
 							</div>
 
 							<div>

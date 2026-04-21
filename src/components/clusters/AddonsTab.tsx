@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
-import { Card, Button, Spinner } from '@/components/ui'
+import { Card, Button, Spinner, SearchableSelect } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { useToast } from '@/hooks/useToast'
 import {
@@ -1633,18 +1633,16 @@ function GitOpsExportModal({ addon, isOpen, repositories, clusterName, gitConfig
 						<label className="block text-sm font-medium text-neutral-300 mb-1">
 							Target Repository
 						</label>
-						<select
+						<SearchableSelect
 							value={repository}
-							onChange={(e) => setRepository(e.target.value)}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-						>
-							<option value="">Select a repository...</option>
-							{repositories.map((repo) => (
-								<option key={repo.fullName} value={repo.fullName}>
-									{repo.fullName} {repo.private ? '(private)' : ''}
-								</option>
-							))}
-						</select>
+							onChange={setRepository}
+							options={repositories.map((repo) => ({
+								value: repo.fullName,
+								label: repo.fullName,
+								suffix: repo.private ? '(private)' : undefined,
+							}))}
+							placeholder="Select a repository..."
+						/>
 					</div>
 
 					{/* Branch and Path */}
@@ -1932,18 +1930,16 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, clusterName, gitCon
 						<label className="block text-sm font-medium text-neutral-300 mb-1">
 							Target Repository
 						</label>
-						<select
+						<SearchableSelect
 							value={repository}
-							onChange={(e) => setRepository(e.target.value)}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-						>
-							<option value="">Select a repository...</option>
-							{repositories.map((repo) => (
-								<option key={repo.fullName} value={repo.fullName}>
-									{repo.fullName} {repo.private ? '(private)' : ''}
-								</option>
-							))}
-						</select>
+							onChange={setRepository}
+							options={repositories.map((repo) => ({
+								value: repo.fullName,
+								label: repo.fullName,
+								suffix: repo.private ? '(private)' : undefined,
+							}))}
+							placeholder="Select a repository..."
+						/>
 					</div>
 
 					{/* Branch and Path */}

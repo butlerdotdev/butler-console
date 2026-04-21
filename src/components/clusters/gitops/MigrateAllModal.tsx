@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { Button, Spinner } from '@/components/ui';
+import { Button, Spinner, SearchableSelect } from '@/components/ui';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal';
 import { useToast } from '@/hooks/useToast';
 import { gitopsApi } from '@/api/gitops';
@@ -210,18 +210,21 @@ export function MigrateAllModal({
 									<span className="ml-2 text-xs text-green-400">(GitOps configured)</span>
 								)}
 							</label>
-							<select
+							<SearchableSelect
 								value={repository}
-								onChange={(e) => setRepository(e.target.value)}
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-							>
-								<option value="">{loadingRepos ? 'Loading repositories...' : 'Select a repository...'}</option>
-								{repositories.map((repo) => (
-									<option key={repo.fullName} value={repo.fullName}>
-										{repo.fullName} {repo.fullName === configuredRepository ? '✓' : ''} {repo.private ? '(private)' : ''}
-									</option>
-								))}
-							</select>
+								onChange={setRepository}
+								options={repositories.map((repo) => ({
+									value: repo.fullName,
+									label: repo.fullName,
+									suffix: [
+										repo.fullName === configuredRepository ? '✓' : '',
+										repo.private ? '(private)' : '',
+									].filter(Boolean).join(' ') || undefined,
+								}))}
+								placeholder="Select a repository..."
+								loading={loadingRepos}
+								loadingText="Loading repositories..."
+							/>
 						</div>
 
 						<div>

@@ -175,19 +175,29 @@ export function Sidebar() {
 	if (mode === 'admin') {
 		navSections = adminSections
 	} else if (mode === 'team' && currentTeam) {
-		const teamItems: NavItem[] = [
-			{ to: buildPath(''), label: 'Dashboard', icon: DashboardIcon, end: true },
+		const workloadItems: NavItem[] = [
 			{ to: buildPath('/clusters'), label: 'Clusters', icon: ClustersIcon },
-			{ to: buildPath('/providers'), label: 'Providers', icon: ProvidersIcon },
-			{ to: buildPath('/members'), label: 'Members', icon: UsersIcon },
 		]
-		// Environments is a team-admin surface. Hidden from operators
-		// and viewers; page itself also renders an access-denied card
-		// if someone navigates directly.
+		// Environments sits next to Clusters within the Workloads
+		// group because envs exist to organize clusters. Team-admin
+		// (or platform-admin) gated: the page itself also renders an
+		// access-denied card if someone navigates directly.
 		if (isTeamAdmin || canAccessAdmin) {
-			teamItems.push({ to: buildPath('/environments'), label: 'Environments', icon: EnvironmentsIcon })
+			workloadItems.push({ to: buildPath('/environments'), label: 'Environments', icon: EnvironmentsIcon })
 		}
-		navSections = [{ items: teamItems }]
+		const teamMgmtItems: NavItem[] = [
+			{ to: buildPath('/members'), label: 'Members', icon: UsersIcon },
+			{ to: buildPath('/providers'), label: 'Providers', icon: ProvidersIcon },
+		]
+		// Section labels mirror the admin-side category pattern so the
+		// collapse UX is identical across modes. Team scope is lighter
+		// today but the grouping has room to grow as team-scoped
+		// surfaces land.
+		navSections = [
+			{ items: [{ to: buildPath(''), label: 'Dashboard', icon: DashboardIcon, end: true }] },
+			{ label: 'Workloads', items: workloadItems },
+			{ label: 'Team', items: teamMgmtItems },
+		]
 		showTeamLabel = true
 		teamLabel = currentTeamDisplayName || currentTeam
 	} else if (isLegacyRoute) {

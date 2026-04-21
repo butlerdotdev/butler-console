@@ -13,6 +13,8 @@ import { ClusterTerminal } from '@/components/terminal'
 import { DeleteClusterModal } from '@/components/clusters/DeleteClusterModal'
 import { ScaleWorkersModal } from '@/components/clusters/ScaleWorkersModal'
 import { EditClusterModal } from '@/components/clusters/EditClusterModal'
+import { ChangeEnvironmentModal } from '@/components/clusters/ChangeEnvironmentModal'
+import { useEnvContext } from '@/hooks/useEnvContext'
 import { useToast } from '@/hooks/useToast'
 import { AddonsTab } from '@/components/clusters'
 import { AccessDenied } from '@/components/AccessDenied'
@@ -67,6 +69,8 @@ export function ClusterDetailPage() {
 	const [showDeleteModal, setShowDeleteModal] = useState(false)
 	const [showScaleModal, setShowScaleModal] = useState(false)
 	const [showEditModal, setShowEditModal] = useState(false)
+	const [showChangeEnvModal, setShowChangeEnvModal] = useState(false)
+	const { availableEnvs } = useEnvContext()
 	const [scaleTarget, setScaleTarget] = useState<number | null>(null)
 	const [loadBalancerRequests, setLoadBalancerRequests] = useState<LoadBalancerRequest[]>([])
 	const [machineRequests, setMachineRequests] = useState<MachineRequest[]>([])
@@ -363,6 +367,15 @@ export function ClusterDetailPage() {
 						>
 							Scale Workers
 						</Button>
+						{availableEnvs.length > 0 && (
+							<Button
+								variant="secondary"
+								onClick={() => setShowChangeEnvModal(true)}
+								disabled={phase === 'Deleting'}
+							>
+								Change Environment
+							</Button>
+						)}
 						<Button
 							variant="danger"
 							onClick={() => setShowDeleteModal(true)}
@@ -448,6 +461,26 @@ export function ClusterDetailPage() {
 					onSaved={() => { success('Cluster Updated', `Cluster ${name} has been updated`); loadCluster(true) }}
 					cluster={cluster}
 					isAdmin={isAdmin}
+				/>
+			)}
+			{cluster && availableEnvs.length > 0 && (
+				<ChangeEnvironmentModal
+					isOpen={showChangeEnvModal}
+					onClose={() => setShowChangeEnvModal(false)}
+					onChanged={(newEnv) => {
+						success(
+							'Environment Changed',
+							newEnv
+								? `Cluster ${clusterName} moved to environment ${newEnv}`
+								: `Cluster ${clusterName} env label cleared`
+						)
+						loadCluster(true)
+					}}
+					clusterName={clusterName}
+					namespace={clusterNamespace}
+					currentEnvironment={cluster.metadata?.labels?.[ENVIRONMENT_LABEL] || ''}
+					availableEnvs={availableEnvs}
+					allowClear={false}
 				/>
 			)}
 		</FadeIn>

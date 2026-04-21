@@ -10,6 +10,7 @@ import {
 	RequireTeamAccess,
 	RequireAdmin,
 } from '@/contexts/TeamProvider'
+import { EnvProvider } from '@/contexts/EnvProvider'
 import { useAuth } from '@/hooks/useAuth'
 import { PreferencesProvider, usePreferences } from '@/contexts/PreferencesContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
@@ -124,7 +125,9 @@ export default function App() {
 					element={
 						<RequireAuth>
 							<TeamContextProvider>
-								<Layout />
+								<EnvProvider>
+									<Layout />
+								</EnvProvider>
 							</TeamContextProvider>
 						</RequireAuth>
 					}

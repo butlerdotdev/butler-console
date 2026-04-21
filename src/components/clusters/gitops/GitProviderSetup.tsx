@@ -19,6 +19,7 @@ export function GitProviderSetup({ onConfigured }: GitProviderSetupProps) {
 	const [providerType, setProviderType] = useState<GitProviderType>('github');
 	const [token, setToken] = useState('');
 	const [url, setUrl] = useState('');
+	const [organization, setOrganization] = useState('');
 	const [saving, setSaving] = useState(false);
 	const [showTokenInput, setShowTokenInput] = useState(false);
 
@@ -36,6 +37,7 @@ export function GitProviderSetup({ onConfigured }: GitProviderSetupProps) {
 				type: providerType,
 				token: token.trim(),
 				url: url.trim() || undefined,
+				organization: organization.trim() || undefined,
 			});
 			onConfigured();
 		} catch (err) {
@@ -185,6 +187,23 @@ export function GitProviderSetup({ onConfigured }: GitProviderSetupProps) {
 								placeholder={providerType === 'github' ? 'https://github.example.com' : 'https://gitlab.example.com'}
 								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
 							/>
+						</div>
+
+						{/* Organization / Group */}
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">
+								{providerType === 'github' ? 'Organization' : 'Group'} <span className="text-neutral-500">(optional)</span>
+							</label>
+							<input
+								type="text"
+								value={organization}
+								onChange={(e) => setOrganization(e.target.value)}
+								placeholder={providerType === 'github' ? 'my-org' : 'my-group'}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+							/>
+							<p className="text-xs text-neutral-500 mt-1">
+								Scope repository list to a specific {providerType === 'github' ? 'organization' : 'group'}
+							</p>
 						</div>
 
 						{/* Actions */}

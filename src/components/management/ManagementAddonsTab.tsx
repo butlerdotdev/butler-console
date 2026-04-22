@@ -990,7 +990,12 @@ function GitOpsExportModal({ addon, isOpen, repositories, loadingRepos, configur
 					{/* Branch and Path */}
 					<div className="grid grid-cols-2 gap-4">
 						<div>
-							<label className="block text-sm font-medium text-neutral-300 mb-1">Branch</label>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">
+								{createPR ? 'Target Branch' : 'Branch'}
+							</label>
+							{createPR && (
+								<p className="text-xs text-neutral-500 mb-1">MR will be opened against this branch</p>
+							)}
 							<div className="relative">
 								<select
 									value={branch}
@@ -1262,7 +1267,12 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, loadingRepos, confi
 					{/* Branch and Path */}
 					<div className="grid grid-cols-2 gap-4">
 						<div>
-							<label className="block text-sm font-medium text-neutral-300 mb-1">Branch</label>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">
+								{createPR ? 'Target Branch' : 'Branch'}
+							</label>
+							{createPR && (
+								<p className="text-xs text-neutral-500 mb-1">MR will be opened against this branch</p>
+							)}
 							<div className="relative">
 								<select
 									value={branch}

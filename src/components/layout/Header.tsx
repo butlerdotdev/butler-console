@@ -7,6 +7,7 @@ import { useWebSocket } from '@/hooks/useWebSocket'
 import { useTeamContext } from '@/hooks/useTeamContext'
 import { useToast } from '@/hooks/useToast'
 import { TeamSwitcher } from './TeamSwitcher'
+import { EnvSwitcher } from './EnvSwitcher'
 import { NotificationBell } from './NotificationBell'
 
 export function Header() {
@@ -195,6 +196,9 @@ export function Header() {
 
 				{/* Notification Bell */}
 				<NotificationBell />
+
+				{/* Env Switcher (only renders in team mode with envs defined) */}
+				<EnvSwitcher />
 
 				{/* Team Switcher */}
 				<TeamSwitcher />

@@ -10,6 +10,8 @@ export interface Cluster {
 		uid?: string
 		resourceVersion?: string
 		creationTimestamp?: string
+		labels?: Record<string, string>
+		annotations?: Record<string, string>
 	}
 	spec: {
 		kubernetesVersion: string
@@ -349,6 +351,14 @@ export const clustersApi = {
 
 	async scale(namespace: string, name: string, replicas: number): Promise<Cluster> {
 		return apiClient.patch<Cluster>(`/clusters/${namespace}/${name}/scale`, { replicas })
+	},
+
+	// changeEnvironment moves the cluster into a different environment
+	// by patching the env label + setting the migration-operation
+	// annotation the TC admission webhook requires for env-label changes.
+	// Pass an empty string to clear the env label.
+	async changeEnvironment(namespace: string, name: string, environment: string): Promise<Cluster> {
+		return apiClient.put<Cluster>(`/clusters/${namespace}/${name}/environment`, { environment })
 	},
 
 	async getKubeconfig(namespace: string, name: string): Promise<{ kubeconfig: string }> {

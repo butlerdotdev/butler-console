@@ -4,12 +4,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { clustersApi, providersApi, type Provider, type ImageInfo, type NetworkInfo, isCloudProvider, getProviderRegion, getProviderNetwork } from '@/api'
+import { clustersApi, providersApi, apiClient, type Provider, type ImageInfo, type NetworkInfo, isCloudProvider, getProviderRegion, getProviderNetwork } from '@/api'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
 import { parseQuantity } from '@/components/ui/ResourceUsageBar'
 import { useToast } from '@/hooks/useToast'
 import { useTeamContext } from '@/hooks/useTeamContext'
+import { useEnvContext } from '@/hooks/useEnvContext'
+import { useAuth } from '@/hooks/useAuth'
 import { SUPPORTED_K8S_VERSIONS } from '@/lib/versions'
+import { ENVIRONMENT_LABEL } from '@/types/environments'
+import { extractWebhookDenial } from '@/lib/webhookError'
 
 interface TeamResourceLimits {
 	maxClusters?: number
@@ -41,6 +45,7 @@ export function CreateClusterPage() {
 	const returnTo = searchParams.get('returnTo')
 	const { success, error: showError } = useToast()
 	const { currentTeam, currentTeamNamespace, currentTeamDisplayName, buildPath } = useTeamContext()
+	const { currentEnv, availableEnvs } = useEnvContext()
 
 	// Providers
 	const [providers, setProviders] = useState<Provider[]>([])
@@ -105,14 +110,84 @@ export function CreateClusterPage() {
 	})
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [envFieldError, setEnvFieldError] = useState<string | null>(null)
 	const [useManualIPs, setUseManualIPs] = useState(false)
 	const [showAdvancedCP, setShowAdvancedCP] = useState(false)
+
+	// Environment selector state. Required when the team defines any env;
+	// hidden otherwise. Default is the current env from the switcher if
+	// set, else the first alphabetical env on the team. availableEnvs is
+	// already sorted alphabetically by EnvProvider.
+	const [selectedEnv, setSelectedEnv] = useState<string>('')
+	useEffect(() => {
+		if (availableEnvs.length === 0) {
+			setSelectedEnv('')
+			return
+		}
+		if (currentEnv && availableEnvs.some((e) => e.name === currentEnv)) {
+			setSelectedEnv(currentEnv)
+			return
+		}
+		setSelectedEnv((prev) => (prev && availableEnvs.some((e) => e.name === prev) ? prev : availableEnvs[0].name))
+	}, [availableEnvs, currentEnv])
+	const envRequired = availableEnvs.length > 0
+
+	// Per-member cap visibility. When the selected env has
+	// maxClustersPerMember > 0, fetch the team's clusters and count the
+	// ones this user already owns in this env so we can tell them
+	// before they submit. The webhook is still the authoritative gate.
+	const { user } = useAuth()
+	const sessionEmail = (user?.email ?? '').toLowerCase()
+	const [ownedInEnv, setOwnedInEnv] = useState<number | null>(null)
+	useEffect(() => {
+		setOwnedInEnv(null)
+		if (!currentTeam || !selectedEnv || !sessionEmail) return
+		const envDef = availableEnvs.find((e) => e.name === selectedEnv)
+		if (!envDef?.limits?.maxClustersPerMember) return
+		let cancelled = false
+		void (async () => {
+			try {
+				const res = await fetch(`/api/teams/${encodeURIComponent(currentTeam)}/clusters`, {
+					credentials: 'include',
+				})
+				if (!res.ok) return
+				const data: { clusters?: Array<{ metadata?: { labels?: Record<string, string>; annotations?: Record<string, string> } }> } = await res.json()
+				if (cancelled) return
+				const count = (data.clusters ?? []).filter((c) => {
+					if (c.metadata?.labels?.[ENVIRONMENT_LABEL] !== selectedEnv) return false
+					const owner = (
+						c.metadata?.annotations?.['butler.butlerlabs.dev/owner'] ??
+						c.metadata?.annotations?.['butler.butlerlabs.dev/creator-email'] ??
+						''
+					).toLowerCase()
+					return owner === sessionEmail
+				}).length
+				setOwnedInEnv(count)
+			} catch {
+				setOwnedInEnv(null)
+			}
+		})()
+		return () => {
+			cancelled = true
+		}
+	}, [currentTeam, selectedEnv, availableEnvs, sessionEmail])
+
+	const selectedEnvPerMemberCap =
+		availableEnvs.find((e) => e.name === selectedEnv)?.limits?.maxClustersPerMember ?? null
+	const atPerMemberCap =
+		selectedEnvPerMemberCap != null &&
+		ownedInEnv != null &&
+		ownedInEnv >= selectedEnvPerMemberCap
 
 	// Resource quota state
 	const [resourceUsage, setResourceUsage] = useState<TeamResourceUsage | null>(null)
 	const [resourceLimits, setResourceLimits] = useState<TeamResourceLimits | null>(null)
 
-	// Fetch team resource usage/limits
+	// Team-level clusterDefaults. Merged with env.clusterDefaults below
+	// to pre-fill the worker / k8s-version fields on the form.
+	const [teamDefaults, setTeamDefaults] = useState<Record<string, unknown> | null>(null)
+
+	// Fetch team resource usage/limits + cluster defaults
 	useEffect(() => {
 		if (!currentTeam) return
 		const fetchQuota = async () => {
@@ -125,15 +200,90 @@ export function CreateClusterPage() {
 					const team = data.team || data
 					const usage = team.resourceUsage || team.status?.resourceUsage
 					const limits = team.resourceLimits || team.spec?.resourceLimits
+					const defs = team.clusterDefaults || team.spec?.clusterDefaults
 					if (usage) setResourceUsage(usage)
 					if (limits) setResourceLimits(limits)
+					if (defs) setTeamDefaults(defs)
 				}
 			} catch {
-				// Non-critical - quota warnings just won't show
+				// Non-critical; quota warnings and defaults fall back.
 			}
 		}
 		fetchQuota()
 	}, [currentTeam])
+
+	// Merge env.clusterDefaults over team.clusterDefaults. Used to
+	// pre-fill form fields and tag each with its source for the UI hint.
+	const defaultsSource = useMemo(() => {
+		const source: Record<string, 'env' | 'team'> = {}
+		const envDef = availableEnvs.find((e) => e.name === selectedEnv)?.clusterDefaults
+		const merged: Record<string, unknown> = {}
+		for (const [k, v] of Object.entries(teamDefaults ?? {})) {
+			if (v == null || v === '') continue
+			merged[k] = v
+			source[k] = 'team'
+		}
+		for (const [k, v] of Object.entries(envDef ?? {})) {
+			if (v == null || v === '') continue
+			merged[k] = v
+			source[k] = 'env'
+		}
+		return { merged, source }
+	}, [teamDefaults, availableEnvs, selectedEnv])
+
+	// Apply the merged defaults to the form, but only for fields whose
+	// current value matches the previously-applied default (so we don't
+	// clobber user edits). appliedDefaults tracks the last-applied set.
+	const [appliedDefaults, setAppliedDefaults] = useState<Record<string, unknown>>({})
+	useEffect(() => {
+		const next = defaultsSource.merged
+		setForm((prev) => {
+			const out = { ...prev }
+			const mapping: Record<string, keyof typeof prev> = {
+				kubernetesVersion: 'kubernetesVersion',
+				workerCount: 'workerReplicas',
+				workerCPU: 'workerCPU',
+			}
+			for (const [defKey, formKey] of Object.entries(mapping) as [string, keyof typeof prev][]) {
+				if (!(defKey in next)) continue
+				const nextVal = next[defKey]
+				const prevDefault = appliedDefaults[defKey]
+				const currentFormVal = prev[formKey]
+				const matchesPrev =
+					prevDefault !== undefined && String(currentFormVal) === String(prevDefault)
+				const isInitial = prevDefault === undefined
+				if (matchesPrev || isInitial) {
+					// Safe to overwrite: either first apply, or user has
+					// not changed this field since the last apply.
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					;(out as any)[formKey] = typeof nextVal === 'number' ? nextVal : String(nextVal ?? '')
+				}
+			}
+			// workerMemoryGi / workerDiskGi land as "<N>Gi" in the form.
+			for (const [defKey, formKey] of [
+				['workerMemoryGi', 'workerMemory'],
+				['workerDiskGi', 'workerDiskSize'],
+			] as const) {
+				if (!(defKey in next)) continue
+				const nextVal = next[defKey]
+				const prevDefault = appliedDefaults[defKey]
+				const currentFormVal = prev[formKey]
+				const prevFormatted = prevDefault !== undefined ? `${prevDefault}Gi` : undefined
+				const matchesPrev = prevFormatted !== undefined && currentFormVal === prevFormatted
+				const isInitial = prevDefault === undefined
+				if (matchesPrev || isInitial) {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					;(out as any)[formKey] = `${nextVal}Gi`
+				}
+			}
+			return out
+		})
+		setAppliedDefaults(next)
+		// appliedDefaults intentionally not in deps — we read it but
+		// its updates are caused by this same effect; including it
+		// would cause a feedback loop.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [defaultsSource])
 
 	// Compute quota warnings based on current form values and team limits
 	const quotaWarnings = useMemo<QuotaWarning[]>(() => {
@@ -393,6 +543,7 @@ export function CreateClusterPage() {
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
 		setError(null)
+		setEnvFieldError(null)
 
 		if (!form.name) {
 			setError('Cluster name is required')
@@ -400,6 +551,10 @@ export function CreateClusterPage() {
 		}
 		if (!form.providerConfigRef) {
 			setError('Provider is required')
+			return
+		}
+		if (envRequired && !selectedEnv) {
+			setEnvFieldError('Environment is required')
 			return
 		}
 		// Validate LB IPs based on networking mode
@@ -537,7 +692,19 @@ export function CreateClusterPage() {
 				payload.schematicID = form.schematicID
 			}
 
-			await clustersApi.create(payload as unknown as Parameters<typeof clustersApi.create>[0])
+			// Ensure the X-Butler-Environment header carries the form's env
+			// choice on this request even if the URL does not. Restore the
+			// context-driven env after the call so the switcher stays the
+			// source of truth for subsequent reads.
+			const priorEnv = apiClient.getEnvironment()
+			if (envRequired) {
+				apiClient.setEnvironment(selectedEnv)
+			}
+			try {
+				await clustersApi.create(payload as unknown as Parameters<typeof clustersApi.create>[0])
+			} finally {
+				apiClient.setEnvironment(priorEnv)
+			}
 			success('Cluster Created', `${form.name} is being provisioned`)
 			if (returnTo) {
 				navigate(`${returnTo}?newCluster=${encodeURIComponent(`${form.namespace}/${form.name}`)}`)
@@ -545,9 +712,22 @@ export function CreateClusterPage() {
 				navigate(buildPath(`/clusters/${form.namespace}/${form.name}`))
 			}
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to create cluster'
-			setError(message)
-			showError('Creation Failed', message)
+			const denial = extractWebhookDenial(err)
+			if (denial) {
+				// Per step-7 spec: if the webhook denial references the env
+				// label/env surface, render inline on the env field;
+				// otherwise render inline near the submit button.
+				const f = denial.field.toLowerCase()
+				if (f.includes('environment')) {
+					setEnvFieldError(denial.message)
+				} else {
+					setError(denial.message)
+				}
+			} else {
+				const message = err instanceof Error ? err.message : 'Failed to create cluster'
+				setError(message)
+				showError('Creation Failed', message)
+			}
 		} finally {
 			setLoading(false)
 		}
@@ -615,6 +795,7 @@ export function CreateClusterPage() {
 										))}
 									</select>
 									<p className="text-xs text-neutral-500 mt-1">Worker kubelet version is determined by the OS image.</p>
+									<DefaultSourceHint source={defaultsSource.source.kubernetesVersion} />
 								</div>
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -646,6 +827,61 @@ export function CreateClusterPage() {
 								</div>
 							</div>
 						</div>
+
+						{/* Environment (only when the team defines envs) */}
+						{envRequired && (
+							<div>
+								<h3 className="text-lg font-medium text-neutral-50 mb-4">Environment</h3>
+								<div>
+									<label className="block text-sm font-medium text-neutral-400 mb-1">
+										Target environment *
+									</label>
+									<select
+										value={selectedEnv}
+										onChange={(e) => {
+											setSelectedEnv(e.target.value)
+											setEnvFieldError(null)
+										}}
+										className={`w-full px-3 py-2 bg-neutral-800 border rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 ${
+											envFieldError ? 'border-red-500' : 'border-neutral-700'
+										}`}
+									>
+										<option value="">Select an environment</option>
+										{availableEnvs.map((env) => (
+											<option key={env.name} value={env.name}>
+												{env.name}
+												{env.limits?.maxClusters != null ? ` (max ${env.limits.maxClusters})` : ''}
+												{env.limits?.maxClustersPerMember != null
+													? `, ${env.limits.maxClustersPerMember}/member`
+													: ''}
+											</option>
+										))}
+									</select>
+									<p className="text-xs text-neutral-500 mt-1">
+										Env-level quota applies on top of the team total.
+									</p>
+									{selectedEnvPerMemberCap != null && ownedInEnv != null && (
+										<div
+											className={`mt-2 p-2 rounded-md text-xs ${
+												atPerMemberCap
+													? 'bg-red-500/10 text-red-300 border border-red-500/20'
+													: 'bg-neutral-800 text-neutral-300 border border-neutral-700'
+											}`}
+										>
+											You own {ownedInEnv} of {selectedEnvPerMemberCap} clusters in {selectedEnv}
+											{atPerMemberCap
+												? ' — at per-member cap. Creating another in this env will be rejected.'
+												: '.'}
+										</div>
+									)}
+									{envFieldError && (
+										<div className="mt-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+											<p className="text-red-400 text-sm whitespace-pre-wrap">{envFieldError}</p>
+										</div>
+									)}
+								</div>
+							</div>
+						)}
 
 						{/* Provider-specific Infrastructure Settings */}
 						{selectedProvider && (
@@ -703,6 +939,7 @@ export function CreateClusterPage() {
 										max={10}
 										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
 									/>
+									<DefaultSourceHint source={defaultsSource.source.workerCount} />
 								</div>
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -717,6 +954,7 @@ export function CreateClusterPage() {
 										max={32}
 										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
 									/>
+									<DefaultSourceHint source={defaultsSource.source.workerCPU} />
 								</div>
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -733,6 +971,7 @@ export function CreateClusterPage() {
 										<option value="16Gi">16 GB</option>
 										<option value="32Gi">32 GB</option>
 									</select>
+									<DefaultSourceHint source={defaultsSource.source.workerMemoryGi} />
 								</div>
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -749,6 +988,7 @@ export function CreateClusterPage() {
 										<option value="100Gi">100 GB</option>
 										<option value="200Gi">200 GB</option>
 									</select>
+									<DefaultSourceHint source={defaultsSource.source.workerDiskGi} />
 								</div>
 							</div>
 						</div>
@@ -1049,7 +1289,7 @@ export function CreateClusterPage() {
 							<Button type="button" variant="secondary" onClick={() => navigate(buildPath('/clusters'))}>
 								Cancel
 							</Button>
-							<Button type="submit" disabled={loading || providers.length === 0 || hasQuotaErrors}>
+							<Button type="submit" disabled={loading || providers.length === 0 || hasQuotaErrors || atPerMemberCap}>
 								{loading ? 'Creating...' : 'Create Cluster'}
 							</Button>
 						</div>
@@ -1436,5 +1676,14 @@ function ProxmoxFields({ form, onChange, provider }: FieldProps & { provider: Pr
 				/>
 			</div>
 		</div>
+	)
+}
+
+function DefaultSourceHint({ source }: { source?: 'env' | 'team' }) {
+	if (!source) return null
+	return (
+		<p className={`text-xs mt-1 ${source === 'env' ? 'text-blue-400' : 'text-neutral-500'}`}>
+			{source === 'env' ? 'from env default' : 'from team default'}
+		</p>
 	)
 }

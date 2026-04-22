@@ -98,6 +98,13 @@ export default {
 					400: v('orange-400'),
 					500: v('orange-500'),
 				},
+				// Env accents. Per-mode values in index.css under --bc-env-N-*.
+				// Tol bright (dark mode) and darker Tol-family (light mode).
+				'env-1': { 300: v('env-1-300'), 500: v('env-1-500') },
+				'env-2': { 300: v('env-2-300'), 500: v('env-2-500') },
+				'env-3': { 300: v('env-3-300'), 500: v('env-3-500') },
+				'env-4': { 300: v('env-4-300'), 500: v('env-4-500') },
+				'env-5': { 300: v('env-5-300'), 500: v('env-5-500') },
 			},
 			gridTemplateColumns: {
 				'16': 'repeat(16, minmax(0, 1fr))',

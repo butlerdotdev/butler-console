@@ -1,4 +1,4 @@
-// Copyright 2025 The Butler Authors.
+// Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 const API_BASE = '/api'
@@ -20,6 +20,7 @@ export class ApiError extends Error {
 
 class ApiClient {
 	private currentTeam: string | null = null
+	private currentEnvironment: string | null = null
 
 	/**
 	 * Set the current team context for authorization.
@@ -37,6 +38,25 @@ class ApiClient {
 		return this.currentTeam
 	}
 
+	/**
+	 * Set the current environment context for team-env scoping.
+	 * When set, all requests will include X-Butler-Environment header.
+	 * The server reads this header and (per ADR-009/ADR-010) stamps the
+	 * env label on created TenantClusters and scopes list responses to
+	 * matching env-labeled resources.
+	 */
+	setEnvironment(env: string | null) {
+		this.currentEnvironment = env && env.length > 0 ? env : null
+	}
+
+	/**
+	 * Get the current environment context. Returns null when no env is
+	 * selected ("All environments" state).
+	 */
+	getEnvironment(): string | null {
+		return this.currentEnvironment
+	}
+
 	private async request<T>(
 		method: string,
 		path: string,
@@ -50,6 +70,13 @@ class ApiClient {
 		// Include team context header when a team is selected
 		if (this.currentTeam) {
 			headers['X-Butler-Team'] = this.currentTeam
+		}
+
+		// Include environment context header when an env is selected.
+		// The server only reads this header when a team scope is also
+		// present; sending it on team-less requests is a no-op.
+		if (this.currentEnvironment) {
+			headers['X-Butler-Environment'] = this.currentEnvironment
 		}
 
 		const options: RequestInit = {

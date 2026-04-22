@@ -10,6 +10,7 @@ import {
 	RequireTeamAccess,
 	RequireAdmin,
 } from '@/contexts/TeamProvider'
+import { EnvProvider } from '@/contexts/EnvProvider'
 import { useAuth } from '@/hooks/useAuth'
 import { PreferencesProvider, usePreferences } from '@/contexts/PreferencesContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
@@ -32,6 +33,7 @@ import { AdminTeamsPage } from '@/pages/AdminTeamsPage'
 import { AdminTeamDetailPage } from '@/pages/AdminTeamDetailPage'
 import { TeamMembersPage } from '@/pages/TeamMembersPage'
 import { TeamSettingsPage } from '@/pages/TeamSettingsPage'
+import { TeamEnvironmentsPage } from '@/pages/TeamEnvironmentsPage'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { SetPasswordPage } from '@/pages/SetPasswordsPage'
 import { DeviceAuthPage } from '@/pages/DeviceAuthPage'
@@ -124,7 +126,9 @@ export default function App() {
 					element={
 						<RequireAuth>
 							<TeamContextProvider>
-								<Layout />
+								<EnvProvider>
+									<Layout />
+								</EnvProvider>
 							</TeamContextProvider>
 						</RequireAuth>
 					}
@@ -146,6 +150,7 @@ export default function App() {
 					<Route path="t/:team/clusters/:namespace/:name" element={<RequireTeamAccess><ClusterDetailPage /></RequireTeamAccess>} />
 					<Route path="t/:team/providers" element={<RequireTeamAccess><TeamProvidersPage /></RequireTeamAccess>} />
 					<Route path="t/:team/members" element={<RequireTeamAccess><TeamMembersPage /></RequireTeamAccess>} />
+					<Route path="t/:team/environments" element={<RequireTeamAccess><TeamEnvironmentsPage /></RequireTeamAccess>} />
 					<Route path="t/:team/settings" element={<RequireTeamAccess><TeamSettingsPage /></RequireTeamAccess>} />
 
 					{/* Admin routes */}

@@ -4,6 +4,7 @@
 export { apiClient } from './client'
 export { authApi } from './auth'
 export { clustersApi } from './clusters'
+export { environmentsApi } from './environments'
 export { providersApi } from './providers'
 export { addonsApi } from './addons'
 export { gitopsApi } from './gitops';
@@ -80,6 +81,13 @@ export type {
 	AuditListResponse,
 	AuditFilters,
 } from './audit'
+
+export type {
+	TeamEnvironment,
+	EnvironmentLimits,
+	EnvironmentRequest,
+} from '@/types/environments'
+export { ENVIRONMENT_LABEL, ENVIRONMENT_NAME_PATTERN, ENVIRONMENT_NAME_MAX_LENGTH } from '@/types/environments'
 
 // Backwards compatible aliases
 export type { ManagementCluster as ManagementClusterInfo } from './clusters'

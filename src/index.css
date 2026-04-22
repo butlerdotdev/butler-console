@@ -96,6 +96,19 @@
 	/* ── Orange palette ── */
 	--bc-orange-400: 251 146 60;
 	--bc-orange-500: 249 115 22;
+
+	/* Env accent palette. Tol bright (https://personal.sron.nl/~pault/).
+	 * Not remapped in .colorblind-* blocks — Tol bright is CVD-safe. */
+	--bc-env-1-500: 68 119 170;    /* #4477AA */
+	--bc-env-1-300: 134 167 200;
+	--bc-env-2-500: 102 204 238;   /* #66CCEE */
+	--bc-env-2-300: 156 222 244;
+	--bc-env-3-500: 34 136 51;     /* #228833 */
+	--bc-env-3-300: 111 178 122;
+	--bc-env-4-500: 204 187 68;    /* #CCBB44 */
+	--bc-env-4-300: 222 211 133;
+	--bc-env-5-500: 238 102 119;   /* #EE6677 */
+	--bc-env-5-300: 244 156 167;
 }
 
 /* ── Light theme ─────────────────────────────────────────────── */
@@ -152,6 +165,19 @@
 	--bc-amber-300: 217 119 6;         /* amber-600 */
 	--bc-amber-400: 217 119 6;         /* amber-600 */
 	--bc-amber-500: 180 83 9;          /* amber-700 */
+
+	/* Env accents — light mode. Tol-bright-family darkened to hit AA on white.
+	 * 300 is darker than 500 here (flips vs. dark mode) to read as text on pill. */
+	--bc-env-1-500: 68 119 170;        /* #4477AA */
+	--bc-env-1-300: 42 82 120;         /* #2A5278 */
+	--bc-env-2-500: 0 102 153;         /* #006699 */
+	--bc-env-2-300: 0 73 110;          /* #00496E */
+	--bc-env-3-500: 31 122 46;         /* #1F7A2E */
+	--bc-env-3-300: 22 88 34;          /* #165822 */
+	--bc-env-4-500: 128 102 0;         /* #806600 */
+	--bc-env-4-300: 92 74 0;           /* #5C4A00 */
+	--bc-env-5-500: 204 51 68;         /* #CC3344 */
+	--bc-env-5-300: 150 37 48;         /* #962530 */
 }
 
 /* ── Colorblind: Deuteranopia (red-green, most common) ─────── */

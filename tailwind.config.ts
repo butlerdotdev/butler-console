@@ -98,34 +98,13 @@ export default {
 					400: v('orange-400'),
 					500: v('orange-500'),
 				},
-				// Environment accent palette sourced from Paul Tol's "bright"
-				// qualitative color scheme (https://personal.sron.nl/~pault/).
-				// Tol's bright was designed with three explicit goals:
-				// distinguishable under normal vision, CVD-safe
-				// (deuteranopia / protanopia / tritanopia), AND
-				// approximately luminance-balanced so the colors read as
-				// equally weighted on a page.
-				//
-				// These accents are arbitrary "tell N envs apart"
-				// markers, not semantic roles, so they sit outside the
-				// --bc-* theme-variable system and stay fixed across
-				// default, light, and all colorblind modes. Per-mode
-				// remaps would defeat Tol's distinguishability property
-				// by design.
-				//
-				// Five of Tol's six bright colors are live. The sixth
-				// (purple #AA3377) is omitted here because its
-				// luminance sits noticeably below the other five and
-				// reintroduces the unevenness the switch to Tol was
-				// meant to fix. Available if a 6th env slot is ever
-				// needed, acknowledging the minor luminance drop.
-				'env-1': { 300: '#86A7C8', 500: '#4477AA' }, // blue
-				'env-2': { 300: '#9CDEF4', 500: '#66CCEE' }, // cyan
-				'env-3': { 300: '#6FB27A', 500: '#228833' }, // green
-				'env-4': { 300: '#DED385', 500: '#CCBB44' }, // yellow
-				'env-5': { 300: '#F49CA7', 500: '#EE6677' }, // red/pink
-				// Reserved 6th: #AA3377 (purple) — lower luminance, use
-				// only if a 6th env slot is needed.
+				// Env accents. Per-mode values in index.css under --bc-env-N-*.
+				// Tol bright (dark mode) and darker Tol-family (light mode).
+				'env-1': { 300: v('env-1-300'), 500: v('env-1-500') },
+				'env-2': { 300: v('env-2-300'), 500: v('env-2-500') },
+				'env-3': { 300: v('env-3-300'), 500: v('env-3-500') },
+				'env-4': { 300: v('env-4-300'), 500: v('env-4-500') },
+				'env-5': { 300: v('env-5-300'), 500: v('env-5-500') },
 			},
 			gridTemplateColumns: {
 				'16': 'repeat(16, minmax(0, 1fr))',

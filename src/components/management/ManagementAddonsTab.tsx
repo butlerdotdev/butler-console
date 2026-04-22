@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Card, Button, Spinner } from '@/components/ui'
+import { Card, Button, Spinner, SearchableSelect } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { useToast } from '@/hooks/useToast'
 import {
@@ -52,6 +52,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 	// Git provider state
 	const [gitConfig, setGitConfig] = useState<GitProviderConfig | null>(null)
 	const [repositories, setRepositories] = useState<Repository[]>([])
+	const [loadingRepos, setLoadingRepos] = useState(false)
 
 	// Management GitOps status (includes configured repository)
 	const [mgmtGitOpsStatus, setMgmtGitOpsStatus] = useState<GitOpsStatus | null>(null)
@@ -89,11 +90,14 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 				setGitConfig(config)
 
 				if (config.configured) {
+					setLoadingRepos(true)
 					const repos = await gitopsApi.listRepositories()
 					setRepositories(repos)
 				}
 			} catch (err) {
 				console.warn('Failed to load git config:', err)
+			} finally {
+				setLoadingRepos(false)
 			}
 		}
 		fetchGitConfig()
@@ -446,6 +450,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 					addon={gitopsExportAddon}
 					isOpen={!!gitopsExportAddon}
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					configuredRepository={mgmtGitOpsStatus?.repository}
 					configuredBranch={mgmtGitOpsStatus?.branch}
 					gitConfigured={gitConfig?.configured ?? false}
@@ -460,6 +465,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 					addon={migrateToGitOps}
 					isOpen={!!migrateToGitOps}
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					configuredRepository={mgmtGitOpsStatus?.repository}
 					configuredBranch={mgmtGitOpsStatus?.branch}
 					gitConfigured={gitConfig?.configured ?? false}
@@ -804,6 +810,7 @@ interface GitOpsExportModalProps {
 	addon: AddonDefinition
 	isOpen: boolean
 	repositories: Repository[]
+	loadingRepos?: boolean
 	configuredRepository?: string
 	configuredBranch?: string
 	gitConfigured: boolean
@@ -811,7 +818,7 @@ interface GitOpsExportModalProps {
 	onExport: (config: { repository: string; branch: string; path: string; createPR: boolean }) => void
 }
 
-function GitOpsExportModal({ addon, isOpen, repositories, configuredRepository, configuredBranch, gitConfigured, onClose, onExport }: GitOpsExportModalProps) {
+function GitOpsExportModal({ addon, isOpen, repositories, loadingRepos, configuredRepository, configuredBranch, gitConfigured, onClose, onExport }: GitOpsExportModalProps) {
 	// Generate correct path based on addon.platform
 	const defaultPath = addon.platform
 		? `clusters/management/infrastructure/${addon.name}`
@@ -823,6 +830,7 @@ function GitOpsExportModal({ addon, isOpen, repositories, configuredRepository, 
 	const [createPR, setCreatePR] = useState(true)
 	const [branches, setBranches] = useState<Branch[]>([])
 	const [loadingBranches, setLoadingBranches] = useState(false)
+	const [exporting, setExporting] = useState(false)
 
 	// Preview state
 	const [preview, setPreview] = useState<Record<string, string> | null>(null)
@@ -860,9 +868,8 @@ function GitOpsExportModal({ addon, isOpen, repositories, configuredRepository, 
 		const loadBranches = async () => {
 			setLoadingBranches(true)
 			try {
-				const [owner, repo] = repository.split('/')
-				if (owner && repo) {
-					const branchList = await gitopsApi.listBranches(owner, repo)
+				if (repository) {
+					const branchList = await gitopsApi.listBranches(repository)
 					setBranches(branchList)
 
 					// Set default branch if available (but prefer configuredBranch)
@@ -966,24 +973,30 @@ function GitOpsExportModal({ addon, isOpen, repositories, configuredRepository, 
 						<label className="block text-sm font-medium text-neutral-300 mb-1">
 							Target Repository
 						</label>
-						<select
+						<SearchableSelect
 							value={repository}
-							onChange={(e) => setRepository(e.target.value)}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-						>
-							<option value="">Select a repository...</option>
-							{repositories.map((repo) => (
-								<option key={repo.fullName} value={repo.fullName}>
-									{repo.fullName} {repo.private ? '(private)' : ''}
-								</option>
-							))}
-						</select>
+							onChange={setRepository}
+							options={repositories.map((repo) => ({
+								value: repo.fullName,
+								label: repo.fullName,
+								suffix: repo.private ? '(private)' : undefined,
+							}))}
+							placeholder="Select a repository..."
+							loading={loadingRepos}
+							loadingText="Loading repositories..."
+							focusRingColor="focus-within:ring-violet-500"
+						/>
 					</div>
 
 					{/* Branch and Path */}
 					<div className="grid grid-cols-2 gap-4">
 						<div>
-							<label className="block text-sm font-medium text-neutral-300 mb-1">Branch</label>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">
+								{createPR ? 'Target Branch' : 'Branch'}
+							</label>
+							{createPR && (
+								<p className="text-xs text-neutral-500 mb-1">MR will be opened against this branch</p>
+							)}
 							<div className="relative">
 								<select
 									value={branch}
@@ -1093,13 +1106,24 @@ function GitOpsExportModal({ addon, isOpen, repositories, configuredRepository, 
 			</ModalBody>
 
 			<ModalFooter>
-				<Button variant="secondary" onClick={onClose}>Cancel</Button>
+				<Button variant="secondary" onClick={onClose} disabled={exporting}>Cancel</Button>
 				<Button
 					variant="primary"
-					onClick={() => onExport({ repository, branch, path, createPR })}
-					disabled={!repository}
+					onClick={async () => {
+						setExporting(true)
+						try {
+							await onExport({ repository, branch, path, createPR })
+						} finally {
+							setExporting(false)
+						}
+					}}
+					disabled={!repository || exporting}
 				>
-					{createPR ? 'Create Pull Request' : 'Export'}
+					{exporting ? (
+						<><Spinner size="sm" /><span className="ml-2">Exporting...</span></>
+					) : (
+						'Export'
+					)}
 				</Button>
 			</ModalFooter>
 		</Modal>
@@ -1112,6 +1136,7 @@ interface MigrateToGitOpsModalProps {
 	addon: ManagementAddon
 	isOpen: boolean
 	repositories: Repository[]
+	loadingRepos?: boolean
 	configuredRepository?: string
 	configuredBranch?: string
 	gitConfigured: boolean
@@ -1119,7 +1144,7 @@ interface MigrateToGitOpsModalProps {
 	onMigrate: (config: { repository: string; branch: string; path: string; createPR: boolean; helmRepoUrl?: string }) => void
 }
 
-function MigrateToGitOpsModal({ addon, isOpen, repositories, configuredRepository, configuredBranch, gitConfigured, onClose, onMigrate }: MigrateToGitOpsModalProps) {
+function MigrateToGitOpsModal({ addon, isOpen, repositories, loadingRepos, configuredRepository, configuredBranch, gitConfigured, onClose, onMigrate }: MigrateToGitOpsModalProps) {
 	// For installed releases, default to apps/ path (most management addons are apps)
 	const defaultPath = `clusters/management/apps/${addon.addon}`
 
@@ -1130,6 +1155,7 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, configuredRepositor
 	const [branches, setBranches] = useState<Branch[]>([])
 	const [loadingBranches, setLoadingBranches] = useState(false)
 	const [helmRepoUrl, setHelmRepoUrl] = useState('')
+	const [exporting, setExporting] = useState(false)
 
 	// Auto-select configured repository when available
 	useEffect(() => {
@@ -1160,9 +1186,8 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, configuredRepositor
 		const loadBranches = async () => {
 			setLoadingBranches(true)
 			try {
-				const [owner, repo] = repository.split('/')
-				if (owner && repo) {
-					const branchList = await gitopsApi.listBranches(owner, repo)
+				if (repository) {
+					const branchList = await gitopsApi.listBranches(repository)
 					setBranches(branchList)
 
 					// Set default branch if available (but prefer configuredBranch)
@@ -1237,24 +1262,30 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, configuredRepositor
 						<label className="block text-sm font-medium text-neutral-300 mb-1">
 							Target Repository
 						</label>
-						<select
+						<SearchableSelect
 							value={repository}
-							onChange={(e) => setRepository(e.target.value)}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-						>
-							<option value="">Select a repository...</option>
-							{repositories.map((repo) => (
-								<option key={repo.fullName} value={repo.fullName}>
-									{repo.fullName} {repo.private ? '(private)' : ''}
-								</option>
-							))}
-						</select>
+							onChange={setRepository}
+							options={repositories.map((repo) => ({
+								value: repo.fullName,
+								label: repo.fullName,
+								suffix: repo.private ? '(private)' : undefined,
+							}))}
+							placeholder="Select a repository..."
+							loading={loadingRepos}
+							loadingText="Loading repositories..."
+							focusRingColor="focus-within:ring-violet-500"
+						/>
 					</div>
 
 					{/* Branch and Path */}
 					<div className="grid grid-cols-2 gap-4">
 						<div>
-							<label className="block text-sm font-medium text-neutral-300 mb-1">Branch</label>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">
+								{createPR ? 'Target Branch' : 'Branch'}
+							</label>
+							{createPR && (
+								<p className="text-xs text-neutral-500 mb-1">MR will be opened against this branch</p>
+							)}
 							<div className="relative">
 								<select
 									value={branch}
@@ -1325,13 +1356,24 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, configuredRepositor
 			</ModalBody>
 
 			<ModalFooter>
-				<Button variant="secondary" onClick={onClose}>Cancel</Button>
+				<Button variant="secondary" onClick={onClose} disabled={exporting}>Cancel</Button>
 				<Button
 					variant="primary"
-					onClick={() => onMigrate({ repository, branch, path, createPR, helmRepoUrl: helmRepoUrl || undefined })}
-					disabled={!repository}
+					onClick={async () => {
+						setExporting(true)
+						try {
+							await onMigrate({ repository, branch, path, createPR, helmRepoUrl: helmRepoUrl || undefined })
+						} finally {
+							setExporting(false)
+						}
+					}}
+					disabled={!repository || exporting}
 				>
-					{createPR ? 'Create Pull Request' : 'Migrate'}
+					{exporting ? (
+						<><Spinner size="sm" /><span className="ml-2">Exporting...</span></>
+					) : (
+						'Export'
+					)}
 				</Button>
 			</ModalFooter>
 		</Modal>

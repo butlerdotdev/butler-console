@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Button, Spinner } from '@/components/ui';
+import { Button, Spinner, SearchableSelect } from '@/components/ui';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal';
 import { useToast } from '@/hooks/useToast';
 import { gitopsApi } from '@/api/gitops';
@@ -13,6 +13,7 @@ import type { DiscoveredRelease, Repository, Branch } from '@/types/gitops';
 interface ExportModalProps {
 	release: DiscoveredRelease;
 	repositories: Repository[];
+	loadingRepos?: boolean;
 	clusterNamespace: string;
 	clusterName: string;
 	configuredRepository?: string;
@@ -23,6 +24,7 @@ interface ExportModalProps {
 export function ExportModal({
 	release,
 	repositories,
+	loadingRepos,
 	clusterNamespace,
 	clusterName,
 	onClose,
@@ -75,9 +77,8 @@ export function ExportModal({
 		const loadBranches = async () => {
 			setLoadingBranches(true);
 			try {
-				const [owner, repo] = repository.split('/');
-				if (owner && repo) {
-					const branchList = await gitopsApi.listBranches(owner, repo);
+				if (repository) {
+					const branchList = await gitopsApi.listBranches(repository);
 					setBranches(branchList);
 
 					// Set default branch if available
@@ -194,18 +195,17 @@ export function ExportModal({
 						<label className="block text-sm font-medium text-neutral-300 mb-1">
 							Target Repository
 						</label>
-						<select
+						<SearchableSelect
 							value={repository}
-							onChange={(e) => setRepository(e.target.value)}
-							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-						>
-							<option value="">Select a repository...</option>
-							{repositories.map((repo) => (
-								<option key={repo.fullName} value={repo.fullName}>
-									{repo.fullName}
-								</option>
-							))}
-						</select>
+							onChange={setRepository}
+							options={repositories.map((repo) => ({
+								value: repo.fullName,
+								label: repo.fullName,
+							}))}
+							placeholder="Select a repository..."
+							loading={loadingRepos}
+							loadingText="Loading repositories..."
+						/>
 					</div>
 
 					{/* Branch Selection */}

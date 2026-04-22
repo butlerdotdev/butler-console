@@ -54,8 +54,8 @@ export const gitopsApi = {
 	/**
 	 * List branches for a repository
 	 */
-	async listBranches(owner: string, repo: string): Promise<Branch[]> {
-		return apiClient.get<Branch[]>(`/gitops/repos/${owner}/${repo}/branches`);
+	async listBranches(fullName: string): Promise<Branch[]> {
+		return apiClient.get<Branch[]>(`/gitops/repos/branches?repo=${encodeURIComponent(fullName)}`);
 	},
 
 	/**

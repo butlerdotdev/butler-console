@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, Spinner, Button } from '@/components/ui';
+import { Card, Spinner, Button, SearchableSelect } from '@/components/ui';
 import { useToast } from '@/hooks/useToast';
 import { gitopsApi } from '@/api/gitops';
 import type {
@@ -12,6 +12,7 @@ import type {
 	DiscoveryResult,
 	DiscoveredRelease,
 	Repository,
+	Branch,
 } from '@/types/gitops';
 import { sortReleases, GITOPS_TOOL_CONFIG, getCategoryLabel } from '@/types/gitops';
 import { GitProviderSetup } from '@/components/clusters/gitops/GitProviderSetup';
@@ -38,6 +39,7 @@ export function ManagementGitOpsTab() {
 	const [gitConfig, setGitConfig] = useState<GitProviderConfig | null>(null);
 	const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
 	const [repositories, setRepositories] = useState<Repository[]>([]);
+	const [loadingRepos, setLoadingRepos] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [discovering, setDiscovering] = useState(false);
 	const [disabling, setDisabling] = useState(false);
@@ -48,6 +50,7 @@ export function ManagementGitOpsTab() {
 	const [showEnableModal, setShowEnableModal] = useState(false);
 	const [showDisableConfirm, setShowDisableConfirm] = useState(false);
 	const [showMigrateAll, setShowMigrateAll] = useState(false);
+	const [reconfiguring, setReconfiguring] = useState(false);
 
 	// Load Git provider config
 	const loadGitConfig = useCallback(async () => {
@@ -55,14 +58,13 @@ export function ManagementGitOpsTab() {
 			const config = await gitopsApi.getConfig();
 			setGitConfig(config);
 
-			// If configured, also load repositories
+			// Load repositories in the background
 			if (config.configured) {
-				try {
-					const repos = await gitopsApi.listRepositories();
-					setRepositories(repos);
-				} catch (err) {
-					console.warn('Failed to load repositories:', err);
-				}
+				setLoadingRepos(true);
+				gitopsApi.listRepositories()
+					.then(repos => setRepositories(repos))
+					.catch(err => console.warn('Failed to load repositories:', err))
+					.finally(() => setLoadingRepos(false));
 			}
 		} catch (err) {
 			console.error('Failed to load GitOps config:', err);
@@ -85,12 +87,11 @@ export function ManagementGitOpsTab() {
 		}
 	}, [showError]);
 
-	// Initial load
+	// Initial load — config and discover run in parallel, repos load in background
 	useEffect(() => {
 		const load = async () => {
 			setLoading(true);
-			await loadGitConfig();
-			await discoverReleases();
+			await Promise.all([loadGitConfig(), discoverReleases()]);
 			setLoading(false);
 		};
 		load();
@@ -135,10 +136,16 @@ export function ManagementGitOpsTab() {
 		);
 	}
 
-	// No Git provider configured
-	if (!gitConfig?.configured) {
+	// No Git provider configured, or user wants to reconfigure
+	if (!gitConfig?.configured || reconfiguring) {
 		return (
-			<GitProviderSetup onConfigured={handleGitConfigured} />
+			<GitProviderSetup
+				onConfigured={() => {
+					setReconfiguring(false);
+					handleGitConfigured();
+				}}
+				onCancel={reconfiguring ? () => setReconfiguring(false) : undefined}
+			/>
 		);
 	}
 
@@ -271,9 +278,15 @@ export function ManagementGitOpsTab() {
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-3">
 						<div className="w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center">
-							<svg className="w-5 h-5 text-neutral-400" fill="currentColor" viewBox="0 0 24 24">
-								<path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
-							</svg>
+							{gitConfig.type === 'gitlab' ? (
+								<svg className="w-5 h-5 text-orange-400" fill="currentColor" viewBox="0 0 24 24">
+									<path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 01-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 014.82 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0118.6 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.51L23 13.45a.84.84 0 01-.35.94z" />
+								</svg>
+							) : (
+								<svg className="w-5 h-5 text-neutral-400" fill="currentColor" viewBox="0 0 24 24">
+									<path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
+								</svg>
+							)}
 						</div>
 						<div>
 							<p className="text-neutral-200 font-medium">
@@ -285,14 +298,23 @@ export function ManagementGitOpsTab() {
 							</p>
 						</div>
 					</div>
-					<Button
-						variant="secondary"
-						size="sm"
-						onClick={() => setShowMigrateAll(true)}
-						disabled={discovering || allReleases.length === 0}
-					>
-						Export All to GitOps
-					</Button>
+					<div className="flex items-center gap-2">
+						<Button
+							variant="secondary"
+							size="sm"
+							onClick={() => setReconfiguring(true)}
+						>
+							Reconfigure
+						</Button>
+						<Button
+							variant="secondary"
+							size="sm"
+							onClick={() => setShowMigrateAll(true)}
+							disabled={discovering || allReleases.length === 0}
+						>
+							Export All to GitOps
+						</Button>
+					</div>
 				</div>
 			</Card>
 
@@ -369,6 +391,7 @@ export function ManagementGitOpsTab() {
 			{showEnableModal && (
 				<EnableManagementGitOpsModal
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					onClose={() => setShowEnableModal(false)}
 					onSuccess={handleEnableSuccess}
 				/>
@@ -388,6 +411,7 @@ export function ManagementGitOpsTab() {
 				<ManagementExportModal
 					release={exportRelease}
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					configuredRepository={gitopsEngine?.repository}
 					onClose={() => setExportRelease(null)}
 					onSuccess={(result) => {
@@ -406,6 +430,7 @@ export function ManagementGitOpsTab() {
 				<ManagementMigrateAllModal
 					releases={allReleases}
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					configuredRepository={gitopsEngine?.repository}
 					onClose={() => setShowMigrateAll(false)}
 					onSuccess={(result) => {
@@ -426,12 +451,14 @@ export function ManagementGitOpsTab() {
 // Enable Management GitOps Modal Component
 interface EnableManagementGitOpsModalProps {
 	repositories: Repository[];
+	loadingRepos?: boolean;
 	onClose: () => void;
 	onSuccess: () => void;
 }
 
 function EnableManagementGitOpsModal({
 	repositories,
+	loadingRepos,
 	onClose,
 	onSuccess,
 }: EnableManagementGitOpsModalProps) {
@@ -445,6 +472,31 @@ function EnableManagementGitOpsModal({
 	const [componentsExtra, setComponentsExtra] = useState<string[]>(
 		FLUX_EXTRA_COMPONENTS.map(c => c.name)
 	);
+
+	// Branch loading
+	const [branches, setBranches] = useState<Branch[]>([]);
+	const [loadingBranches, setLoadingBranches] = useState(false);
+
+	useEffect(() => {
+		if (!repository) {
+			setBranches([]);
+			return;
+		}
+		const load = async () => {
+			setLoadingBranches(true);
+			try {
+				const list = await gitopsApi.listBranches(repository);
+				setBranches(list);
+				const def = repositories.find(r => r.fullName === repository)?.defaultBranch;
+				if (def && branch === 'main') setBranch(def);
+			} catch {
+				setBranches([]);
+			} finally {
+				setLoadingBranches(false);
+			}
+		};
+		load();
+	}, [repository, repositories]);
 
 	// Loading state
 	const [enabling, setEnabling] = useState(false);
@@ -511,18 +563,20 @@ function EnableManagementGitOpsModal({
 							<label className="block text-sm font-medium text-neutral-300 mb-1">
 								Target Repository
 							</label>
-							<select
+							<SearchableSelect
 								value={repository}
-								onChange={(e) => setRepository(e.target.value)}
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-							>
-								<option value="">Select a repository...</option>
-								{repositories.map((repo) => (
-									<option key={repo.fullName} value={repo.fullName}>
-										{repo.fullName} {repo.private ? '(private)' : ''}
-									</option>
-								))}
-							</select>
+								onChange={setRepository}
+								options={repositories.map((repo) => ({
+									value: repo.fullName,
+									label: repo.fullName,
+									suffix: repo.private ? '(private)' : undefined,
+								}))}
+								placeholder="Select a repository..."
+								loading={loadingRepos}
+								loadingText="Loading repositories..."
+								disabled={loadingRepos}
+								focusRingColor="focus-within:ring-violet-500"
+							/>
 						</div>
 
 						{/* Branch and Path */}
@@ -531,12 +585,30 @@ function EnableManagementGitOpsModal({
 								<label className="block text-sm font-medium text-neutral-300 mb-1">
 									Branch
 								</label>
-								<input
-									type="text"
-									value={branch}
-									onChange={(e) => setBranch(e.target.value)}
-									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-								/>
+								{loadingBranches ? (
+									<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-500 flex items-center gap-2">
+										<Spinner size="sm" /> Loading branches...
+									</div>
+								) : branches.length > 0 ? (
+									<select
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									>
+										{branches.map((b) => (
+											<option key={b.name} value={b.name}>
+												{b.name}{b.default ? ' (default)' : ''}
+											</option>
+										))}
+									</select>
+								) : (
+									<input
+										type="text"
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									/>
+								)}
 							</div>
 							<div>
 								<label className="block text-sm font-medium text-neutral-300 mb-1">
@@ -728,6 +800,7 @@ function DisableManagementGitOpsModal({ disabling, onClose, onConfirm }: Disable
 interface ManagementExportModalProps {
 	release: DiscoveredRelease;
 	repositories: Repository[];
+	loadingRepos?: boolean;
 	configuredRepository?: string; // owner/repo format - auto-select this if provided
 	onClose: () => void;
 	onSuccess: (result: { prUrl?: string; commitUrl?: string }) => void;
@@ -736,6 +809,7 @@ interface ManagementExportModalProps {
 function ManagementExportModal({
 	release,
 	repositories,
+	loadingRepos,
 	configuredRepository,
 	onClose,
 	onSuccess,
@@ -750,12 +824,37 @@ function ManagementExportModal({
 	const [prTitle, setPrTitle] = useState(`Add ${release.name} to GitOps`);
 	const [helmRepoUrl, setHelmRepoUrl] = useState(release.repoUrl || '');
 
+	const [branches, setBranches] = useState<Branch[]>([]);
+	const [loadingBranches, setLoadingBranches] = useState(false);
+
 	// Update repository when configuredRepository becomes available
 	useEffect(() => {
 		if (configuredRepository && !repository) {
 			setRepository(configuredRepository);
 		}
 	}, [configuredRepository, repository]);
+
+	// Load branches when repository changes
+	useEffect(() => {
+		if (!repository) {
+			setBranches([]);
+			return;
+		}
+		const load = async () => {
+			setLoadingBranches(true);
+			try {
+				const list = await gitopsApi.listBranches(repository);
+				setBranches(list);
+				const def = repositories.find(r => r.fullName === repository)?.defaultBranch;
+				if (def && branch === 'main') setBranch(def);
+			} catch {
+				setBranches([]);
+			} finally {
+				setLoadingBranches(false);
+			}
+		};
+		load();
+	}, [repository, repositories]);
 
 	// Loading state
 	const [exporting, setExporting] = useState(false);
@@ -895,32 +994,57 @@ function ManagementExportModal({
 									<span className="ml-2 text-xs text-violet-400">(GitOps configured)</span>
 								)}
 							</label>
-							<select
+							<SearchableSelect
 								value={repository}
-								onChange={(e) => setRepository(e.target.value)}
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-							>
-								<option value="">Select a repository...</option>
-								{repositories.map((repo) => (
-									<option key={repo.fullName} value={repo.fullName}>
-										{repo.fullName} {repo.fullName === configuredRepository ? '✓' : ''} {repo.private ? '(private)' : ''}
-									</option>
-								))}
-							</select>
+								onChange={setRepository}
+								options={repositories.map((repo) => ({
+									value: repo.fullName,
+									label: repo.fullName,
+									suffix: [
+										repo.fullName === configuredRepository ? '✓' : '',
+										repo.private ? '(private)' : '',
+									].filter(Boolean).join(' ') || undefined,
+								}))}
+								placeholder="Select a repository..."
+								loading={loadingRepos}
+								loadingText="Loading repositories..."
+								focusRingColor="focus-within:ring-violet-500"
+							/>
 						</div>
 
 						{/* Branch and Path */}
 						<div className="grid grid-cols-2 gap-4">
 							<div>
 								<label className="block text-sm font-medium text-neutral-300 mb-1">
-									Branch
+									{createPR ? 'Target Branch' : 'Branch'}
 								</label>
-								<input
-									type="text"
-									value={branch}
-									onChange={(e) => setBranch(e.target.value)}
-									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-								/>
+								{createPR && (
+									<p className="text-xs text-neutral-500 mb-1">MR will be opened against this branch</p>
+								)}
+								{loadingBranches ? (
+									<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-500 flex items-center gap-2">
+										<Spinner size="sm" /> Loading branches...
+									</div>
+								) : branches.length > 0 ? (
+									<select
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									>
+										{branches.map((b) => (
+											<option key={b.name} value={b.name}>
+												{b.name}{b.default ? ' (default)' : ''}
+											</option>
+										))}
+									</select>
+								) : (
+									<input
+										type="text"
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									/>
+								)}
 							</div>
 							<div>
 								<label className="block text-sm font-medium text-neutral-300 mb-1">
@@ -1054,6 +1178,7 @@ function ManagementExportModal({
 interface ManagementMigrateAllModalProps {
 	releases: DiscoveredRelease[];
 	repositories: Repository[];
+	loadingRepos?: boolean;
 	configuredRepository?: string;
 	onClose: () => void;
 	onSuccess: (result: { prUrl?: string }) => void;
@@ -1062,6 +1187,7 @@ interface ManagementMigrateAllModalProps {
 function ManagementMigrateAllModal({
 	releases,
 	repositories,
+	loadingRepos,
 	configuredRepository,
 	onClose,
 	onSuccess,
@@ -1085,6 +1211,31 @@ function ManagementMigrateAllModal({
 			setRepository(configuredRepository);
 		}
 	}, [configuredRepository, repository]);
+
+	// Branch loading
+	const [branches, setBranches] = useState<Branch[]>([]);
+	const [loadingBranches, setLoadingBranches] = useState(false);
+
+	useEffect(() => {
+		if (!repository) {
+			setBranches([]);
+			return;
+		}
+		const load = async () => {
+			setLoadingBranches(true);
+			try {
+				const list = await gitopsApi.listBranches(repository);
+				setBranches(list);
+				const def = repositories.find(r => r.fullName === repository)?.defaultBranch;
+				if (def && branch === 'main') setBranch(def);
+			} catch {
+				setBranches([]);
+			} finally {
+				setLoadingBranches(false);
+			}
+		};
+		load();
+	}, [repository, repositories]);
 
 	// Loading state
 	const [migrating, setMigrating] = useState(false);
@@ -1220,30 +1371,55 @@ function ManagementMigrateAllModal({
 										<span className="ml-2 text-xs text-violet-400">(GitOps configured)</span>
 									)}
 								</label>
-								<select
+								<SearchableSelect
 									value={repository}
-									onChange={(e) => setRepository(e.target.value)}
-									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-								>
-									<option value="">Select a repository...</option>
-									{repositories.map((repo) => (
-										<option key={repo.fullName} value={repo.fullName}>
-											{repo.fullName} {repo.fullName === configuredRepository ? '✓' : ''} {repo.private ? '(private)' : ''}
-										</option>
-									))}
-								</select>
+									onChange={setRepository}
+									options={repositories.map((repo) => ({
+										value: repo.fullName,
+										label: repo.fullName,
+										suffix: [
+											repo.fullName === configuredRepository ? '✓' : '',
+											repo.private ? '(private)' : '',
+										].filter(Boolean).join(' ') || undefined,
+									}))}
+									placeholder="Select a repository..."
+									loading={loadingRepos}
+									loadingText="Loading repositories..."
+									focusRingColor="focus-within:ring-violet-500"
+								/>
 							</div>
 
 							<div>
 								<label className="block text-sm font-medium text-neutral-300 mb-1">
-									Branch
+									{createPR ? 'Target Branch' : 'Branch'}
 								</label>
-								<input
-									type="text"
-									value={branch}
-									onChange={(e) => setBranch(e.target.value)}
-									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-								/>
+								{createPR && (
+									<p className="text-xs text-neutral-500 mb-1">MR will be opened against this branch</p>
+								)}
+								{loadingBranches ? (
+									<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-500 flex items-center gap-2">
+										<Spinner size="sm" /> Loading branches...
+									</div>
+								) : branches.length > 0 ? (
+									<select
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									>
+										{branches.map((b) => (
+											<option key={b.name} value={b.name}>
+												{b.name}{b.default ? ' (default)' : ''}
+											</option>
+										))}
+									</select>
+								) : (
+									<input
+										type="text"
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									/>
+								)}
 							</div>
 						</div>
 

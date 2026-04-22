@@ -52,6 +52,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 	// Git provider state
 	const [gitConfig, setGitConfig] = useState<GitProviderConfig | null>(null)
 	const [repositories, setRepositories] = useState<Repository[]>([])
+	const [loadingRepos, setLoadingRepos] = useState(false)
 
 	// Management GitOps status (includes configured repository)
 	const [mgmtGitOpsStatus, setMgmtGitOpsStatus] = useState<GitOpsStatus | null>(null)
@@ -89,11 +90,14 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 				setGitConfig(config)
 
 				if (config.configured) {
+					setLoadingRepos(true)
 					const repos = await gitopsApi.listRepositories()
 					setRepositories(repos)
 				}
 			} catch (err) {
 				console.warn('Failed to load git config:', err)
+			} finally {
+				setLoadingRepos(false)
 			}
 		}
 		fetchGitConfig()
@@ -446,6 +450,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 					addon={gitopsExportAddon}
 					isOpen={!!gitopsExportAddon}
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					configuredRepository={mgmtGitOpsStatus?.repository}
 					configuredBranch={mgmtGitOpsStatus?.branch}
 					gitConfigured={gitConfig?.configured ?? false}
@@ -460,6 +465,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 					addon={migrateToGitOps}
 					isOpen={!!migrateToGitOps}
 					repositories={repositories}
+					loadingRepos={loadingRepos}
 					configuredRepository={mgmtGitOpsStatus?.repository}
 					configuredBranch={mgmtGitOpsStatus?.branch}
 					gitConfigured={gitConfig?.configured ?? false}
@@ -804,6 +810,7 @@ interface GitOpsExportModalProps {
 	addon: AddonDefinition
 	isOpen: boolean
 	repositories: Repository[]
+	loadingRepos?: boolean
 	configuredRepository?: string
 	configuredBranch?: string
 	gitConfigured: boolean
@@ -811,7 +818,7 @@ interface GitOpsExportModalProps {
 	onExport: (config: { repository: string; branch: string; path: string; createPR: boolean }) => void
 }
 
-function GitOpsExportModal({ addon, isOpen, repositories, configuredRepository, configuredBranch, gitConfigured, onClose, onExport }: GitOpsExportModalProps) {
+function GitOpsExportModal({ addon, isOpen, repositories, loadingRepos, configuredRepository, configuredBranch, gitConfigured, onClose, onExport }: GitOpsExportModalProps) {
 	// Generate correct path based on addon.platform
 	const defaultPath = addon.platform
 		? `clusters/management/infrastructure/${addon.name}`
@@ -860,9 +867,8 @@ function GitOpsExportModal({ addon, isOpen, repositories, configuredRepository, 
 		const loadBranches = async () => {
 			setLoadingBranches(true)
 			try {
-				const [owner, repo] = repository.split('/')
-				if (owner && repo) {
-					const branchList = await gitopsApi.listBranches(owner, repo)
+				if (repository) {
+					const branchList = await gitopsApi.listBranches(repository)
 					setBranches(branchList)
 
 					// Set default branch if available (but prefer configuredBranch)
@@ -975,6 +981,8 @@ function GitOpsExportModal({ addon, isOpen, repositories, configuredRepository, 
 								suffix: repo.private ? '(private)' : undefined,
 							}))}
 							placeholder="Select a repository..."
+							loading={loadingRepos}
+							loadingText="Loading repositories..."
 							focusRingColor="focus-within:ring-violet-500"
 						/>
 					</div>
@@ -1111,6 +1119,7 @@ interface MigrateToGitOpsModalProps {
 	addon: ManagementAddon
 	isOpen: boolean
 	repositories: Repository[]
+	loadingRepos?: boolean
 	configuredRepository?: string
 	configuredBranch?: string
 	gitConfigured: boolean
@@ -1118,7 +1127,7 @@ interface MigrateToGitOpsModalProps {
 	onMigrate: (config: { repository: string; branch: string; path: string; createPR: boolean; helmRepoUrl?: string }) => void
 }
 
-function MigrateToGitOpsModal({ addon, isOpen, repositories, configuredRepository, configuredBranch, gitConfigured, onClose, onMigrate }: MigrateToGitOpsModalProps) {
+function MigrateToGitOpsModal({ addon, isOpen, repositories, loadingRepos, configuredRepository, configuredBranch, gitConfigured, onClose, onMigrate }: MigrateToGitOpsModalProps) {
 	// For installed releases, default to apps/ path (most management addons are apps)
 	const defaultPath = `clusters/management/apps/${addon.addon}`
 
@@ -1159,9 +1168,8 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, configuredRepositor
 		const loadBranches = async () => {
 			setLoadingBranches(true)
 			try {
-				const [owner, repo] = repository.split('/')
-				if (owner && repo) {
-					const branchList = await gitopsApi.listBranches(owner, repo)
+				if (repository) {
+					const branchList = await gitopsApi.listBranches(repository)
 					setBranches(branchList)
 
 					// Set default branch if available (but prefer configuredBranch)
@@ -1245,6 +1253,8 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, configuredRepositor
 								suffix: repo.private ? '(private)' : undefined,
 							}))}
 							placeholder="Select a repository..."
+							loading={loadingRepos}
+							loadingText="Loading repositories..."
 							focusRingColor="focus-within:ring-violet-500"
 						/>
 					</div>

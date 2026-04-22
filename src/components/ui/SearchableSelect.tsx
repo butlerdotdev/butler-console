@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 
 export interface SearchableSelectOption {
@@ -40,7 +41,9 @@ export function SearchableSelect({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const listRef = useRef<HTMLUListElement>(null);
+	const dropdownRef = useRef<HTMLDivElement>(null);
 	const [highlightIndex, setHighlightIndex] = useState(0);
+	const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
 
 	const filtered = query
 		? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
@@ -48,10 +51,52 @@ export function SearchableSelect({
 
 	const selectedOption = options.find((o) => o.value === value);
 
-	// Close on outside click
+	// Calculate dropdown position from trigger rect
+	const updatePosition = useCallback(() => {
+		if (!containerRef.current) return;
+		const rect = containerRef.current.getBoundingClientRect();
+		const spaceBelow = window.innerHeight - rect.bottom;
+		const dropdownMaxH = 288; // max-h-60 + search input (~48px)
+		const flipUp = spaceBelow < dropdownMaxH && rect.top > spaceBelow;
+
+		setDropdownStyle({
+			position: 'fixed',
+			left: rect.left,
+			width: rect.width,
+			zIndex: 9999,
+			...(flipUp
+				? { bottom: window.innerHeight - rect.top + 4 }
+				: { top: rect.bottom + 4 }),
+		});
+	}, []);
+
+	// Reposition on scroll / resize while open
+	useEffect(() => {
+		if (!open) return;
+		updatePosition();
+		const handleReposition = () => updatePosition();
+		window.addEventListener('scroll', handleReposition, true);
+		window.addEventListener('resize', handleReposition);
+		return () => {
+			window.removeEventListener('scroll', handleReposition, true);
+			window.removeEventListener('resize', handleReposition);
+		};
+	}, [open, updatePosition]);
+
+	// Focus the search input when dropdown opens
+	useLayoutEffect(() => {
+		if (open) {
+			setTimeout(() => inputRef.current?.focus(), 0);
+		}
+	}, [open]);
+
+	// Close on outside click (handles both trigger and portaled dropdown)
 	useEffect(() => {
 		const handler = (e: MouseEvent) => {
-			if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+			const target = e.target as Node;
+			const inContainer = containerRef.current?.contains(target);
+			const inDropdown = dropdownRef.current?.contains(target);
+			if (!inContainer && !inDropdown) {
 				setOpen(false);
 				setQuery('');
 			}
@@ -130,9 +175,6 @@ export function SearchableSelect({
 				onClick={() => {
 					if (disabled || loading) return;
 					setOpen(!open);
-					if (!open) {
-						setTimeout(() => inputRef.current?.focus(), 0);
-					}
 				}}
 				disabled={disabled || loading}
 				className={cn(
@@ -152,9 +194,9 @@ export function SearchableSelect({
 				</span>
 			</button>
 
-			{/* Dropdown */}
-			{open && (
-				<div className="absolute z-50 mt-1 w-full bg-neutral-800 border border-neutral-700 rounded-lg shadow-lg overflow-hidden">
+			{/* Dropdown (portaled to body to avoid overflow clipping in modals) */}
+			{open && createPortal(
+				<div ref={dropdownRef} style={dropdownStyle} className="bg-neutral-800 border border-neutral-700 rounded-lg shadow-lg overflow-hidden">
 					{/* Search input */}
 					<div className="p-2 border-b border-neutral-700">
 						<input
@@ -162,6 +204,7 @@ export function SearchableSelect({
 							type="text"
 							value={query}
 							onChange={(e) => setQuery(e.target.value)}
+							onKeyDown={handleKeyDown}
 							placeholder="Search..."
 							className="w-full px-2 py-1.5 bg-neutral-900 border border-neutral-600 rounded text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500"
 						/>
@@ -197,7 +240,8 @@ export function SearchableSelect({
 							))
 						)}
 					</ul>
-				</div>
+				</div>,
+				document.body
 			)}
 		</div>
 	);

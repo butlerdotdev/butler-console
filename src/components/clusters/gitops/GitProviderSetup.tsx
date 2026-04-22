@@ -11,9 +11,10 @@ import type { GitProviderType } from '@/types/gitops';
 
 interface GitProviderSetupProps {
 	onConfigured: () => void;
+	onCancel?: () => void;
 }
 
-export function GitProviderSetup({ onConfigured }: GitProviderSetupProps) {
+export function GitProviderSetup({ onConfigured, onCancel }: GitProviderSetupProps) {
 	const { error: showError } = useToast();
 
 	const [providerType, setProviderType] = useState<GitProviderType>('github');
@@ -72,6 +73,9 @@ export function GitProviderSetup({ onConfigured }: GitProviderSetupProps) {
 							<button
 								onClick={() => {
 									setProviderType('github');
+									setToken('');
+									setUrl('');
+									setOrganization('');
 									setShowTokenInput(true);
 								}}
 								className="p-4 rounded-lg border-2 border-neutral-700 hover:border-green-500/50 bg-neutral-800/50 hover:bg-neutral-800 transition-all group"
@@ -89,6 +93,9 @@ export function GitProviderSetup({ onConfigured }: GitProviderSetupProps) {
 							<button
 								onClick={() => {
 									setProviderType('gitlab');
+									setToken('');
+									setUrl('');
+									setOrganization('');
 									setShowTokenInput(true);
 								}}
 								className="p-4 rounded-lg border-2 border-neutral-700 hover:border-orange-500/50 bg-neutral-800/50 hover:bg-neutral-800 transition-all group"
@@ -107,6 +114,13 @@ export function GitProviderSetup({ onConfigured }: GitProviderSetupProps) {
 						<p className="text-sm text-neutral-500 text-center">
 							Select your Git provider to get started
 						</p>
+						{onCancel && (
+							<div className="text-center pt-2">
+								<Button variant="secondary" size="sm" onClick={onCancel}>
+									Cancel
+								</Button>
+							</div>
+						)}
 					</div>
 				) : (
 					<form onSubmit={handleSubmit} className="space-y-4">
@@ -163,7 +177,7 @@ export function GitProviderSetup({ onConfigured }: GitProviderSetupProps) {
 									<>
 										Requires <code className="text-neutral-400">api</code> scope.{' '}
 										<a
-											href={`${url.trim() || 'https://gitlab.com'}/-/profile/personal_access_tokens`}
+											href={`${/^https?:\/\//i.test(url.trim()) ? url.trim() : 'https://gitlab.com'}/-/profile/personal_access_tokens`}
 											target="_blank"
 											rel="noopener noreferrer"
 											className="text-orange-400 hover:underline"

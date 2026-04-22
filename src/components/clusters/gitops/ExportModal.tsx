@@ -77,9 +77,8 @@ export function ExportModal({
 		const loadBranches = async () => {
 			setLoadingBranches(true);
 			try {
-				const [owner, repo] = repository.split('/');
-				if (owner && repo) {
-					const branchList = await gitopsApi.listBranches(owner, repo);
+				if (repository) {
+					const branchList = await gitopsApi.listBranches(repository);
 					setBranches(branchList);
 
 					// Set default branch if available

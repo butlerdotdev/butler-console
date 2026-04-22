@@ -89,9 +89,8 @@ export function MigrateAllModal({
 		const loadBranches = async () => {
 			setLoadingBranches(true);
 			try {
-				const [owner, repo] = repository.split('/');
-				if (owner && repo) {
-					const branchList = await gitopsApi.listBranches(owner, repo);
+				if (repository) {
+					const branchList = await gitopsApi.listBranches(repository);
 					setBranches(branchList);
 
 					const defaultBranch = repositories.find(r => r.fullName === repository)?.defaultBranch;

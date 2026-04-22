@@ -183,7 +183,11 @@ export function CreateClusterPage() {
 	const [resourceUsage, setResourceUsage] = useState<TeamResourceUsage | null>(null)
 	const [resourceLimits, setResourceLimits] = useState<TeamResourceLimits | null>(null)
 
-	// Fetch team resource usage/limits
+	// Team-level clusterDefaults. Merged with env.clusterDefaults below
+	// to pre-fill the worker / k8s-version fields on the form.
+	const [teamDefaults, setTeamDefaults] = useState<Record<string, unknown> | null>(null)
+
+	// Fetch team resource usage/limits + cluster defaults
 	useEffect(() => {
 		if (!currentTeam) return
 		const fetchQuota = async () => {
@@ -196,15 +200,90 @@ export function CreateClusterPage() {
 					const team = data.team || data
 					const usage = team.resourceUsage || team.status?.resourceUsage
 					const limits = team.resourceLimits || team.spec?.resourceLimits
+					const defs = team.clusterDefaults || team.spec?.clusterDefaults
 					if (usage) setResourceUsage(usage)
 					if (limits) setResourceLimits(limits)
+					if (defs) setTeamDefaults(defs)
 				}
 			} catch {
-				// Non-critical - quota warnings just won't show
+				// Non-critical; quota warnings and defaults fall back.
 			}
 		}
 		fetchQuota()
 	}, [currentTeam])
+
+	// Merge env.clusterDefaults over team.clusterDefaults. Used to
+	// pre-fill form fields and tag each with its source for the UI hint.
+	const defaultsSource = useMemo(() => {
+		const source: Record<string, 'env' | 'team'> = {}
+		const envDef = availableEnvs.find((e) => e.name === selectedEnv)?.clusterDefaults
+		const merged: Record<string, unknown> = {}
+		for (const [k, v] of Object.entries(teamDefaults ?? {})) {
+			if (v == null || v === '') continue
+			merged[k] = v
+			source[k] = 'team'
+		}
+		for (const [k, v] of Object.entries(envDef ?? {})) {
+			if (v == null || v === '') continue
+			merged[k] = v
+			source[k] = 'env'
+		}
+		return { merged, source }
+	}, [teamDefaults, availableEnvs, selectedEnv])
+
+	// Apply the merged defaults to the form, but only for fields whose
+	// current value matches the previously-applied default (so we don't
+	// clobber user edits). appliedDefaults tracks the last-applied set.
+	const [appliedDefaults, setAppliedDefaults] = useState<Record<string, unknown>>({})
+	useEffect(() => {
+		const next = defaultsSource.merged
+		setForm((prev) => {
+			const out = { ...prev }
+			const mapping: Record<string, keyof typeof prev> = {
+				kubernetesVersion: 'kubernetesVersion',
+				workerCount: 'workerReplicas',
+				workerCPU: 'workerCPU',
+			}
+			for (const [defKey, formKey] of Object.entries(mapping) as [string, keyof typeof prev][]) {
+				if (!(defKey in next)) continue
+				const nextVal = next[defKey]
+				const prevDefault = appliedDefaults[defKey]
+				const currentFormVal = prev[formKey]
+				const matchesPrev =
+					prevDefault !== undefined && String(currentFormVal) === String(prevDefault)
+				const isInitial = prevDefault === undefined
+				if (matchesPrev || isInitial) {
+					// Safe to overwrite: either first apply, or user has
+					// not changed this field since the last apply.
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					;(out as any)[formKey] = typeof nextVal === 'number' ? nextVal : String(nextVal ?? '')
+				}
+			}
+			// workerMemoryGi / workerDiskGi land as "<N>Gi" in the form.
+			for (const [defKey, formKey] of [
+				['workerMemoryGi', 'workerMemory'],
+				['workerDiskGi', 'workerDiskSize'],
+			] as const) {
+				if (!(defKey in next)) continue
+				const nextVal = next[defKey]
+				const prevDefault = appliedDefaults[defKey]
+				const currentFormVal = prev[formKey]
+				const prevFormatted = prevDefault !== undefined ? `${prevDefault}Gi` : undefined
+				const matchesPrev = prevFormatted !== undefined && currentFormVal === prevFormatted
+				const isInitial = prevDefault === undefined
+				if (matchesPrev || isInitial) {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					;(out as any)[formKey] = `${nextVal}Gi`
+				}
+			}
+			return out
+		})
+		setAppliedDefaults(next)
+		// appliedDefaults intentionally not in deps — we read it but
+		// its updates are caused by this same effect; including it
+		// would cause a feedback loop.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [defaultsSource])
 
 	// Compute quota warnings based on current form values and team limits
 	const quotaWarnings = useMemo<QuotaWarning[]>(() => {
@@ -716,6 +795,7 @@ export function CreateClusterPage() {
 										))}
 									</select>
 									<p className="text-xs text-neutral-500 mt-1">Worker kubelet version is determined by the OS image.</p>
+									<DefaultSourceHint source={defaultsSource.source.kubernetesVersion} />
 								</div>
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -859,6 +939,7 @@ export function CreateClusterPage() {
 										max={10}
 										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
 									/>
+									<DefaultSourceHint source={defaultsSource.source.workerCount} />
 								</div>
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -873,6 +954,7 @@ export function CreateClusterPage() {
 										max={32}
 										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
 									/>
+									<DefaultSourceHint source={defaultsSource.source.workerCPU} />
 								</div>
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -889,6 +971,7 @@ export function CreateClusterPage() {
 										<option value="16Gi">16 GB</option>
 										<option value="32Gi">32 GB</option>
 									</select>
+									<DefaultSourceHint source={defaultsSource.source.workerMemoryGi} />
 								</div>
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -905,6 +988,7 @@ export function CreateClusterPage() {
 										<option value="100Gi">100 GB</option>
 										<option value="200Gi">200 GB</option>
 									</select>
+									<DefaultSourceHint source={defaultsSource.source.workerDiskGi} />
 								</div>
 							</div>
 						</div>
@@ -1592,5 +1676,14 @@ function ProxmoxFields({ form, onChange, provider }: FieldProps & { provider: Pr
 				/>
 			</div>
 		</div>
+	)
+}
+
+function DefaultSourceHint({ source }: { source?: 'env' | 'team' }) {
+	if (!source) return null
+	return (
+		<p className={`text-xs mt-1 ${source === 'env' ? 'text-blue-400' : 'text-neutral-500'}`}>
+			{source === 'env' ? 'from env default' : 'from team default'}
+		</p>
 	)
 }

@@ -120,7 +120,7 @@ export function TeamEnvironmentsPage() {
 					<div>
 						<h1 className="text-2xl font-semibold text-neutral-50">Environments</h1>
 						<p className="text-neutral-400 mt-1">
-							Define and quota envs within {currentTeamDisplayName || currentTeam}. See ADR-009.
+							Define and quota envs within {currentTeamDisplayName || currentTeam}.
 						</p>
 					</div>
 					<Button onClick={() => setShowCreate(true)}>

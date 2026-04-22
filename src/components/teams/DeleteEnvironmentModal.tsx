@@ -93,7 +93,7 @@ export function DeleteEnvironmentModal({
 						<p className="mt-3 text-sm text-amber-300">
 							{clusterCount} cluster{clusterCount === 1 ? '' : 's'} currently carry this env
 							label. They will remain but will be orphaned against env accounting; they
-							continue to count against the team total. See ADR-009 phase-2 migration.
+							continue to count against the team total.
 						</p>
 					) : (
 						<p className="mt-3 text-sm text-neutral-400">No clusters currently use this env.</p>

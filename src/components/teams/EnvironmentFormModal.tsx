@@ -434,7 +434,7 @@ export function EnvironmentFormModal({ isOpen, team, mode, initial, onClose, onS
 								<h3 className="text-sm font-semibold text-neutral-200">Environment access</h3>
 								<p className="text-xs text-neutral-500 mt-1">
 									Elevates team members within this env. Cannot reduce a team role
-									(additive-only inheritance, ADR-009).
+									(additive-only inheritance).
 								</p>
 							</div>
 

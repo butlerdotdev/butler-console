@@ -778,7 +778,7 @@ export function CreateClusterPage() {
 										))}
 									</select>
 									<p className="text-xs text-neutral-500 mt-1">
-										Env-level quota applies on top of the team total. See ADR-009.
+										Env-level quota applies on top of the team total.
 									</p>
 									{selectedEnvPerMemberCap != null && ownedInEnv != null && (
 										<div

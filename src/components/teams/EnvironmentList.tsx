@@ -22,7 +22,7 @@ export function EnvironmentList({ envs, clusterCountsByEnv, canEdit, onEdit, onD
 			<Card className="p-8 text-center">
 				<p className="text-neutral-400">No environments defined yet.</p>
 				<p className="text-sm text-neutral-500 mt-2">
-					Add one to gate cluster creation by env quota (see ADR-009).
+					Add one to gate cluster creation with per-environment quotas.
 				</p>
 			</Card>
 		)

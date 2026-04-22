@@ -12,6 +12,17 @@ import { Card, Spinner, StatusBadge, FadeIn, Button } from '@/components/ui'
 import { envAccent, NEUTRAL_ACCENT, type EnvAccent } from '@/lib/envColor'
 import { cn } from '@/lib/utils'
 
+// Owner is written as an annotation by the controller (or falls back
+// to the creator-email annotation the server/CLI stamps). Exposed as
+// a conditional column in the cluster list, same pattern as ENV.
+const OWNER_ANNOTATION = 'butler.butlerlabs.dev/owner'
+const CREATOR_EMAIL_ANNOTATION = 'butler.butlerlabs.dev/creator-email'
+
+function clusterOwner(c: Cluster): string {
+	const a = c.metadata?.annotations
+	return a?.[OWNER_ANNOTATION] || a?.[CREATOR_EMAIL_ANNOTATION] || ''
+}
+
 interface ManagementClusterInfo {
 	kubernetesVersion: string
 	phase: string
@@ -217,6 +228,13 @@ export function ClustersPage() {
 		return clusters.some((c) => !!c.metadata?.labels?.[ENVIRONMENT_LABEL])
 	}, [shouldGroup, currentEnv, clusters])
 
+	// Conditional Owner column: appears when at least one cluster in
+	// the result set carries the owner/creator annotation. Mirrors the
+	// ENV column shape.
+	const showOwnerColumn = useMemo(() => {
+		return clusters.some((c) => clusterOwner(c) !== '')
+	}, [clusters])
+
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center h-64">
@@ -309,6 +327,7 @@ export function ClustersPage() {
 									cluster={cluster}
 									buildPath={buildPath}
 									showEnv={showEnvColumnInFlat}
+									showOwner={showOwnerColumn}
 									accent={flatActiveEnvAccent ?? undefined}
 								/>
 							))}
@@ -558,6 +577,7 @@ function GroupSection({
 								cluster={cluster}
 								buildPath={buildPath}
 								showEnv={false}
+								showOwner={clusters.some((c) => clusterOwner(c) !== '')}
 								accent={accent}
 							/>
 						))}
@@ -615,11 +635,13 @@ function ClusterCard({
 	cluster,
 	buildPath,
 	showEnv,
+	showOwner,
 	accent,
 }: {
 	cluster: Cluster
 	buildPath: (path: string) => string
 	showEnv: boolean
+	showOwner?: boolean
 	accent?: EnvAccent
 }) {
 	const name = cluster.metadata.name
@@ -629,6 +651,7 @@ function ClusterCard({
 	const workers = cluster.spec.workers?.replicas || 0
 	const provider = cluster.spec.providerConfigRef?.name || 'Default'
 	const envLabel = cluster.metadata.labels?.[ENVIRONMENT_LABEL] || '-'
+	const owner = clusterOwner(cluster) || '-'
 
 	const createdAt = cluster.metadata.creationTimestamp
 	let age = 'Unknown'
@@ -675,6 +698,12 @@ function ClusterCard({
 							<div className="text-right">
 								<p className="text-xs text-neutral-500 uppercase tracking-wide">Env</p>
 								<p className="text-sm text-neutral-200">{envLabel}</p>
+							</div>
+						)}
+						{showOwner && (
+							<div className="text-right max-w-[180px]">
+								<p className="text-xs text-neutral-500 uppercase tracking-wide">Owner</p>
+								<p className="text-sm text-neutral-200 truncate" title={owner}>{owner}</p>
 							</div>
 						)}
 						<div className="text-right">

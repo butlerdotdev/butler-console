@@ -560,6 +560,18 @@ function OverviewTab({ cluster, namespace, name, scaleTarget, loadBalancerReques
 								</dd>
 							</div>
 						)}
+						{(() => {
+							const owner =
+								cluster.metadata?.annotations?.['butler.butlerlabs.dev/owner'] ||
+								cluster.metadata?.annotations?.['butler.butlerlabs.dev/creator-email']
+							if (!owner) return null
+							return (
+								<div className="flex justify-between">
+									<dt className="text-neutral-400">Created by</dt>
+									<dd className="text-neutral-50 truncate" title={owner}>{owner}</dd>
+								</div>
+							)
+						})()}
 						<div className="flex justify-between">
 							<dt className="text-neutral-400">Workers</dt>
 							<dd className="text-neutral-50">

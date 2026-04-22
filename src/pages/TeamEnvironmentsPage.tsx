@@ -9,6 +9,7 @@ import { Card, FadeIn, Spinner, Button } from '@/components/ui'
 import { EnvironmentList } from '@/components/teams/EnvironmentList'
 import { EnvironmentFormModal } from '@/components/teams/EnvironmentFormModal'
 import { DeleteEnvironmentModal } from '@/components/teams/DeleteEnvironmentModal'
+import { MigrateEnvironmentModal } from '@/components/teams/MigrateEnvironmentModal'
 import type { TeamEnvironment } from '@/types/environments'
 import { ENVIRONMENT_LABEL } from '@/types/environments'
 
@@ -25,7 +26,7 @@ interface ClusterListResponse {
 }
 
 export function TeamEnvironmentsPage() {
-	const { currentTeam, currentTeamDisplayName, isTeamAdmin, canAccessAdmin } = useTeamContext()
+	const { currentTeam, currentTeamNamespace, currentTeamDisplayName, isTeamAdmin, canAccessAdmin } = useTeamContext()
 	const { availableEnvs, envsLoading, refreshEnvs } = useEnvContext()
 	useDocumentTitle(
 		currentTeamDisplayName ? `${currentTeamDisplayName} Environments` : 'Environments',
@@ -38,6 +39,7 @@ export function TeamEnvironmentsPage() {
 	const [showCreate, setShowCreate] = useState(false)
 	const [editing, setEditing] = useState<TeamEnvironment | null>(null)
 	const [deleting, setDeleting] = useState<TeamEnvironment | null>(null)
+	const [showMigrate, setShowMigrate] = useState(false)
 
 	const fetchClusterCounts = useCallback(async () => {
 		if (!currentTeam) return
@@ -123,17 +125,24 @@ export function TeamEnvironmentsPage() {
 							Define and quota envs within {currentTeamDisplayName || currentTeam}.
 						</p>
 					</div>
-					<Button onClick={() => setShowCreate(true)}>
-						<svg
-							className="w-4 h-4 mr-2"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-						</svg>
-						Create environment
-					</Button>
+					<div className="flex items-center gap-2">
+						{availableEnvs.length > 0 && (
+							<Button variant="secondary" onClick={() => setShowMigrate(true)}>
+								Migrate clusters...
+							</Button>
+						)}
+						<Button onClick={() => setShowCreate(true)}>
+							<svg
+								className="w-4 h-4 mr-2"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+							</svg>
+							Create environment
+						</Button>
+					</div>
 				</div>
 
 				<Card className="p-4 border-blue-500/20 bg-blue-500/5">
@@ -203,6 +212,14 @@ export function TeamEnvironmentsPage() {
 							clusterCount={deletingCount}
 							onClose={() => setDeleting(null)}
 							onDeleted={handleDeleted}
+						/>
+						<MigrateEnvironmentModal
+							isOpen={showMigrate}
+							team={currentTeam}
+							teamNamespace={currentTeamNamespace}
+							envs={availableEnvs}
+							onClose={() => setShowMigrate(false)}
+							onDone={fetchClusterCounts}
 						/>
 					</>
 				)}

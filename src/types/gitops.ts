@@ -55,6 +55,7 @@ export interface Branch {
 	name: string;
 	sha: string;
 	protected: boolean;
+	default: boolean;
 }
 
 /**

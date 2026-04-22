@@ -12,6 +12,7 @@ import type {
 	DiscoveryResult,
 	DiscoveredRelease,
 	Repository,
+	Branch,
 } from '@/types/gitops';
 import { sortReleases, GITOPS_TOOL_CONFIG, getCategoryLabel } from '@/types/gitops';
 import { GitProviderSetup } from '@/components/clusters/gitops/GitProviderSetup';
@@ -472,6 +473,31 @@ function EnableManagementGitOpsModal({
 		FLUX_EXTRA_COMPONENTS.map(c => c.name)
 	);
 
+	// Branch loading
+	const [branches, setBranches] = useState<Branch[]>([]);
+	const [loadingBranches, setLoadingBranches] = useState(false);
+
+	useEffect(() => {
+		if (!repository) {
+			setBranches([]);
+			return;
+		}
+		const load = async () => {
+			setLoadingBranches(true);
+			try {
+				const list = await gitopsApi.listBranches(repository);
+				setBranches(list);
+				const def = repositories.find(r => r.fullName === repository)?.defaultBranch;
+				if (def && branch === 'main') setBranch(def);
+			} catch {
+				setBranches([]);
+			} finally {
+				setLoadingBranches(false);
+			}
+		};
+		load();
+	}, [repository, repositories]);
+
 	// Loading state
 	const [enabling, setEnabling] = useState(false);
 
@@ -559,12 +585,30 @@ function EnableManagementGitOpsModal({
 								<label className="block text-sm font-medium text-neutral-300 mb-1">
 									Branch
 								</label>
-								<input
-									type="text"
-									value={branch}
-									onChange={(e) => setBranch(e.target.value)}
-									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-								/>
+								{loadingBranches ? (
+									<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-500 flex items-center gap-2">
+										<Spinner size="sm" /> Loading branches...
+									</div>
+								) : branches.length > 0 ? (
+									<select
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									>
+										{branches.map((b) => (
+											<option key={b.name} value={b.name}>
+												{b.name}{b.default ? ' (default)' : ''}
+											</option>
+										))}
+									</select>
+								) : (
+									<input
+										type="text"
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									/>
+								)}
 							</div>
 							<div>
 								<label className="block text-sm font-medium text-neutral-300 mb-1">
@@ -780,12 +824,37 @@ function ManagementExportModal({
 	const [prTitle, setPrTitle] = useState(`Add ${release.name} to GitOps`);
 	const [helmRepoUrl, setHelmRepoUrl] = useState(release.repoUrl || '');
 
+	const [branches, setBranches] = useState<Branch[]>([]);
+	const [loadingBranches, setLoadingBranches] = useState(false);
+
 	// Update repository when configuredRepository becomes available
 	useEffect(() => {
 		if (configuredRepository && !repository) {
 			setRepository(configuredRepository);
 		}
 	}, [configuredRepository, repository]);
+
+	// Load branches when repository changes
+	useEffect(() => {
+		if (!repository) {
+			setBranches([]);
+			return;
+		}
+		const load = async () => {
+			setLoadingBranches(true);
+			try {
+				const list = await gitopsApi.listBranches(repository);
+				setBranches(list);
+				const def = repositories.find(r => r.fullName === repository)?.defaultBranch;
+				if (def && branch === 'main') setBranch(def);
+			} catch {
+				setBranches([]);
+			} finally {
+				setLoadingBranches(false);
+			}
+		};
+		load();
+	}, [repository, repositories]);
 
 	// Loading state
 	const [exporting, setExporting] = useState(false);
@@ -947,14 +1016,35 @@ function ManagementExportModal({
 						<div className="grid grid-cols-2 gap-4">
 							<div>
 								<label className="block text-sm font-medium text-neutral-300 mb-1">
-									Branch
+									{createPR ? 'Target Branch' : 'Branch'}
 								</label>
-								<input
-									type="text"
-									value={branch}
-									onChange={(e) => setBranch(e.target.value)}
-									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-								/>
+								{createPR && (
+									<p className="text-xs text-neutral-500 mb-1">MR will be opened against this branch</p>
+								)}
+								{loadingBranches ? (
+									<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-500 flex items-center gap-2">
+										<Spinner size="sm" /> Loading branches...
+									</div>
+								) : branches.length > 0 ? (
+									<select
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									>
+										{branches.map((b) => (
+											<option key={b.name} value={b.name}>
+												{b.name}{b.default ? ' (default)' : ''}
+											</option>
+										))}
+									</select>
+								) : (
+									<input
+										type="text"
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									/>
+								)}
 							</div>
 							<div>
 								<label className="block text-sm font-medium text-neutral-300 mb-1">
@@ -1122,6 +1212,31 @@ function ManagementMigrateAllModal({
 		}
 	}, [configuredRepository, repository]);
 
+	// Branch loading
+	const [branches, setBranches] = useState<Branch[]>([]);
+	const [loadingBranches, setLoadingBranches] = useState(false);
+
+	useEffect(() => {
+		if (!repository) {
+			setBranches([]);
+			return;
+		}
+		const load = async () => {
+			setLoadingBranches(true);
+			try {
+				const list = await gitopsApi.listBranches(repository);
+				setBranches(list);
+				const def = repositories.find(r => r.fullName === repository)?.defaultBranch;
+				if (def && branch === 'main') setBranch(def);
+			} catch {
+				setBranches([]);
+			} finally {
+				setLoadingBranches(false);
+			}
+		};
+		load();
+	}, [repository, repositories]);
+
 	// Loading state
 	const [migrating, setMigrating] = useState(false);
 
@@ -1276,14 +1391,35 @@ function ManagementMigrateAllModal({
 
 							<div>
 								<label className="block text-sm font-medium text-neutral-300 mb-1">
-									Branch
+									{createPR ? 'Target Branch' : 'Branch'}
 								</label>
-								<input
-									type="text"
-									value={branch}
-									onChange={(e) => setBranch(e.target.value)}
-									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-								/>
+								{createPR && (
+									<p className="text-xs text-neutral-500 mb-1">MR will be opened against this branch</p>
+								)}
+								{loadingBranches ? (
+									<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-500 flex items-center gap-2">
+										<Spinner size="sm" /> Loading branches...
+									</div>
+								) : branches.length > 0 ? (
+									<select
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									>
+										{branches.map((b) => (
+											<option key={b.name} value={b.name}>
+												{b.name}{b.default ? ' (default)' : ''}
+											</option>
+										))}
+									</select>
+								) : (
+									<input
+										type="text"
+										value={branch}
+										onChange={(e) => setBranch(e.target.value)}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+									/>
+								)}
 							</div>
 						</div>
 

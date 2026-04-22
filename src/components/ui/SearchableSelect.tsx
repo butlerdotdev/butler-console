@@ -43,7 +43,19 @@ export function SearchableSelect({
 	const listRef = useRef<HTMLUListElement>(null);
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	const [highlightIndex, setHighlightIndex] = useState(0);
+	const [lastQuery, setLastQuery] = useState(query);
 	const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({ position: 'fixed', zIndex: 9999 });
+
+	// Reset the highlighted index when the filter changes. Derived during
+	// render rather than in a useEffect, which is the React-recommended
+	// pattern for "reset state when a prop or input changes" (see
+	// https://react.dev/reference/react/useState#storing-information-from-previous-renders).
+	// The effect form triggers react-hooks/set-state-in-effect and cascades
+	// renders; the render-time form does not.
+	if (query !== lastQuery) {
+		setLastQuery(query);
+		setHighlightIndex(0);
+	}
 
 	const filtered = query
 		? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
@@ -70,9 +82,13 @@ export function SearchableSelect({
 		};
 	}, []);
 
-	// Reposition on scroll / resize while open (useLayoutEffect to avoid flicker)
+	// Reposition on scroll / resize while open (useLayoutEffect to avoid flicker).
+	// The initial position read requires getBoundingClientRect on the mounted
+	// container ref; that measurement is intrinsically effect-only, so the
+	// set-state-in-effect rule's concern (derive during render) does not apply.
 	useLayoutEffect(() => {
 		if (!open) return;
+		// eslint-disable-next-line react-hooks/set-state-in-effect
 		setDropdownStyle(computePosition());
 		const handleReposition = () => setDropdownStyle(computePosition());
 		window.addEventListener('scroll', handleReposition, true);
@@ -104,11 +120,6 @@ export function SearchableSelect({
 		document.addEventListener('mousedown', handler);
 		return () => document.removeEventListener('mousedown', handler);
 	}, []);
-
-	// Reset highlight when filter changes
-	useEffect(() => {
-		setHighlightIndex(0);
-	}, [query]);
 
 	// Scroll highlighted item into view
 	useEffect(() => {

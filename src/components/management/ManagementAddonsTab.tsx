@@ -830,6 +830,7 @@ function GitOpsExportModal({ addon, isOpen, repositories, loadingRepos, configur
 	const [createPR, setCreatePR] = useState(true)
 	const [branches, setBranches] = useState<Branch[]>([])
 	const [loadingBranches, setLoadingBranches] = useState(false)
+	const [exporting, setExporting] = useState(false)
 
 	// Preview state
 	const [preview, setPreview] = useState<Record<string, string> | null>(null)
@@ -1105,13 +1106,24 @@ function GitOpsExportModal({ addon, isOpen, repositories, loadingRepos, configur
 			</ModalBody>
 
 			<ModalFooter>
-				<Button variant="secondary" onClick={onClose}>Cancel</Button>
+				<Button variant="secondary" onClick={onClose} disabled={exporting}>Cancel</Button>
 				<Button
 					variant="primary"
-					onClick={() => onExport({ repository, branch, path, createPR })}
-					disabled={!repository}
+					onClick={async () => {
+						setExporting(true)
+						try {
+							await onExport({ repository, branch, path, createPR })
+						} finally {
+							setExporting(false)
+						}
+					}}
+					disabled={!repository || exporting}
 				>
-					{createPR ? 'Create Pull Request' : 'Export'}
+					{exporting ? (
+						<><Spinner size="sm" /><span className="ml-2">Exporting...</span></>
+					) : (
+						'Export'
+					)}
 				</Button>
 			</ModalFooter>
 		</Modal>
@@ -1143,6 +1155,7 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, loadingRepos, confi
 	const [branches, setBranches] = useState<Branch[]>([])
 	const [loadingBranches, setLoadingBranches] = useState(false)
 	const [helmRepoUrl, setHelmRepoUrl] = useState('')
+	const [exporting, setExporting] = useState(false)
 
 	// Auto-select configured repository when available
 	useEffect(() => {
@@ -1343,13 +1356,24 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, loadingRepos, confi
 			</ModalBody>
 
 			<ModalFooter>
-				<Button variant="secondary" onClick={onClose}>Cancel</Button>
+				<Button variant="secondary" onClick={onClose} disabled={exporting}>Cancel</Button>
 				<Button
 					variant="primary"
-					onClick={() => onMigrate({ repository, branch, path, createPR, helmRepoUrl: helmRepoUrl || undefined })}
-					disabled={!repository}
+					onClick={async () => {
+						setExporting(true)
+						try {
+							await onMigrate({ repository, branch, path, createPR, helmRepoUrl: helmRepoUrl || undefined })
+						} finally {
+							setExporting(false)
+						}
+					}}
+					disabled={!repository || exporting}
 				>
-					{createPR ? 'Create Pull Request' : 'Migrate'}
+					{exporting ? (
+						<><Spinner size="sm" /><span className="ml-2">Exporting...</span></>
+					) : (
+						'Export'
+					)}
 				</Button>
 			</ModalFooter>
 		</Modal>

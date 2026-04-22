@@ -10,18 +10,53 @@ export interface EnvironmentLimits {
 	maxClustersPerMember?: number
 }
 
+export interface EnvironmentAccessUser {
+	name: string
+	role: 'admin' | 'operator' | 'viewer'
+}
+
+export interface EnvironmentAccessGroup {
+	name: string
+	role: 'admin' | 'operator' | 'viewer'
+	identityProvider?: string
+}
+
+// Env-level RBAC elevation per ADR-009 additive-only inheritance.
+// These roles can elevate a team member within this env; they cannot
+// reduce a team-level role. Webhook enforces at admission.
+export interface EnvironmentAccess {
+	users?: EnvironmentAccessUser[]
+	groups?: EnvironmentAccessGroup[]
+}
+
+// ClusterDefaults mirrors Team.spec.clusterDefaults shape. Per-env
+// defaults override team-level defaults when a TC is created in the
+// env without the field set explicitly.
+export interface EnvironmentClusterDefaults {
+	kubernetesVersion?: string
+	workerCount?: number
+	workerCPU?: number
+	workerMemoryGi?: number
+	workerDiskGi?: number
+}
+
 export interface TeamEnvironment {
 	name: string
+	description?: string
 	limits?: EnvironmentLimits
+	access?: EnvironmentAccess
+	clusterDefaults?: EnvironmentClusterDefaults
 }
 
 // EnvironmentRequest is the body for POST/PUT on
-// /api/teams/{name}/environments. The server keys the URL on the env
-// name on update; the body's Name field is validated for equality and
-// is immutable after create (see UpdateEnvironment handler).
+// /api/teams/{name}/environments. Name is immutable after create
+// (server UpdateEnvironment handler rejects name mismatches).
 export interface EnvironmentRequest {
 	name: string
+	description?: string
 	limits?: EnvironmentLimits
+	access?: EnvironmentAccess
+	clusterDefaults?: EnvironmentClusterDefaults
 }
 
 // Env-name character class matches the CRD validation pattern applied

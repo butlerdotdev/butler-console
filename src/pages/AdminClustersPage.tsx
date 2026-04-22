@@ -12,6 +12,7 @@ import { ENVIRONMENT_LABEL } from '@/types/environments'
 import { Card, StatusBadge, Spinner, FadeIn, Modal, ModalHeader, ModalBody, ModalFooter, Button } from '@/components/ui'
 import { envAccent, NEUTRAL_ACCENT, type EnvAccent } from '@/lib/envColor'
 import { cn } from '@/lib/utils'
+import type { TeamEnvironment } from '@/types/environments'
 
 interface ManagementClusterInfo {
 	kubernetesVersion: string
@@ -28,6 +29,7 @@ interface Team {
 	namespace?: string
 	clusterCount: number
 	memberCount: number
+	environments?: TeamEnvironment[]
 }
 
 type SortField = 'name' | 'namespace' | 'phase' | 'workers' | 'createdAt'
@@ -289,10 +291,36 @@ export function AdminClustersPage() {
 		return result
 	}, [clusters, search, teamFilter, statusFilter, sortField, sortDirection])
 
+	// Per-env per-member cap info, collected across all teams that
+	// define the env. Same env name in different teams may carry
+	// different caps — we show the value when it's consistent, note
+	// "varies" otherwise.
+	const perMemberCapByEnv = useMemo(() => {
+		const capsByEnv = new Map<string, Set<number>>()
+		for (const t of teams) {
+			for (const env of t.environments ?? []) {
+				const cap = env.limits?.maxClustersPerMember
+				if (cap == null || cap <= 0) continue
+				if (!capsByEnv.has(env.name)) capsByEnv.set(env.name, new Set())
+				capsByEnv.get(env.name)!.add(cap)
+			}
+		}
+		const out = new Map<string, { value: number | null; varies: boolean }>()
+		for (const [name, values] of capsByEnv) {
+			if (values.size === 1) {
+				out.set(name, { value: [...values][0], varies: false })
+			} else if (values.size > 1) {
+				out.set(name, { value: null, varies: true })
+			}
+		}
+		return out
+	}, [teams])
+
 	// Grouped-by-env: section per env-label value plus a "no environment"
 	// section for unlabeled clusters. Cross-team, so we group on the raw
-	// label value rather than any single Team's spec.environments[];
-	// quota bars intentionally absent because caps are per-team.
+	// label value rather than any single Team's spec.environments[].
+	// Cap info is sourced from perMemberCapByEnv and rendered as a
+	// badge per ADR-009 section-header context.
 	const envGroupSections = useMemo(() => {
 		if (viewMode !== 'env') return null
 		const byEnv = new Map<string, Cluster[]>()
@@ -303,15 +331,21 @@ export function AdminClustersPage() {
 			byEnv.get(key)!.push(c)
 		}
 		const namedKeys = [...byEnv.keys()].filter((k) => k !== '').sort()
-		const sections: { key: string; label: string; accent: EnvAccent; clusters: Cluster[] }[] = []
+		const sections: { key: string; label: string; accent: EnvAccent; clusters: Cluster[]; perMemberCap?: { value: number | null; varies: boolean } }[] = []
 		for (const k of namedKeys) {
-			sections.push({ key: k, label: k, accent: envAccent(k), clusters: byEnv.get(k) || [] })
+			sections.push({
+				key: k,
+				label: k,
+				accent: envAccent(k),
+				clusters: byEnv.get(k) || [],
+				perMemberCap: perMemberCapByEnv.get(k),
+			})
 		}
 		if (byEnv.has('')) {
 			sections.push({ key: '__unlabeled__', label: '(no environment)', accent: NEUTRAL_ACCENT, clusters: byEnv.get('') || [] })
 		}
 		return sections
-	}, [viewMode, filteredClusters])
+	}, [viewMode, filteredClusters, perMemberCapByEnv])
 
 	// Grouped-by-team: section per team namespace. Uses the team
 	// display name when the lookup resolves, otherwise the raw
@@ -358,13 +392,15 @@ export function AdminClustersPage() {
 			const display = team?.displayName || team?.name || teamKey || '(no team)'
 			const envMap = byTeam.get(teamKey)!
 			const namedEnvs = [...envMap.keys()].filter((k) => k !== '').sort()
-			const envSections: { key: string; label: string; accent: EnvAccent; clusters: Cluster[] }[] = []
+			const envSections: { key: string; label: string; accent: EnvAccent; clusters: Cluster[]; perMemberCap?: number }[] = []
 			for (const e of namedEnvs) {
+				const envDef = team?.environments?.find((x) => x.name === e)
 				envSections.push({
 					key: `${teamKey}::${e}`,
 					label: e,
 					accent: envAccent(e),
 					clusters: envMap.get(e) || [],
+					perMemberCap: envDef?.limits?.maxClustersPerMember ?? undefined,
 				})
 			}
 			if (envMap.has('')) {
@@ -604,11 +640,16 @@ export function AdminClustersPage() {
 					<div className="space-y-6">
 						{envGroupSections.map((section) => {
 							const key = `env:${section.key}`
+							const cap = section.perMemberCap
+							const sublabel = [
+								`${section.clusters.length} ${section.clusters.length === 1 ? 'cluster' : 'clusters'}`,
+								cap?.varies ? 'per-member cap: varies by team' : cap?.value != null ? `per-member cap: ${cap.value}` : null,
+							].filter(Boolean).join(' · ')
 							return (
 								<AdminGroupSection
 									key={key}
 									label={section.label}
-									sublabel={`${section.clusters.length} ${section.clusters.length === 1 ? 'cluster' : 'clusters'}`}
+									sublabel={sublabel}
 									accentDot={section.accent.dot}
 									tint={section.accent.headerTint}
 									border={section.accent.border}
@@ -678,11 +719,15 @@ export function AdminClustersPage() {
 										<div className="pl-6 space-y-3 border-l border-neutral-800 ml-3">
 											{team.envSections.map((env) => {
 												const envKey = `tenv-env:${env.key}`
+												const sub = [
+													`${env.clusters.length} ${env.clusters.length === 1 ? 'cluster' : 'clusters'}`,
+													env.perMemberCap != null ? `per-member cap: ${env.perMemberCap}` : null,
+												].filter(Boolean).join(' · ')
 												return (
 													<AdminGroupSection
 														key={envKey}
 														label={env.label}
-														sublabel={`${env.clusters.length} ${env.clusters.length === 1 ? 'cluster' : 'clusters'}`}
+														sublabel={sub}
 														accentDot={env.accent.dot}
 														tint={env.accent.headerTint}
 														border={env.accent.border}

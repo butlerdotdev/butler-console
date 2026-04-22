@@ -10,7 +10,9 @@ import { parseQuantity } from '@/components/ui/ResourceUsageBar'
 import { useToast } from '@/hooks/useToast'
 import { useTeamContext } from '@/hooks/useTeamContext'
 import { useEnvContext } from '@/hooks/useEnvContext'
+import { useAuth } from '@/hooks/useAuth'
 import { SUPPORTED_K8S_VERSIONS } from '@/lib/versions'
+import { ENVIRONMENT_LABEL } from '@/types/environments'
 import { extractWebhookDenial } from '@/lib/webhookError'
 
 interface TeamResourceLimits {
@@ -129,6 +131,53 @@ export function CreateClusterPage() {
 		setSelectedEnv((prev) => (prev && availableEnvs.some((e) => e.name === prev) ? prev : availableEnvs[0].name))
 	}, [availableEnvs, currentEnv])
 	const envRequired = availableEnvs.length > 0
+
+	// Per-member cap visibility. When the selected env has
+	// maxClustersPerMember > 0, fetch the team's clusters and count the
+	// ones this user already owns in this env so we can tell them
+	// before they submit. The webhook is still the authoritative gate.
+	const { user } = useAuth()
+	const sessionEmail = (user?.email ?? '').toLowerCase()
+	const [ownedInEnv, setOwnedInEnv] = useState<number | null>(null)
+	useEffect(() => {
+		setOwnedInEnv(null)
+		if (!currentTeam || !selectedEnv || !sessionEmail) return
+		const envDef = availableEnvs.find((e) => e.name === selectedEnv)
+		if (!envDef?.limits?.maxClustersPerMember) return
+		let cancelled = false
+		void (async () => {
+			try {
+				const res = await fetch(`/api/teams/${encodeURIComponent(currentTeam)}/clusters`, {
+					credentials: 'include',
+				})
+				if (!res.ok) return
+				const data: { clusters?: Array<{ metadata?: { labels?: Record<string, string>; annotations?: Record<string, string> } }> } = await res.json()
+				if (cancelled) return
+				const count = (data.clusters ?? []).filter((c) => {
+					if (c.metadata?.labels?.[ENVIRONMENT_LABEL] !== selectedEnv) return false
+					const owner = (
+						c.metadata?.annotations?.['butler.butlerlabs.dev/owner'] ??
+						c.metadata?.annotations?.['butler.butlerlabs.dev/creator-email'] ??
+						''
+					).toLowerCase()
+					return owner === sessionEmail
+				}).length
+				setOwnedInEnv(count)
+			} catch {
+				setOwnedInEnv(null)
+			}
+		})()
+		return () => {
+			cancelled = true
+		}
+	}, [currentTeam, selectedEnv, availableEnvs, sessionEmail])
+
+	const selectedEnvPerMemberCap =
+		availableEnvs.find((e) => e.name === selectedEnv)?.limits?.maxClustersPerMember ?? null
+	const atPerMemberCap =
+		selectedEnvPerMemberCap != null &&
+		ownedInEnv != null &&
+		ownedInEnv >= selectedEnvPerMemberCap
 
 	// Resource quota state
 	const [resourceUsage, setResourceUsage] = useState<TeamResourceUsage | null>(null)
@@ -731,6 +780,20 @@ export function CreateClusterPage() {
 									<p className="text-xs text-neutral-500 mt-1">
 										Env-level quota applies on top of the team total. See ADR-009.
 									</p>
+									{selectedEnvPerMemberCap != null && ownedInEnv != null && (
+										<div
+											className={`mt-2 p-2 rounded-md text-xs ${
+												atPerMemberCap
+													? 'bg-red-500/10 text-red-300 border border-red-500/20'
+													: 'bg-neutral-800 text-neutral-300 border border-neutral-700'
+											}`}
+										>
+											You own {ownedInEnv} of {selectedEnvPerMemberCap} clusters in {selectedEnv}
+											{atPerMemberCap
+												? ' — at per-member cap. Creating another in this env will be rejected.'
+												: '.'}
+										</div>
+									)}
 									{envFieldError && (
 										<div className="mt-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
 											<p className="text-red-400 text-sm whitespace-pre-wrap">{envFieldError}</p>
@@ -1142,7 +1205,7 @@ export function CreateClusterPage() {
 							<Button type="button" variant="secondary" onClick={() => navigate(buildPath('/clusters'))}>
 								Cancel
 							</Button>
-							<Button type="submit" disabled={loading || providers.length === 0 || hasQuotaErrors}>
+							<Button type="submit" disabled={loading || providers.length === 0 || hasQuotaErrors || atPerMemberCap}>
 								{loading ? 'Creating...' : 'Create Cluster'}
 							</Button>
 						</div>

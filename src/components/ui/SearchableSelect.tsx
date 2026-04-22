@@ -43,7 +43,7 @@ export function SearchableSelect({
 	const listRef = useRef<HTMLUListElement>(null);
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	const [highlightIndex, setHighlightIndex] = useState(0);
-	const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+	const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({ position: 'fixed', zIndex: 9999 });
 
 	const filtered = query
 		? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
@@ -52,14 +52,14 @@ export function SearchableSelect({
 	const selectedOption = options.find((o) => o.value === value);
 
 	// Calculate dropdown position from trigger rect
-	const updatePosition = useCallback(() => {
-		if (!containerRef.current) return;
+	const computePosition = useCallback((): React.CSSProperties => {
+		if (!containerRef.current) return { position: 'fixed', zIndex: 9999 };
 		const rect = containerRef.current.getBoundingClientRect();
 		const spaceBelow = window.innerHeight - rect.bottom;
 		const dropdownMaxH = 288; // max-h-60 + search input (~48px)
 		const flipUp = spaceBelow < dropdownMaxH && rect.top > spaceBelow;
 
-		setDropdownStyle({
+		return {
 			position: 'fixed',
 			left: rect.left,
 			width: rect.width,
@@ -67,21 +67,21 @@ export function SearchableSelect({
 			...(flipUp
 				? { bottom: window.innerHeight - rect.top + 4 }
 				: { top: rect.bottom + 4 }),
-		});
+		};
 	}, []);
 
-	// Reposition on scroll / resize while open
-	useEffect(() => {
+	// Reposition on scroll / resize while open (useLayoutEffect to avoid flicker)
+	useLayoutEffect(() => {
 		if (!open) return;
-		updatePosition();
-		const handleReposition = () => updatePosition();
+		setDropdownStyle(computePosition());
+		const handleReposition = () => setDropdownStyle(computePosition());
 		window.addEventListener('scroll', handleReposition, true);
 		window.addEventListener('resize', handleReposition);
 		return () => {
 			window.removeEventListener('scroll', handleReposition, true);
 			window.removeEventListener('resize', handleReposition);
 		};
-	}, [open, updatePosition]);
+	}, [open, computePosition]);
 
 	// Focus the search input when dropdown opens
 	useLayoutEffect(() => {
@@ -174,6 +174,7 @@ export function SearchableSelect({
 				type="button"
 				onClick={() => {
 					if (disabled || loading) return;
+					if (!open) setDropdownStyle(computePosition());
 					setOpen(!open);
 				}}
 				disabled={disabled || loading}

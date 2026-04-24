@@ -139,6 +139,9 @@ export interface CreateClusterRequest {
 	proxmoxStorage?: string
 	proxmoxTemplateID?: number
 
+	// NTP time servers for Talos worker nodes (optional)
+	timeServers?: string[]
+
 	// Control plane resource overrides (optional)
 	controlPlaneResources?: {
 		apiServer?: {

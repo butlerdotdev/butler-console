@@ -4,8 +4,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { clustersApi, providersApi, apiClient, type Provider, type ImageInfo, type NetworkInfo, isCloudProvider, getProviderRegion, getProviderNetwork } from '@/api'
+import { clustersApi, providersApi, apiClient, type Provider, type ImageInfo, type NetworkInfo, type ClusterInfo, type StorageContainerInfo, isCloudProvider, getProviderRegion, getProviderNetwork } from '@/api'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/SearchableSelect'
 import { parseQuantity } from '@/components/ui/ResourceUsageBar'
 import { useToast } from '@/hooks/useToast'
 import { useTeamContext } from '@/hooks/useTeamContext'
@@ -60,6 +61,14 @@ export function CreateClusterPage() {
 	const [networks, setNetworks] = useState<NetworkInfo[]>([])
 	const [loadingNetworks, setLoadingNetworks] = useState(false)
 
+	// Nutanix clusters
+	const [nutanixClusters, setNutanixClusters] = useState<ClusterInfo[]>([])
+	const [loadingClusters, setLoadingClusters] = useState(false)
+
+	// Nutanix storage containers
+	const [storageContainers, setStorageContainers] = useState<StorageContainerInfo[]>([])
+	const [loadingStorageContainers, setLoadingStorageContainers] = useState(false)
+
 	// Determine namespace based on team context
 	// If in team context, use team namespace; otherwise default to butler-tenants
 	const defaultNamespace = currentTeamNamespace || 'butler-tenants'
@@ -94,6 +103,8 @@ export function CreateClusterPage() {
 		awsSubnet: '',
 		// Image schematic (optional)
 		schematicID: '',
+		// NTP time servers (optional, comma-separated)
+		timeServers: '',
 		// Control plane resources (optional)
 		cpApiServerCpuReq: '',
 		cpApiServerMemReq: '',
@@ -455,6 +466,8 @@ export function CreateClusterPage() {
 		if (!selectedProvider) {
 			setImages([])
 			setNetworks([])
+			setNutanixClusters([])
+			setStorageContainers([])
 			return
 		}
 
@@ -512,6 +525,36 @@ export function CreateClusterPage() {
 
 		fetchImages()
 		fetchNetworks()
+
+		// Fetch Nutanix-specific resources
+		if (providerType === 'nutanix') {
+			const fetchClusters = async () => {
+				setLoadingClusters(true)
+				try {
+					const response = await providersApi.listClusters(ns, selectedProvider.metadata.name)
+					setNutanixClusters(response.clusters || [])
+				} catch (err) {
+					console.error('Failed to fetch Nutanix clusters:', err)
+				} finally {
+					setLoadingClusters(false)
+				}
+			}
+
+			const fetchStorageContainers = async () => {
+				setLoadingStorageContainers(true)
+				try {
+					const response = await providersApi.listStorageContainers(ns, selectedProvider.metadata.name)
+					setStorageContainers(response.storageContainers || [])
+				} catch (err) {
+					console.error('Failed to fetch storage containers:', err)
+				} finally {
+					setLoadingStorageContainers(false)
+				}
+			}
+
+			fetchClusters()
+			fetchStorageContainers()
+		}
 	}, [selectedProvider])
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -530,9 +573,12 @@ export function CreateClusterPage() {
 			// Reset provider-specific fields when provider changes
 			harvesterImageName: '',
 			harvesterNetworkName: '',
-			nutanixImageUUID: '',
-			nutanixSubnetUUID: '',
 			awsSubnet: '',
+			// Pre-fill Nutanix fields from ProviderConfig defaults
+			nutanixClusterUUID: provider?.spec.nutanix?.clusterUUID || '',
+			nutanixSubnetUUID: provider?.spec.nutanix?.subnetUUID || '',
+			nutanixImageUUID: provider?.spec.nutanix?.imageUUID || '',
+			nutanixStorageContainerUUID: provider?.spec.nutanix?.storageContainerUUID || '',
 		}))
 	}
 
@@ -690,6 +736,11 @@ export function CreateClusterPage() {
 			// Add schematic ID if specified
 			if (form.schematicID) {
 				payload.schematicID = form.schematicID
+			}
+
+			// Add NTP time servers if specified
+			if (form.timeServers.trim()) {
+				payload.timeServers = form.timeServers.split(',').map((s: string) => s.trim()).filter(Boolean)
 			}
 
 			// Ensure the X-Butler-Environment header carries the form's env
@@ -904,11 +955,16 @@ export function CreateClusterPage() {
 								{providerType === 'nutanix' && (
 									<NutanixFields
 										form={form}
+										setForm={setForm}
 										onChange={handleChange}
 										images={images}
 										loadingImages={loadingImages}
 										networks={networks}
 										loadingNetworks={loadingNetworks}
+										clusters={nutanixClusters}
+										loadingClusters={loadingClusters}
+										storageContainers={storageContainers}
+										loadingStorageContainers={loadingStorageContainers}
 									/>
 								)}
 
@@ -1173,6 +1229,23 @@ export function CreateClusterPage() {
 												</p>
 											</div>
 
+											{/* NTP Time Servers */}
+											<div>
+												<label className="block text-sm font-medium text-neutral-400 mb-1">NTP Servers</label>
+												<input
+													type="text"
+													name="timeServers"
+													value={form.timeServers}
+													onChange={handleChange}
+													placeholder="e.g., ntp01.example.com, ntp02.example.com"
+													className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+												/>
+												<p className="text-xs text-neutral-500 mt-1">
+													Comma-separated NTP server hostnames. Leave empty to use the provider default.
+													Required on networks where the Talos default (time.cloudflare.com) is unreachable.
+												</p>
+											</div>
+
 											<p className="text-xs text-neutral-500">
 												Override platform defaults for tenant control plane components. Leave empty to use ButlerConfig defaults or BestEffort QoS.
 											</p>
@@ -1312,6 +1385,14 @@ interface FieldPropsWithResources extends FieldProps {
 	loadingNetworks: boolean
 }
 
+interface NutanixFieldProps extends FieldPropsWithResources {
+	setForm: (updater: (prev: Record<string, unknown>) => Record<string, unknown>) => void
+	clusters: ClusterInfo[]
+	loadingClusters: boolean
+	storageContainers: StorageContainerInfo[]
+	loadingStorageContainers: boolean
+}
+
 function HarvesterFields({ form, onChange, images, loadingImages, networks, loadingNetworks }: FieldPropsWithResources) {
 	return (
 		<div className="grid grid-cols-2 gap-4">
@@ -1404,101 +1485,99 @@ function HarvesterFields({ form, onChange, images, loadingImages, networks, load
 	)
 }
 
-function NutanixFields({ form, onChange, images, loadingImages, networks, loadingNetworks }: FieldPropsWithResources) {
+function NutanixFields({
+	form,
+	setForm,
+	images,
+	loadingImages,
+	networks,
+	loadingNetworks,
+	clusters,
+	loadingClusters,
+	storageContainers,
+	loadingStorageContainers,
+}: NutanixFieldProps) {
+	const clusterOptions: SearchableSelectOption[] = clusters.map((c) => ({
+		value: c.id,
+		label: c.name,
+		suffix: c.id.slice(0, 8) + '...',
+	}))
+
+	const subnetOptions: SearchableSelectOption[] = networks.map((net) => ({
+		value: net.id,
+		label: net.name,
+		suffix: net.vlan ? `VLAN ${net.vlan}` : undefined,
+	}))
+
+	const imageOptions: SearchableSelectOption[] = images.map((img) => ({
+		value: img.id,
+		label: img.name,
+		suffix: img.os ? `(${img.os})` : undefined,
+	}))
+
+	const storageOptions: SearchableSelectOption[] = storageContainers.map((sc) => ({
+		value: sc.id,
+		label: sc.name,
+	}))
+
 	return (
 		<div className="grid grid-cols-2 gap-4">
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
-					Cluster UUID *
+					Cluster *
 				</label>
-				<input
-					type="text"
-					name="nutanixClusterUUID"
+				<SearchableSelect
 					value={form.nutanixClusterUUID as string}
-					onChange={onChange}
-					placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-					className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+					onChange={(val) => setForm((prev) => ({ ...prev, nutanixClusterUUID: val }))}
+					options={clusterOptions}
+					placeholder="Select cluster..."
+					loading={loadingClusters}
+					loadingText="Loading clusters..."
 				/>
+				<p className="text-xs text-neutral-500 mt-1">
+					Prism Element cluster for VM placement
+				</p>
 			</div>
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
 					Subnet *
 				</label>
-				{loadingNetworks ? (
-					<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg flex items-center">
-						<Spinner size="sm" className="mr-2" />
-						<span className="text-neutral-400">Loading subnets...</span>
-					</div>
-				) : networks.length > 0 ? (
-					<select
-						name="nutanixSubnetUUID"
-						value={form.nutanixSubnetUUID as string}
-						onChange={onChange}
-						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-					>
-						<option value="">Select subnet...</option>
-						{networks.map((net) => (
-							<option key={net.id} value={net.id}>
-								{net.name} {net.vlan ? `(VLAN ${net.vlan})` : ''}
-							</option>
-						))}
-					</select>
-				) : (
-					<input
-						type="text"
-						name="nutanixSubnetUUID"
-						value={form.nutanixSubnetUUID as string}
-						onChange={onChange}
-						placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-					/>
-				)}
+				<SearchableSelect
+					value={form.nutanixSubnetUUID as string}
+					onChange={(val) => setForm((prev) => ({ ...prev, nutanixSubnetUUID: val }))}
+					options={subnetOptions}
+					placeholder="Select subnet..."
+					loading={loadingNetworks}
+					loadingText="Loading subnets..."
+				/>
 			</div>
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
 					Image
 				</label>
-				{loadingImages ? (
-					<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg flex items-center">
-						<Spinner size="sm" className="mr-2" />
-						<span className="text-neutral-400">Loading images...</span>
-					</div>
-				) : images.length > 0 ? (
-					<select
-						name="nutanixImageUUID"
-						value={form.nutanixImageUUID as string}
-						onChange={onChange}
-						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-					>
-						<option value="">Select image (optional)...</option>
-						{images.map((img) => (
-							<option key={img.id} value={img.id}>
-								{img.name} {img.os && `(${img.os})`}
-							</option>
-						))}
-					</select>
-				) : (
-					<input
-						type="text"
-						name="nutanixImageUUID"
-						value={form.nutanixImageUUID as string}
-						onChange={onChange}
-						placeholder="Optional, uses provider default"
-						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-					/>
-				)}
+				<SearchableSelect
+					value={form.nutanixImageUUID as string}
+					onChange={(val) => setForm((prev) => ({ ...prev, nutanixImageUUID: val }))}
+					options={imageOptions}
+					placeholder="Select image (optional)..."
+					loading={loadingImages}
+					loadingText="Loading images..."
+				/>
+				<p className="text-xs text-neutral-500 mt-1">
+					OS image for worker nodes (uses provider default if not set)
+				</p>
 			</div>
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
-					Storage Container UUID
+					Storage Container
 				</label>
-				<input
-					type="text"
-					name="nutanixStorageContainerUUID"
+				<SearchableSelect
 					value={form.nutanixStorageContainerUUID as string}
-					onChange={onChange}
-					placeholder="Optional"
-					className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+					onChange={(val) => setForm((prev) => ({ ...prev, nutanixStorageContainerUUID: val }))}
+					options={storageOptions}
+					placeholder="Select storage container (optional)..."
+					loading={loadingStorageContainers}
+					loadingText="Loading storage containers..."
 				/>
 			</div>
 		</div>

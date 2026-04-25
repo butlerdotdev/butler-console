@@ -31,7 +31,7 @@ export type {
 	ConfigStatusInfo,
 } from './config'
 
-export type { Provider, ProviderListResponse, CreateProviderRequest, ValidateResponse, ImageInfo, NetworkInfo, CloudProviderType, OnPremProviderType } from './providers'
+export type { Provider, ProviderListResponse, CreateProviderRequest, ValidateResponse, ImageInfo, NetworkInfo, ClusterInfo, StorageContainerInfo, CloudProviderType, OnPremProviderType } from './providers'
 export { isCloudProvider, getProviderRegion, getProviderNetwork } from './providers'
 export type {
 	Cluster,

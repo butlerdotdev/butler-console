@@ -508,35 +508,32 @@ function ProviderDetail({
 								)}
 							</div>
 							{caInfo.certificates?.map((cert, i) => (
-								<div key={i} className="p-3 bg-neutral-800/50 border border-neutral-700 rounded-lg">
-									<div className="grid grid-cols-2 gap-2">
-										<div>
-											<p className="text-xs text-neutral-500">Subject</p>
-											<p className="text-sm text-neutral-200 font-mono">{cert.subject}</p>
-										</div>
-										<div>
-											<p className="text-xs text-neutral-500">Issuer</p>
-											<p className="text-sm text-neutral-200 font-mono">{cert.issuer}</p>
-										</div>
-										<div>
-											<p className="text-xs text-neutral-500">Expires</p>
-											<p className="text-sm text-neutral-200">{new Date(cert.notAfter).toLocaleDateString()}</p>
-										</div>
-										<div className="flex items-center gap-2">
-											{cert.isCA && (
-												<span className="px-2 py-0.5 text-xs font-medium bg-blue-500/10 text-blue-400 rounded">CA</span>
-											)}
-											{cert.selfSigned && (
-												<span className="px-2 py-0.5 text-xs font-medium bg-neutral-500/10 text-neutral-400 rounded">Self-signed root</span>
-											)}
-											<span className={`px-2 py-0.5 text-xs font-medium rounded ${
-												cert.healthStatus === 'Healthy' ? 'bg-green-500/10 text-green-400' :
-												cert.healthStatus === 'Warning' ? 'bg-yellow-500/10 text-yellow-400' :
-												'bg-red-500/10 text-red-400'
-											}`}>
-												{cert.healthStatus}
-											</span>
-										</div>
+								<div key={i} className="p-3 bg-neutral-800/50 border border-neutral-700 rounded-lg space-y-2">
+									<div className="flex items-center gap-2 flex-wrap">
+										{cert.isCA && (
+											<span className="px-2 py-0.5 text-xs font-medium bg-blue-500/10 text-blue-400 rounded">CA</span>
+										)}
+										{cert.selfSigned && (
+											<span className="px-2 py-0.5 text-xs font-medium bg-neutral-500/10 text-neutral-400 rounded">Self-signed root</span>
+										)}
+										<span className={`px-2 py-0.5 text-xs font-medium rounded ${
+											cert.healthStatus === 'Healthy' ? 'bg-green-500/10 text-green-400' :
+											cert.healthStatus === 'Warning' ? 'bg-yellow-500/10 text-yellow-400' :
+											'bg-red-500/10 text-red-400'
+										}`}>
+											{cert.healthStatus}
+										</span>
+										<span className="text-xs text-neutral-500 ml-auto">
+											Expires {new Date(cert.notAfter).toLocaleDateString()}
+										</span>
+									</div>
+									<div>
+										<p className="text-xs text-neutral-500">Subject</p>
+										<p className="text-sm text-neutral-200 font-mono truncate" title={cert.subject}>{cert.subject}</p>
+									</div>
+									<div>
+										<p className="text-xs text-neutral-500">Issuer</p>
+										<p className="text-sm text-neutral-200 font-mono truncate" title={cert.issuer}>{cert.issuer}</p>
 									</div>
 								</div>
 							))}

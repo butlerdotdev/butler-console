@@ -738,7 +738,6 @@ export function CreateClusterPage() {
 				payload.schematicID = form.schematicID
 			}
 
-			// Add NTP time servers if specified
 			if (form.timeServers.trim()) {
 				payload.timeServers = form.timeServers.split(',').map((s: string) => s.trim()).filter(Boolean)
 			}
@@ -1386,7 +1385,8 @@ interface FieldPropsWithResources extends FieldProps {
 }
 
 interface NutanixFieldProps extends FieldPropsWithResources {
-	setForm: (updater: (prev: Record<string, unknown>) => Record<string, unknown>) => void
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	setForm: React.Dispatch<React.SetStateAction<any>>
 	clusters: ClusterInfo[]
 	loadingClusters: boolean
 	storageContainers: StorageContainerInfo[]

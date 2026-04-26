@@ -1528,7 +1528,7 @@ function NutanixFields({
 				</label>
 				<SearchableSelect
 					value={form.nutanixClusterUUID as string}
-					onChange={(val) => setForm((prev) => ({ ...prev, nutanixClusterUUID: val }))}
+					onChange={(val) => setForm((prev: Record<string, unknown>) => ({ ...prev, nutanixClusterUUID: val }))}
 					options={clusterOptions}
 					placeholder="Select cluster..."
 					loading={loadingClusters}
@@ -1544,7 +1544,7 @@ function NutanixFields({
 				</label>
 				<SearchableSelect
 					value={form.nutanixSubnetUUID as string}
-					onChange={(val) => setForm((prev) => ({ ...prev, nutanixSubnetUUID: val }))}
+					onChange={(val) => setForm((prev: Record<string, unknown>) => ({ ...prev, nutanixSubnetUUID: val }))}
 					options={subnetOptions}
 					placeholder="Select subnet..."
 					loading={loadingNetworks}
@@ -1557,7 +1557,7 @@ function NutanixFields({
 				</label>
 				<SearchableSelect
 					value={form.nutanixImageUUID as string}
-					onChange={(val) => setForm((prev) => ({ ...prev, nutanixImageUUID: val }))}
+					onChange={(val) => setForm((prev: Record<string, unknown>) => ({ ...prev, nutanixImageUUID: val }))}
 					options={imageOptions}
 					placeholder="Select image (optional)..."
 					loading={loadingImages}
@@ -1573,7 +1573,7 @@ function NutanixFields({
 				</label>
 				<SearchableSelect
 					value={form.nutanixStorageContainerUUID as string}
-					onChange={(val) => setForm((prev) => ({ ...prev, nutanixStorageContainerUUID: val }))}
+					onChange={(val) => setForm((prev: Record<string, unknown>) => ({ ...prev, nutanixStorageContainerUUID: val }))}
 					options={storageOptions}
 					placeholder="Select storage container (optional)..."
 					loading={loadingStorageContainers}

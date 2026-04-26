@@ -139,6 +139,8 @@ export interface CreateClusterRequest {
 	proxmoxStorage?: string
 	proxmoxTemplateID?: number
 
+	timeServers?: string[]
+
 	// Control plane resource overrides (optional)
 	controlPlaneResources?: {
 		apiServer?: {

@@ -36,6 +36,7 @@ export function CreateProviderPage() {
 	const [nutanixUsername, setNutanixUsername] = useState('')
 	const [nutanixPassword, setNutanixPassword] = useState('')
 	const [nutanixInsecure, setNutanixInsecure] = useState(false)
+	const [nutanixCABundle, setNutanixCABundle] = useState('')
 
 	// Proxmox credentials & endpoint
 	const [proxmoxEndpoint, setProxmoxEndpoint] = useState('')
@@ -171,6 +172,7 @@ export function CreateProviderPage() {
 			request.nutanixUsername = nutanixUsername
 			request.nutanixPassword = nutanixPassword
 			request.nutanixInsecure = nutanixInsecure
+			if (nutanixCABundle) request.nutanixCABundle = nutanixCABundle
 		} else if (providerType === 'proxmox') {
 			request.proxmoxEndpoint = proxmoxEndpoint
 			request.proxmoxInsecure = proxmoxInsecure
@@ -424,6 +426,8 @@ export function CreateProviderPage() {
 								setPassword={(v) => { setNutanixPassword(v); setTestResult(null) }}
 								insecure={nutanixInsecure}
 								setInsecure={setNutanixInsecure}
+								caBundle={nutanixCABundle}
+								setCABundle={(v) => { setNutanixCABundle(v); setTestResult(null) }}
 							/>
 						)}
 
@@ -656,6 +660,8 @@ function NutanixCredentials({
 	setPassword,
 	insecure,
 	setInsecure,
+	caBundle,
+	setCABundle,
 }: {
 	endpoint: string
 	setEndpoint: (v: string) => void
@@ -667,7 +673,20 @@ function NutanixCredentials({
 	setPassword: (v: string) => void
 	insecure: boolean
 	setInsecure: (v: boolean) => void
+	caBundle: string
+	setCABundle: (v: string) => void
 }) {
+	const handleCAFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0]
+		if (file) {
+			const reader = new FileReader()
+			reader.onload = (event) => {
+				setCABundle(event.target?.result as string)
+			}
+			reader.readAsText(file)
+		}
+	}
+
 	return (
 		<div>
 			<h3 className="text-lg font-medium text-neutral-50 mb-4">Nutanix Connection</h3>
@@ -732,6 +751,32 @@ function NutanixCredentials({
 					/>
 					<span className="text-sm text-neutral-400">Allow insecure TLS (skip certificate verification)</span>
 				</label>
+				{!insecure && (
+					<div>
+						<label className="block text-sm font-medium text-neutral-400 mb-1">
+							CA Bundle (PEM)
+						</label>
+						<p className="text-xs text-neutral-500 mb-2">
+							If Prism Central uses a corporate or self-signed CA, paste or upload the PEM-encoded certificate chain.
+						</p>
+						<textarea
+							value={caBundle}
+							onChange={(e) => setCABundle(e.target.value)}
+							placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+							rows={4}
+							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+						/>
+						<label className="inline-block mt-1 text-xs text-green-400 hover:text-green-300 cursor-pointer">
+							<input
+								type="file"
+								accept=".pem,.crt,.cer,.ca-bundle"
+								className="hidden"
+								onChange={handleCAFileUpload}
+							/>
+							Upload .pem or .crt file
+						</label>
+					</div>
+				)}
 			</div>
 		</div>
 	)

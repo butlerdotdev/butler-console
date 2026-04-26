@@ -101,7 +101,25 @@ export interface ProviderListResponse {
 
 export interface ValidateResponse {
 	valid: boolean
+	category?: string // tls, network, auth, parse
 	message: string
+	detail?: unknown
+}
+
+export interface CABundleCertInfo {
+	subject: string
+	issuer: string
+	notAfter: string
+	isCA: boolean
+	healthStatus: string
+	selfSigned: boolean
+}
+
+export interface CAInfoResponse {
+	configured: boolean
+	certificates?: CABundleCertInfo[]
+	health?: string
+	nearestExpiry?: string
 }
 
 export interface CreateProviderRequest {
@@ -116,6 +134,8 @@ export interface CreateProviderRequest {
 	nutanixUsername?: string
 	nutanixPassword?: string
 	nutanixInsecure?: boolean
+	nutanixCABundle?: string
+	removeCABundle?: boolean
 	// Proxmox
 	proxmoxEndpoint?: string
 	proxmoxUsername?: string
@@ -253,6 +273,10 @@ export const providersApi = {
 
 	async listStorageContainers(namespace: string, name: string): Promise<StorageContainerListResponse> {
 		return apiClient.get<StorageContainerListResponse>(`/providers/${namespace}/${name}/storage-containers`)
+	},
+
+	async getCAInfo(namespace: string, name: string): Promise<CAInfoResponse> {
+		return apiClient.get<CAInfoResponse>(`/providers/${namespace}/${name}/ca-info`)
 	},
 
 	async listTeamProviders(teamName: string): Promise<ProviderListResponse> {

@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { providersApi, type Provider, type ValidateResponse, type NetworkInfo, type CreateProviderRequest } from '@/api/providers'
+import { providersApi, type Provider, type ValidateResponse, type NetworkInfo, type CreateProviderRequest, type CAInfoResponse } from '@/api/providers'
 import { Card, Spinner, Button, FadeIn } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { useToast } from '@/hooks/useToast'
@@ -388,6 +388,8 @@ function ProviderDetail({
 	const [networks, setNetworks] = useState<NetworkInfo[]>([])
 	const [networksLoading, setNetworksLoading] = useState(false)
 	const [networksError, setNetworksError] = useState<string | null>(null)
+	const [caInfo, setCAInfo] = useState<CAInfoResponse | null>(null)
+	const [caInfoLoading, setCAInfoLoading] = useState(false)
 
 	useEffect(() => {
 		const loadNetworks = async () => {
@@ -406,7 +408,25 @@ function ProviderDetail({
 			}
 		}
 		loadNetworks()
-	}, [provider.metadata.namespace, provider.metadata.name])
+
+		if (type === 'nutanix') {
+			const loadCAInfo = async () => {
+				setCAInfoLoading(true)
+				try {
+					const info = await providersApi.getCAInfo(
+						provider.metadata.namespace,
+						provider.metadata.name
+					)
+					setCAInfo(info)
+				} catch {
+					// CA info is best-effort; don't block the detail view
+				} finally {
+					setCAInfoLoading(false)
+				}
+			}
+			loadCAInfo()
+		}
+	}, [provider.metadata.namespace, provider.metadata.name, type])
 
 	const hasNetwork = !!provider.spec.network
 	const hasScope = !!provider.spec.scope?.type
@@ -454,6 +474,74 @@ function ProviderDetail({
 						<InfoRow label="Port" value={String(provider.spec.nutanix.port || 9440)} />
 						<InfoRow label="Insecure TLS" value={provider.spec.nutanix.insecure ? 'Yes' : 'No'} />
 					</div>
+				</div>
+			)}
+
+			{/* CA Bundle info (Nutanix only) */}
+			{type === 'nutanix' && (
+				<div>
+					<h4 className="text-sm font-medium text-neutral-400 mb-3">CA Bundle</h4>
+					{caInfoLoading ? (
+						<div className="flex items-center gap-2 text-sm text-neutral-500">
+							<Spinner size="sm" />
+							<span>Loading CA info...</span>
+						</div>
+					) : !caInfo || !caInfo.configured ? (
+						<p className="text-sm text-neutral-500">
+							No CA bundle configured. {provider.spec.nutanix?.insecure ? 'TLS verification is disabled.' : 'Using system trust store.'}
+						</p>
+					) : (
+						<div className="space-y-3">
+							<div className="flex items-center gap-2">
+								<span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+									caInfo.health === 'Healthy' ? 'bg-green-500/10 text-green-400' :
+									caInfo.health === 'Warning' ? 'bg-yellow-500/10 text-yellow-400' :
+									caInfo.health === 'Critical' || caInfo.health === 'Expired' ? 'bg-red-500/10 text-red-400' :
+									'bg-neutral-500/10 text-neutral-400'
+								}`}>
+									{caInfo.health}
+								</span>
+								{caInfo.nearestExpiry && (
+									<span className="text-xs text-neutral-500">
+										Nearest expiry: {new Date(caInfo.nearestExpiry).toLocaleDateString()}
+									</span>
+								)}
+							</div>
+							{caInfo.certificates?.map((cert, i) => (
+								<div key={i} className="p-3 bg-neutral-800/50 border border-neutral-700 rounded-lg">
+									<div className="grid grid-cols-2 gap-2">
+										<div>
+											<p className="text-xs text-neutral-500">Subject</p>
+											<p className="text-sm text-neutral-200 font-mono">{cert.subject}</p>
+										</div>
+										<div>
+											<p className="text-xs text-neutral-500">Issuer</p>
+											<p className="text-sm text-neutral-200 font-mono">{cert.issuer}</p>
+										</div>
+										<div>
+											<p className="text-xs text-neutral-500">Expires</p>
+											<p className="text-sm text-neutral-200">{new Date(cert.notAfter).toLocaleDateString()}</p>
+										</div>
+										<div className="flex items-center gap-2">
+											{cert.isCA && (
+												<span className="px-2 py-0.5 text-xs font-medium bg-blue-500/10 text-blue-400 rounded">CA</span>
+											)}
+											{cert.selfSigned && (
+												<span className="px-2 py-0.5 text-xs font-medium bg-neutral-500/10 text-neutral-400 rounded">Self-signed root</span>
+											)}
+											<span className={`px-2 py-0.5 text-xs font-medium rounded ${
+												cert.healthStatus === 'Healthy' ? 'bg-green-500/10 text-green-400' :
+												cert.healthStatus === 'Warning' ? 'bg-yellow-500/10 text-yellow-400' :
+												'bg-red-500/10 text-red-400'
+											}`}>
+												{cert.healthStatus}
+											</span>
+										</div>
+									</div>
+								</div>
+							))}
+						</div>
+					)}
 				</div>
 			)}
 
@@ -708,6 +796,7 @@ function EditProviderModal({
 	const type = provider.spec.provider
 	const [saving, setSaving] = useState(false)
 	const [form, setForm] = useState<Record<string, string>>({})
+	const [removeCABundle, setRemoveCABundle] = useState(false)
 
 	const handleSave = async () => {
 		setSaving(true)
@@ -722,6 +811,11 @@ function EditProviderModal({
 					if (form.endpoint) data.nutanixEndpoint = form.endpoint
 					if (form.username) data.nutanixUsername = form.username
 					if (form.password) data.nutanixPassword = form.password
+					if (removeCABundle) {
+						data.removeCABundle = true
+					} else if (form.caBundle) {
+						data.nutanixCABundle = form.caBundle
+					}
 					break
 				case 'proxmox':
 					if (form.endpoint) data.proxmoxEndpoint = form.endpoint
@@ -765,7 +859,7 @@ function EditProviderModal({
 		}
 	}
 
-	const hasChanges = Object.values(form).some(v => v.trim() !== '')
+	const hasChanges = Object.values(form).some(v => v.trim() !== '') || removeCABundle
 
 	const renderCredentialFields = () => {
 		switch (type) {
@@ -788,6 +882,50 @@ function EditProviderModal({
 						<EditField label="Endpoint" placeholder={provider.spec.nutanix?.endpoint || 'e.g. 10.0.0.1'} value={form.endpoint || ''} onChange={v => setForm(prev => ({ ...prev, endpoint: v }))} />
 						<EditField label="Username" placeholder="Leave blank to keep current" value={form.username || ''} onChange={v => setForm(prev => ({ ...prev, username: v }))} />
 						<EditField label="Password" placeholder="Leave blank to keep current" value={form.password || ''} onChange={v => setForm(prev => ({ ...prev, password: v }))} type="password" />
+						{!removeCABundle && (
+							<div>
+								<label className="block text-sm font-medium text-neutral-400 mb-1">CA Bundle (PEM)</label>
+								<textarea
+									value={form.caBundle || ''}
+									onChange={(e) => setForm(prev => ({ ...prev, caBundle: e.target.value }))}
+									placeholder="Paste new PEM to replace CA bundle, or leave blank to keep current"
+									rows={3}
+									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm resize-none"
+								/>
+								<label className="inline-block mt-1 text-xs text-green-400 hover:text-green-300 cursor-pointer">
+									<input
+										type="file"
+										accept=".pem,.crt,.cer,.ca-bundle"
+										className="hidden"
+										onChange={(e) => {
+											const file = e.target.files?.[0]
+											if (file) {
+												const reader = new FileReader()
+												reader.onload = (ev) => setForm(prev => ({ ...prev, caBundle: ev.target?.result as string }))
+												reader.readAsText(file)
+											}
+										}}
+									/>
+									Upload .pem or .crt file
+								</label>
+							</div>
+						)}
+						<div className="pt-1">
+							<label className="flex items-center gap-2 cursor-pointer">
+								<input
+									type="checkbox"
+									checked={removeCABundle}
+									onChange={(e) => {
+										setRemoveCABundle(e.target.checked)
+										if (e.target.checked) {
+											setForm(prev => { const next = { ...prev }; delete next.caBundle; return next })
+										}
+									}}
+									className="w-4 h-4 rounded border-neutral-700 bg-neutral-800 text-red-500 focus:ring-red-500"
+								/>
+								<span className="text-sm text-neutral-400">Remove existing CA bundle</span>
+							</label>
+						</div>
 					</>
 				)
 			case 'proxmox':

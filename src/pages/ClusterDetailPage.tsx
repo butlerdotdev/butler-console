@@ -540,7 +540,9 @@ function OverviewTab({ cluster, namespace, name, scaleTarget, loadBalancerReques
 								<dt className="text-neutral-400">Worker OS</dt>
 								<dd className="text-neutral-50">
 									{spec.workers.machineTemplate.os.type || 'Unknown'}
-									{spec.workers.machineTemplate.os.version ? ` ${spec.workers.machineTemplate.os.version}` : ''}
+									{spec.workers.machineTemplate.os.type === 'talos' && spec.workers.machineTemplate.os.talos?.version
+										? ` ${spec.workers.machineTemplate.os.talos.version}`
+										: spec.workers.machineTemplate.os.version ? ` ${spec.workers.machineTemplate.os.version}` : ''}
 								</dd>
 							</div>
 						)}

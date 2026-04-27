@@ -91,7 +91,7 @@ export function MigrateAllModal({
 			try {
 				if (repository) {
 					const branchList = await gitopsApi.listBranches(repository);
-					setBranches(branchList);
+					setBranches(branchList ?? []);
 
 					const defaultBranch = repositories.find(r => r.fullName === repository)?.defaultBranch;
 					if (defaultBranch) {
@@ -100,6 +100,7 @@ export function MigrateAllModal({
 				}
 			} catch (err) {
 				console.warn('Failed to load branches:', err);
+				setBranches([]);
 			} finally {
 				setLoadingBranches(false);
 			}

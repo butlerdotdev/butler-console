@@ -52,7 +52,7 @@ export function GitOpsTab() {
 			if (config.configured) {
 				setLoadingRepos(true);
 				gitopsApi.listRepositories()
-					.then(repos => setRepositories(repos))
+					.then(repos => setRepositories(repos ?? []))
 					.catch(err => console.warn('Failed to load repositories:', err))
 					.finally(() => setLoadingRepos(false));
 			}

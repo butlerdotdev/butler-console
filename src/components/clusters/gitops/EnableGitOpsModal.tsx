@@ -82,7 +82,7 @@ export function EnableGitOpsModal({
 			try {
 				if (repository) {
 					const branchList = await gitopsApi.listBranches(repository);
-					setBranches(branchList);
+					setBranches(branchList ?? []);
 
 					// Set default branch if available
 					const defaultBranch = repositories.find(r => r.fullName === repository)?.defaultBranch;
@@ -92,6 +92,7 @@ export function EnableGitOpsModal({
 				}
 			} catch (err) {
 				console.warn('Failed to load branches:', err);
+				setBranches([]);
 			} finally {
 				setLoadingBranches(false);
 			}

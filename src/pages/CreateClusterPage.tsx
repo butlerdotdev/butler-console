@@ -1015,34 +1015,28 @@ export function CreateClusterPage() {
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
 										Memory
 									</label>
-									<select
+									<input
+										type="text"
 										name="workerMemory"
 										value={form.workerMemory}
 										onChange={handleChange}
-										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-									>
-										<option value="4Gi">4 GB</option>
-										<option value="8Gi">8 GB</option>
-										<option value="16Gi">16 GB</option>
-										<option value="32Gi">32 GB</option>
-									</select>
+										placeholder="16Gi"
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
+									/>
 									<DefaultSourceHint source={defaultsSource.source.workerMemoryGi} />
 								</div>
 								<div>
 									<label className="block text-sm font-medium text-neutral-400 mb-1">
 										Disk Size
 									</label>
-									<select
+									<input
+										type="text"
 										name="workerDiskSize"
 										value={form.workerDiskSize}
 										onChange={handleChange}
-										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500"
-									>
-										<option value="25Gi">25 GB</option>
-										<option value="50Gi">50 GB</option>
-										<option value="100Gi">100 GB</option>
-										<option value="200Gi">200 GB</option>
-									</select>
+										placeholder="100Gi"
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
+									/>
 									<DefaultSourceHint source={defaultsSource.source.workerDiskGi} />
 								</div>
 							</div>

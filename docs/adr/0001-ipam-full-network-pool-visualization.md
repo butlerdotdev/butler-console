@@ -26,7 +26,7 @@ color-coded grid. The gaps are in the summary layer above it:
 - **Stats cards** report controller status values scoped to the tenant range
   (`TotalIPs`, `AllocatedIPs`, `AvailableIPs`), not the full pool.
 - **No layout overview** shows how the full CIDR is subdivided across uses.
-- **Reserved ranges are visually uniform** — all gray, no distinction between
+- **Reserved ranges are visually uniform**: all gray, no distinction between
   DHCP, management, infrastructure, or generic reservations.
 - **PoolUsageBar** shows a single green/amber/red bar for tenant utilization
   only.
@@ -48,7 +48,7 @@ Specifically:
 1. **Extract IP math utilities** (`ipToInt`, `intToIp`, `parseCIDR`) from
    `IPAddressMap.tsx` into a shared `src/lib/ip-math.ts` module.
 
-2. **Add a NetworkLayoutBar component** — a stacked horizontal bar showing
+2. **Add a NetworkLayoutBar component.** A stacked horizontal bar showing
    the full CIDR divided into proportional segments:
 
    ```
@@ -56,21 +56,20 @@ Specifically:
    │ 10.92.90.0/23  (512 addresses)                              │
    │                                                              │
    │ ┌──────────────────────────────────────────────────────────┐ │
-   │ │░░░░░░░░░│████████│▓▓▓▓▓▓▓▓▓▓▓▓▓│▒▒▒▒▒│●│              │ │
-   │ │ DHCP    │  Mgmt  │   Tenant     │ Rsvd │G│  Unassigned  │ │
+   │ │▒▒▒▒▒▒▒▒▒│▒▒▒▒▒▒▒▒│▓▓▓▓▓▓▓▓▓▓▓▓▓│▒▒▒▒▒│●│              │ │
+   │ │ Rsvd    │  Rsvd  │   Tenant     │ Rsvd │G│  Unassigned  │ │
    │ │ .0-.127 │.128-159│  .160-.223   │      │ │   .224-.511  │ │
    │ └──────────────────────────────────────────────────────────┘ │
    │                                                              │
    │ Segment colors:                                              │
-   │   ░ Reserved (DHCP scope)     █ Reserved (Management LBs)   │
-   │   ▓ Tenant allocation         ▒ Reserved (other)            │
-   │   ● Gateway                      Unassigned                 │
+   │   ▒ Reserved (gray)           ▓ Tenant allocation (green)   │
+   │   ● Gateway (cyan)               Unassigned (dark neutral)  │
    └──────────────────────────────────────────────────────────────┘
    ```
 
-   In Phase 1, all reserved ranges share the same gray color.
-   Descriptions appear in hover tooltips. The tenant segment is subdivided
-   to show allocated (darker) vs available (lighter) within it.
+   All reserved ranges share the same gray color. Descriptions appear in
+   hover tooltips. The tenant segment is subdivided to show allocated
+   (darker) vs available (lighter) within it.
 
 3. **Revise stats cards into two tiers:**
 
@@ -91,10 +90,11 @@ Specifically:
 4. **Enhance the Reserved Ranges card** to show IP count and percentage of
    total pool alongside each CIDR and description.
 
-### Phase 2: CRD schema enhancement (multi-repo)
+### Proposed Phase 2: CRD schema enhancement (subject to Phase 1 reception)
 
-Add a `purpose` enum field to the existing `ReservedRange` struct in
-`butler-api`:
+If Phase 1 validates that the full-pool view is useful in production,
+Phase 2 would add a `purpose` enum field to the existing `ReservedRange`
+struct in `butler-api`:
 
 ```go
 type ReservedRange struct {
@@ -106,12 +106,32 @@ type ReservedRange struct {
 }
 ```
 
-This unlocks color-coded reserved-range visualization in the console. Each
-purpose gets a distinct color in both the NetworkLayoutBar and IPAddressMap
-grid. The create/edit modals gain a "Purpose" dropdown per reserved range.
+With this field, the console can color-code reserved ranges by purpose.
+Each purpose gets a distinct color in both the NetworkLayoutBar and
+IPAddressMap grid. The create/edit modals gain a "Purpose" dropdown per
+reserved range.
 
 The field is optional and defaults to empty, so existing NetworkPool
 resources continue to work unchanged.
+
+With purpose data available, the layout bar would look like:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ 10.92.90.0/23  (512 addresses)                              │
+│                                                              │
+│ ┌──────────────────────────────────────────────────────────┐ │
+│ │░░░░░░░░░│████████│▓▓▓▓▓▓▓▓▓▓▓▓▓│▒▒▒▒▒│●│              │ │
+│ │ DHCP    │  Mgmt  │   Tenant     │ Rsvd │G│  Unassigned  │ │
+│ │ .0-.127 │.128-159│  .160-.223   │      │ │   .224-.511  │ │
+│ └──────────────────────────────────────────────────────────┘ │
+│                                                              │
+│ Segment colors:                                              │
+│   ░ DHCP (orange)                █ Management (indigo)       │
+│   ▓ Tenant allocation (green)   ▒ Reserved/other (gray)     │
+│   ● Gateway (cyan)                 Unassigned (dark neutral) │
+└──────────────────────────────────────────────────────────────┘
+```
 
 ### Why this approach over alternatives
 
@@ -123,16 +143,17 @@ reliably. Annotation typos silently produce wrong visualizations.
 
 **Separate CR/ConfigMap (rejected):** A console-managed
 `NetworkPoolLayout` resource decouples the layout data from the pool
-lifecycle. This means two objects to keep in sync per pool, no
-referential integrity (pool gets deleted, layout stays), and one more
-thing for operators to write YAML for. The reserved ranges on the
-NetworkPool spec already carry 90% of this data.
+lifecycle. An ownerReference on the layout resource would handle garbage
+collection, but operators still have to author and maintain two objects
+per pool, and the console has to fetch both on every page load. The
+reserved ranges on the NetworkPool spec already carry the CIDRs and
+descriptions. Only the purpose categorization is missing.
 
 **CRD-first (rejected as initial approach):** Gating the console work on
-a CRD change delays the fix unnecessarily. The core problem — "show the
-full pool" — is solvable with data that already exists. The CRD
-enhancement adds refinement (per-type coloring) and should follow, not
-block, the console work.
+a CRD change delays the console work. The core problem ("show the
+full pool") is solvable with data that already exists. The CRD
+enhancement adds refinement (per-type coloring) and can follow the
+console work.
 
 ## Consequences
 
@@ -150,14 +171,14 @@ block, the console work.
 - **Overlap warnings** (DHCP scope vs tenant range) are a follow-up.
   Phase 1 provides the visual context for operators to spot overlaps
   themselves. Automated detection requires either the `purpose` field
-  (Phase 2) or description-string heuristics (fragile). Ship it after
-  Phase 2 lands.
-- **Controller-side full-pool stats** — the controller currently reports
+  (Phase 2) or description-string heuristics (fragile). Defer until
+  Phase 2 lands, if Phase 2 proceeds.
+- **Controller-side full-pool stats.** The controller currently reports
   `TotalIPs`/`AllocatedIPs`/`AvailableIPs` scoped to the tenant range.
   A future enhancement could add full-pool counters to the status, but
   client-side computation from spec fields is sufficient and avoids a
   controller change.
-- **NetworkPoolsPage (list view)** — the pool card list continues showing
+- **NetworkPoolsPage (list view).** The pool card list continues showing
   tenant utilization via PoolUsageBar. Adding full-pool context to the
   list view is a separate decision; the detail page is the priority.
 
@@ -183,9 +204,9 @@ block, the console work.
 | Modify | `src/components/networks/IPAddressMap.tsx` (import from ip-math) |
 | Modify | `src/pages/NetworkPoolDetailPage.tsx` (layout bar, two-tier stats, enhanced reserved card) |
 
-PoolUsageBar.tsx is unchanged — it's still used by the list page.
+PoolUsageBar.tsx is unchanged; it's still used by the list page.
 
-### Phase 2 PRs (multi-repo)
+### Proposed Phase 2 PRs (multi-repo, if Phase 2 proceeds)
 
 | Repo | Scope |
 |------|-------|

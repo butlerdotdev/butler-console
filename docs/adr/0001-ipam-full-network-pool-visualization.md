@@ -34,13 +34,13 @@ color-coded grid. The gaps are in the summary layer above it:
 ## Decision
 
 Extend the IPAM detail page to show the full network pool context, using a
-two-phase approach:
+phased approach:
 
-### Phase 1: Console-only changes (no schema change)
+### Console-only changes (no schema change)
 
 All data needed to render the full pool breakdown already exists in the
 NetworkPool spec: `cidr`, `reserved[]` (with CIDR + description), and
-`tenantAllocation.start/end`. Phase 1 computes the full layout client-side
+`tenantAllocation.start/end`. The console change computes the full layout client-side
 and renders it. No API, CRD, or controller changes.
 
 Specifically:
@@ -90,10 +90,11 @@ Specifically:
 4. **Enhance the Reserved Ranges card** to show IP count and percentage of
    total pool alongside each CIDR and description.
 
-### Proposed Phase 2: CRD schema enhancement (subject to Phase 1 reception)
+### Proposed CRD schema enhancement (subject to console change reception)
 
-If Phase 1 validates that the full-pool view is useful in production,
-Phase 2 would add a `purpose` enum field to the existing `ReservedRange`
+If the console change validates that the full-pool view is useful in
+production, a follow-up would add a `purpose` enum field to the existing
+`ReservedRange`
 struct in `butler-api`:
 
 ```go
@@ -169,10 +170,10 @@ console work.
 ### What's deferred
 
 - **Overlap warnings** (DHCP scope vs tenant range) are a follow-up.
-  Phase 1 provides the visual context for operators to spot overlaps
-  themselves. Automated detection requires either the `purpose` field
-  (Phase 2) or description-string heuristics (fragile). Defer until
-  Phase 2 lands, if Phase 2 proceeds.
+  The console change provides the visual context for operators to spot
+  overlaps themselves. Automated detection requires either the `purpose`
+  field (CRD enhancement) or description-string heuristics (fragile).
+  Defer until the CRD enhancement lands, if it proceeds.
 - **Controller-side full-pool stats.** The controller currently reports
   `TotalIPs`/`AllocatedIPs`/`AvailableIPs` scoped to the tenant range.
   A future enhancement could add full-pool counters to the status, but
@@ -195,7 +196,7 @@ console work.
 
 ## Implementation Outline
 
-### Phase 1 PR (butler-console only)
+### Console change PR (butler-console only)
 
 | Action | File |
 |--------|------|
@@ -206,7 +207,7 @@ console work.
 
 PoolUsageBar.tsx is unchanged; it's still used by the list page.
 
-### Proposed Phase 2 PRs (multi-repo, if Phase 2 proceeds)
+### Proposed CRD enhancement PRs (multi-repo, if it proceeds)
 
 | Repo | Scope |
 |------|-------|
@@ -214,7 +215,7 @@ PoolUsageBar.tsx is unchanged; it's still used by the list page.
 | butler-charts | Update CRD template in butler-crds chart, version bump |
 | butler-console | Purpose-aware colors in IPAddressMap + NetworkLayoutBar, purpose dropdown in create/edit modals |
 
-### Phase 3 PR (follow-up)
+### Follow-up: overlap warning banner
 
 | Repo | Scope |
 |------|-------|
@@ -228,4 +229,4 @@ PoolUsageBar.tsx is unchanged; it's still used by the list page.
   layout bar segment widths should sum to 100% and align with the
   IPAddressMap grid
 - Backward compatibility: pools without `purpose` field render identically
-  to Phase 1 (all reserved ranges gray)
+  to the console-only version (all reserved ranges gray)

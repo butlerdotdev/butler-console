@@ -1,15 +1,17 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { networksApi } from '@/api/networks'
 import { Card, Spinner, Button, FadeIn } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
-import { PoolUsageBar } from '@/components/networks/PoolUsageBar'
 import { CreateNetworkPoolModal } from '@/components/networks/CreateNetworkPoolModal'
+import { computePoolLayout } from '@/components/networks/NetworkLayoutBar'
 import { useToast } from '@/hooks/useToast'
+import { cn } from '@/lib/utils'
+import { parseCIDR } from '@/lib/ip-math'
 import type { NetworkPool } from '@/types/networks'
 
 export function NetworkPoolsPage() {
@@ -163,15 +165,42 @@ interface PoolCardProps {
 	onDelete: (e: React.MouseEvent) => void
 }
 
+const MINI_BAR_COLORS: Record<string, string> = {
+	gateway: 'bg-cyan-500/30',
+	reserved: 'bg-neutral-600/60',
+	'tenant-allocated': 'bg-amber-500/50',
+	'tenant-available': 'bg-emerald-500/50',
+	unassigned: 'bg-neutral-800/60',
+}
+
 function PoolCard({ pool, onDelete }: PoolCardProps) {
 	const { name, namespace, creationTimestamp } = pool.metadata
 	const { cidr } = pool.spec
 	const status = pool.status
-	const totalIPs = status?.totalIPs || 0
+	const tenantTotalIPs = status?.totalIPs || 0
 	const allocatedIPs = status?.allocatedIPs || 0
-	const availableIPs = status?.availableIPs || 0
 	const allocationCount = status?.allocationCount || 0
-	const pct = totalIPs > 0 ? Math.round((allocatedIPs / totalIPs) * 100) : 0
+	const pct = tenantTotalIPs > 0 ? Math.round((allocatedIPs / tenantTotalIPs) * 100) : 0
+	const poolSize = parseCIDR(cidr).size
+
+	const segments = useMemo(
+		() => computePoolLayout(pool, allocatedIPs),
+		[pool, allocatedIPs],
+	)
+
+	// Summarize segment sizes by kind for the legend
+	const summary = useMemo(() => {
+		const counts: Record<string, number> = {}
+		for (const s of segments) {
+			counts[s.kind] = (counts[s.kind] || 0) + s.size
+		}
+		return counts
+	}, [segments])
+
+	const reservedTotal = summary['reserved'] || 0
+	const tenantAllocated = summary['tenant-allocated'] || 0
+	const tenantAvailable = summary['tenant-available'] || 0
+	const unassigned = summary['unassigned'] || 0
 
 	const age = creationTimestamp
 		? new Date(creationTimestamp).toLocaleDateString()
@@ -179,7 +208,8 @@ function PoolCard({ pool, onDelete }: PoolCardProps) {
 
 	return (
 		<Link to={`/admin/networks/${namespace}/${name}`}>
-			<Card className="p-5 cursor-pointer hover:bg-neutral-800/50 transition-colors">
+			<Card className="p-5 cursor-pointer hover:bg-neutral-800/50 transition-colors space-y-3">
+				{/* Top row: name, badge, meta, actions */}
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-4 min-w-0">
 						<div className="w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center flex-shrink-0">
@@ -207,13 +237,6 @@ function PoolCard({ pool, onDelete }: PoolCardProps) {
 					</div>
 
 					<div className="flex items-center gap-6">
-						<div className="w-40 hidden lg:block">
-							<PoolUsageBar allocated={allocatedIPs} total={totalIPs} />
-						</div>
-						<div className="text-right hidden md:block">
-							<p className="text-xs text-neutral-500 uppercase tracking-wide">Available</p>
-							<p className="text-sm text-neutral-200">{availableIPs} IPs</p>
-						</div>
 						<div className="text-right hidden md:block">
 							<p className="text-xs text-neutral-500 uppercase tracking-wide">Allocations</p>
 							<p className="text-sm text-neutral-200">{allocationCount}</p>
@@ -232,6 +255,51 @@ function PoolCard({ pool, onDelete }: PoolCardProps) {
 							</svg>
 						</button>
 					</div>
+				</div>
+
+				{/* Layout bar */}
+				<div className="h-3 bg-neutral-800 rounded-full overflow-hidden flex">
+					{segments.map((seg, i) => {
+						const widthPct = poolSize > 0 ? (seg.size / poolSize) * 100 : 0
+						if (widthPct < 0.1) return null
+						return (
+							<div
+								key={i}
+								className={cn('h-full', MINI_BAR_COLORS[seg.kind])}
+								style={{ width: `${widthPct}%` }}
+							/>
+						)
+					})}
+				</div>
+
+				{/* Legend line */}
+				<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+					<span className="text-neutral-400">
+						{poolSize.toLocaleString()} IPs
+					</span>
+					{reservedTotal > 0 && (
+						<span className="text-neutral-400">
+							<span className="inline-block w-2 h-2 rounded-sm bg-neutral-600/60 mr-1 align-middle" />
+							{reservedTotal} Reserved
+						</span>
+					)}
+					{tenantTotalIPs > 0 && (
+						<span className="text-neutral-400">
+							<span className="inline-block w-2 h-2 rounded-sm bg-amber-500/50 mr-1 align-middle" />
+							{tenantAllocated} of {tenantTotalIPs} Tenant Used
+						</span>
+					)}
+					{tenantAvailable > 0 && (
+						<span className="text-neutral-400">
+							<span className="inline-block w-2 h-2 rounded-sm bg-emerald-500/50 mr-1 align-middle" />
+							{tenantAvailable} Tenant Free
+						</span>
+					)}
+					{unassigned > 0 && (
+						<span className="text-neutral-500">
+							{unassigned} Unassigned
+						</span>
+					)}
 				</div>
 			</Card>
 		</Link>

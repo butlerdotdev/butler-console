@@ -3,27 +3,7 @@
 
 import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
-
-// ----------------------------------------------------------------------------
-// IP Math Helpers
-// ----------------------------------------------------------------------------
-
-function ipToInt(ip: string): number {
-	return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0
-}
-
-function intToIp(n: number): string {
-	return [(n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff].join('.')
-}
-
-function parseCIDR(cidr: string): { start: number; end: number; prefix: number; size: number } {
-	const [ip, prefix] = cidr.split('/')
-	const p = parseInt(prefix, 10)
-	const mask = p === 0 ? 0 : (~0 << (32 - p)) >>> 0
-	const start = ipToInt(ip) & mask
-	const size = 1 << (32 - p)
-	return { start, end: (start + size - 1) >>> 0, prefix: p, size }
-}
+import { ipToInt, intToIp, parseCIDR, rangesOverlap } from '@/lib/ip-math'
 
 // ----------------------------------------------------------------------------
 // Types
@@ -122,10 +102,6 @@ const STATUS_LABELS: Record<BlockStatus, string> = {
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
-
-function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
-	return aStart <= bEnd && bStart <= aEnd
-}
 
 function statusDisplayName(status: BlockStatus): string {
 	switch (status) {

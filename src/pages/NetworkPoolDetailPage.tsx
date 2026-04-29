@@ -1,7 +1,7 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { networksApi } from '@/api/networks'
@@ -9,8 +9,10 @@ import { Card, Spinner, Button, FadeIn, StatusBadge } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { PoolUsageBar } from '@/components/networks/PoolUsageBar'
 import { IPAddressMap } from '@/components/networks/IPAddressMap'
+import { NetworkLayoutBar, computePoolLayout } from '@/components/networks/NetworkLayoutBar'
 import { EditNetworkPoolModal } from '@/components/networks/EditNetworkPoolModal'
 import { useToast } from '@/hooks/useToast'
+import { cidrSize } from '@/lib/ip-math'
 import type { NetworkPool, IPAllocation } from '@/types/networks'
 
 export function NetworkPoolDetailPage() {
@@ -80,6 +82,30 @@ export function NetworkPoolDetailPage() {
 		}
 	}
 
+	// Full-pool stats derived from layout segments (single source of truth).
+	// Hooks must run unconditionally, so these are placed before early returns.
+	const fullPoolStats = useMemo(() => {
+		if (!pool) return { poolTotal: 0, reservedIPs: 0, tenantRangeSize: 0, unassigned: 0 }
+		const segments = computePoolLayout(pool, pool.status?.allocatedIPs || 0)
+		const counts: Record<string, number> = {}
+		for (const s of segments) {
+			counts[s.kind] = (counts[s.kind] || 0) + s.size
+		}
+		const poolTotal = segments.reduce((sum, s) => sum + s.size, 0)
+		return {
+			poolTotal,
+			reservedIPs: (counts['reserved'] || 0) + (counts['gateway'] || 0),
+			tenantRangeSize: (counts['tenant-allocated'] || 0) + (counts['tenant-available'] || 0),
+			unassigned: counts['unassigned'] || 0,
+		}
+	}, [pool])
+
+	const tenantRangeLabel = useMemo(() => {
+		const ta = pool?.spec.tenantAllocation
+		if (ta?.start && ta?.end) return `${ta.start} - ${ta.end}`
+		return null
+	}, [pool])
+
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center h-64">
@@ -103,9 +129,9 @@ export function NetworkPoolDetailPage() {
 	}
 
 	const status = pool.status
-	const totalIPs = status?.totalIPs || 0
+	const tenantTotalIPs = status?.totalIPs || 0
 	const allocatedIPs = status?.allocatedIPs || 0
-	const availableIPs = status?.availableIPs || 0
+	const tenantAvailableIPs = status?.availableIPs || 0
 	const fragmentation = status?.fragmentation || 0
 	const largestFreeBlock = status?.largestFreeBlock || 0
 	const allocationCount = status?.allocationCount || 0
@@ -139,22 +165,45 @@ export function NetworkPoolDetailPage() {
 					</Button>
 				</div>
 
-				{/* Stats Cards */}
-				<div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-					<StatCard label="Total IPs" value={totalIPs.toLocaleString()} />
-					<StatCard label="Allocated" value={allocatedIPs.toLocaleString()} />
-					<StatCard label="Available" value={availableIPs.toLocaleString()} />
-					<StatCard
-						label="Fragmentation"
-						value={`${Math.round(fragmentation * 100)}%`}
-					/>
-					<StatCard label="Largest Free Block" value={largestFreeBlock.toLocaleString()} />
+				{/* Network Layout Bar */}
+				<Card className="p-5">
+					<NetworkLayoutBar pool={pool} allocatedIPs={allocatedIPs} />
+				</Card>
+
+				{/* Full Pool Stats */}
+				<div>
+					<h3 className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-3">Full Pool</h3>
+					<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+						<StatCard label="Pool Size" value={fullPoolStats.poolTotal.toLocaleString()} />
+						<StatCard label="Reserved" value={fullPoolStats.reservedIPs.toLocaleString()} />
+						<StatCard label="Tenant Range" value={fullPoolStats.tenantRangeSize.toLocaleString()} />
+						<StatCard label="Unassigned" value={fullPoolStats.unassigned.toLocaleString()} />
+					</div>
 				</div>
 
-				{/* Usage Bar */}
+				{/* Tenant Allocation Stats */}
+				<div>
+					<h3 className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1">
+						Tenant Allocation
+					</h3>
+					{tenantRangeLabel && (
+						<p className="text-xs text-neutral-600 font-mono mb-3">{tenantRangeLabel}</p>
+					)}
+					<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+						<StatCard label="Allocated" value={allocatedIPs.toLocaleString()} />
+						<StatCard label="Available" value={tenantAvailableIPs.toLocaleString()} />
+						<StatCard
+							label="Fragmentation"
+							value={`${Math.round(fragmentation * 100)}%`}
+						/>
+						<StatCard label="Largest Free Block" value={largestFreeBlock.toLocaleString()} />
+					</div>
+				</div>
+
+				{/* Tenant Utilization Bar */}
 				<Card className="p-5">
-					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-3">Pool Utilization</h3>
-					<PoolUsageBar allocated={allocatedIPs} total={totalIPs} />
+					<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide mb-3">Tenant Utilization</h3>
+					<PoolUsageBar allocated={allocatedIPs} total={tenantTotalIPs} />
 					<p className="text-xs text-neutral-500 mt-2">
 						{allocationCount} active allocation{allocationCount !== 1 ? 's' : ''}
 					</p>
@@ -278,14 +327,32 @@ export function NetworkPoolDetailPage() {
 							<p className="text-sm text-neutral-500">No reserved ranges</p>
 						) : (
 							<div className="space-y-2">
-								{pool.spec.reserved.map((r, i) => (
-									<div key={i} className="flex items-center justify-between py-2 border-b border-neutral-800 last:border-0">
-										<span className="text-sm text-neutral-200 font-mono">{r.cidr}</span>
-										{r.description && (
-											<span className="text-xs text-neutral-500">{r.description}</span>
-										)}
+								{pool.spec.reserved.map((r, i) => {
+									const size = cidrSize(r.cidr)
+									const pct = fullPoolStats.poolTotal > 0
+										? ((size / fullPoolStats.poolTotal) * 100).toFixed(1)
+										: '0'
+									return (
+										<div key={i} className="flex items-center justify-between py-2 border-b border-neutral-800 last:border-0">
+											<div className="flex items-center gap-3">
+												<span className="text-sm text-neutral-200 font-mono">{r.cidr}</span>
+												{r.description && (
+													<span className="text-xs text-neutral-500">{r.description}</span>
+												)}
+											</div>
+											<span className="text-xs text-neutral-500 font-mono">
+												{size.toLocaleString()} IPs ({pct}%)
+											</span>
+										</div>
+									)
+								})}
+								{pool.spec.reserved.length > 1 && (
+									<div className="flex items-center justify-end pt-2">
+										<span className="text-xs text-neutral-400 font-mono">
+											Total reserved: {fullPoolStats.reservedIPs.toLocaleString()} IPs
+										</span>
 									</div>
-								))}
+								)}
 							</div>
 						)}
 					</Card>

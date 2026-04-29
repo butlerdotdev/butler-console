@@ -9,10 +9,10 @@ import { Card, Spinner, Button, FadeIn, StatusBadge } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { PoolUsageBar } from '@/components/networks/PoolUsageBar'
 import { IPAddressMap } from '@/components/networks/IPAddressMap'
-import { NetworkLayoutBar } from '@/components/networks/NetworkLayoutBar'
+import { NetworkLayoutBar, computePoolLayout } from '@/components/networks/NetworkLayoutBar'
 import { EditNetworkPoolModal } from '@/components/networks/EditNetworkPoolModal'
 import { useToast } from '@/hooks/useToast'
-import { parseCIDR, cidrSize, ipToInt } from '@/lib/ip-math'
+import { cidrSize } from '@/lib/ip-math'
 import type { NetworkPool, IPAllocation } from '@/types/networks'
 
 export function NetworkPoolDetailPage() {
@@ -82,22 +82,22 @@ export function NetworkPoolDetailPage() {
 		}
 	}
 
-	// Full-pool stats computed client-side from spec fields.
+	// Full-pool stats derived from layout segments (single source of truth).
 	// Hooks must run unconditionally, so these are placed before early returns.
 	const fullPoolStats = useMemo(() => {
 		if (!pool) return { poolTotal: 0, reservedIPs: 0, tenantRangeSize: 0, unassigned: 0 }
-		const poolTotal = parseCIDR(pool.spec.cidr).size
-		const reservedIPs = (pool.spec.reserved || []).reduce(
-			(sum, r) => sum + cidrSize(r.cidr), 0,
-		)
-		const ta = pool.spec.tenantAllocation
-		let tenantRangeSize = 0
-		if (ta?.start && ta?.end) {
-			tenantRangeSize = (ipToInt(ta.end) - ipToInt(ta.start) + 1) >>> 0
+		const segments = computePoolLayout(pool, pool.status?.allocatedIPs || 0)
+		const counts: Record<string, number> = {}
+		for (const s of segments) {
+			counts[s.kind] = (counts[s.kind] || 0) + s.size
 		}
-		const gateway = 1
-		const unassigned = Math.max(0, poolTotal - gateway - reservedIPs - tenantRangeSize)
-		return { poolTotal, reservedIPs, tenantRangeSize, unassigned }
+		const poolTotal = segments.reduce((sum, s) => sum + s.size, 0)
+		return {
+			poolTotal,
+			reservedIPs: (counts['reserved'] || 0) + (counts['gateway'] || 0),
+			tenantRangeSize: (counts['tenant-allocated'] || 0) + (counts['tenant-available'] || 0),
+			unassigned: counts['unassigned'] || 0,
+		}
 	}, [pool])
 
 	const tenantRangeLabel = useMemo(() => {

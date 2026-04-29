@@ -154,8 +154,8 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segm
 			description = 'Network/gateway address'
 		}
 
-		// Check reserved (next priority)
-		if (kind === 'unassigned' || kind === 'gateway') {
+		// Check reserved (next priority, but gateway wins)
+		if (kind === 'unassigned') {
 			for (const r of regions) {
 				if (r.kind === 'reserved' && rangesOverlap(clampedStart, clampedEnd, r.start, r.end)) {
 					kind = 'reserved'

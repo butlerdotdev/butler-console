@@ -9,7 +9,7 @@ export { AuthProvider } from './AuthProvider'
 // Team
 export { TeamContext } from './TeamContext'
 export type { ContextMode, TeamContextValue, TeamInfo } from './TeamContext'
-export { TeamContextProvider, RequireAuth, RequireTeamAccess, RequireAdmin } from './TeamProvider'
+export { TeamContextProvider, RequireAuth, RequireTeamAccess, RequirePlatformAccess, RequireAdmin } from './TeamProvider'
 
 // Toast
 export { ToastContext } from './ToastContext'

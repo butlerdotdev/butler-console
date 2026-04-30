@@ -72,10 +72,9 @@ function SmartRedirect() {
 		)
 	}
 
-	// Check if user is platform admin (NOT just any team admin)
-	// Convention: admin of "platform-team" = platform admin
-	// TODO: Add proper spec.platformRole to User CRD
-	const isPlatformAdmin = user?.role === 'admin' || user?.isAdmin === true || user?.isPlatformAdmin === true ||
+	// Check if user has platform-level access (admin or viewer)
+	const hasPlatformAccess = user?.platformRole === 'admin' || user?.platformRole === 'viewer' ||
+		user?.role === 'admin' || user?.isAdmin === true || user?.isPlatformAdmin === true ||
 		user?.teams?.some((t: TeamRef) => {
 			const teamName = t.name || t.metadata?.name
 			const role = t.role || t.metadata?.role
@@ -83,7 +82,7 @@ function SmartRedirect() {
 		})
 
 	// Respect default view preference
-	if (preferences.defaultView === 'admin' && isPlatformAdmin) {
+	if (preferences.defaultView === 'admin' && hasPlatformAccess) {
 		return <Navigate to="/admin" replace />
 	}
 	if (preferences.defaultView === 'team') {
@@ -95,7 +94,7 @@ function SmartRedirect() {
 	}
 
 	// Default: "last" behavior (same as original logic)
-	if (isPlatformAdmin) {
+	if (hasPlatformAccess) {
 		return <Navigate to="/admin" replace />
 	}
 

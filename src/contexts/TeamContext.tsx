@@ -28,11 +28,17 @@ export interface TeamContextValue {
 	/** Whether user is currently in admin mode */
 	isAdminMode: boolean
 
-	/** Whether user has platform admin privileges (can access admin mode) */
+	/** Whether user has platform-level access (admin or viewer) */
 	canAccessAdmin: boolean
+
+	/** Whether user is a platform admin (can mutate) vs platform viewer (read-only) */
+	isPlatformViewer: boolean
 
 	/** Whether user is an admin of the current team (team-level admin, not platform admin) */
 	isTeamAdmin: boolean
+
+	/** The user's role in the current team (admin, operator, viewer, or undefined) */
+	currentTeamRole: string | undefined
 
 	/** Navigate to a specific team */
 	switchToTeam: (teamName: string) => void

@@ -105,21 +105,33 @@ export function TeamContextProvider({ children }: TeamContextProviderProps) {
 	// Falls back to team name if not specified
 	const currentTeamNamespace = currentTeamInfo?.namespace || currentTeam
 
-	// Check if user can access admin mode (platform admin only, not team admin)
+	// Check if user has platform-level access (admin or viewer)
 	const canAccessAdmin = useMemo(() => {
-		// Check explicit flags first
+		// Check platformRole first (set by backend from IdP groups or CRD)
+		if (user?.platformRole === 'admin' || user?.platformRole === 'viewer') {
+			return true
+		}
+		// Backwards compat: check legacy flags
 		if (user?.role === 'admin' || user?.isAdmin === true || user?.isPlatformAdmin === true) {
 			return true
 		}
 		// Convention: admin of "platform-team" = platform admin
 		return normalizedTeams.some((t) => t.name === 'platform-team' && t.role === 'admin')
-	}, [user?.role, user?.isAdmin, user?.isPlatformAdmin, normalizedTeams])
+	}, [user?.platformRole, user?.role, user?.isAdmin, user?.isPlatformAdmin, normalizedTeams])
+
+	// Check if user is a platform viewer (has platform access but read-only)
+	const isPlatformViewer = useMemo(() => {
+		return user?.platformRole === 'viewer'
+	}, [user?.platformRole])
 
 	// Check if user is an admin of the current team (team-level admin)
 	const isTeamAdmin = useMemo(() => {
 		if (!currentTeam || !currentTeamInfo) return false
 		return currentTeamInfo.role === 'admin'
 	}, [currentTeam, currentTeamInfo])
+
+	// Current team role (admin, operator, viewer, or undefined)
+	const currentTeamRole = currentTeamInfo?.role
 
 	// Navigation functions
 	const switchToTeam = useCallback(
@@ -176,7 +188,9 @@ export function TeamContextProvider({ children }: TeamContextProviderProps) {
 			currentTeamNamespace,
 			isAdminMode: mode === 'admin',
 			canAccessAdmin,
+			isPlatformViewer,
 			isTeamAdmin,
+			currentTeamRole,
 			switchToTeam,
 			switchToAdmin,
 			switchToOverview,
@@ -189,7 +203,9 @@ export function TeamContextProvider({ children }: TeamContextProviderProps) {
 			currentTeamDisplayName,
 			currentTeamNamespace,
 			canAccessAdmin,
+			isPlatformViewer,
 			isTeamAdmin,
+			currentTeamRole,
 			switchToTeam,
 			switchToAdmin,
 			switchToOverview,
@@ -263,14 +279,16 @@ export function RequireTeamAccess({ children }: RouteGuardProps) {
 	// Normalize teams for checking
 	const normalizedTeams = normalizeTeams(user?.teams || [])
 
-	// Platform admins can access any team
-	const isPlatformAdmin =
+	// Platform admins and viewers can access any team
+	const hasPlatformAccess =
+		user?.platformRole === 'admin' ||
+		user?.platformRole === 'viewer' ||
 		user?.role === 'admin' ||
 		user?.isAdmin === true ||
 		user?.isPlatformAdmin === true ||
 		normalizedTeams.some((t) => t.name === 'platform-team' && t.role === 'admin')
 
-	if (isPlatformAdmin) {
+	if (hasPlatformAccess) {
 		return <>{children}</>
 	}
 
@@ -293,11 +311,11 @@ export function RequireTeamAccess({ children }: RouteGuardProps) {
 }
 
 /**
- * Requires user to have platform admin privileges.
- * Team admins are NOT platform admins (except platform-team admin).
- * Redirects to team view if not platform admin.
+ * Requires platform-level access (admin or viewer).
+ * Team admins are NOT platform users (except platform-team admin).
+ * Redirects to team view if no platform access.
  */
-export function RequireAdmin({ children }: RouteGuardProps) {
+export function RequirePlatformAccess({ children }: RouteGuardProps) {
 	const { user, isLoading } = useAuth()
 
 	if (isLoading) {
@@ -311,19 +329,21 @@ export function RequireAdmin({ children }: RouteGuardProps) {
 	// Normalize teams to check platform-team admin
 	const normalizedTeams = normalizeTeams(user?.teams || [])
 
-	// Platform admin is determined by:
-	// 1. user.role === 'admin' (explicit platform role)
-	// 2. user.isAdmin === true (explicit flag)
-	// 3. user.isPlatformAdmin === true (explicit flag)
-	// 4. Admin of "platform-team" team (convention)
-	const isPlatformAdmin =
+	// Platform access is determined by:
+	// 1. user.platformRole is 'admin' or 'viewer' (from backend IdP group resolution)
+	// 2. user.role === 'admin' (explicit platform role, legacy)
+	// 3. user.isAdmin === true (explicit flag, legacy)
+	// 4. user.isPlatformAdmin === true (explicit flag, legacy)
+	// 5. Admin of "platform-team" team (convention)
+	const hasPlatformAccess =
+		user?.platformRole === 'admin' ||
+		user?.platformRole === 'viewer' ||
 		user?.role === 'admin' ||
 		user?.isAdmin === true ||
 		user?.isPlatformAdmin === true ||
 		normalizedTeams.some((t) => t.name === 'platform-team' && t.role === 'admin')
 
-	if (!isPlatformAdmin) {
-		// Not platform admin - redirect to first team or overview
+	if (!hasPlatformAccess) {
 		if (normalizedTeams.length > 0) {
 			return <Navigate to={`/t/${normalizedTeams[0].name}`} replace />
 		}
@@ -332,3 +352,6 @@ export function RequireAdmin({ children }: RouteGuardProps) {
 
 	return <>{children}</>
 }
+
+/** @deprecated Use RequirePlatformAccess instead */
+export const RequireAdmin = RequirePlatformAccess

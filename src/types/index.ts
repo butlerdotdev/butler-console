@@ -69,11 +69,12 @@ export interface User {
 	displayName?: string
 	picture?: string
 
-	// Platform-level admin flags
-	// Backend sets these based on User CRD or conventions
+	// Platform-level role and admin flags
+	// Backend sets these based on User CRD, IdP groups, or conventions
 	role?: 'admin' | 'user' | string
 	isAdmin?: boolean
 	isPlatformAdmin?: boolean
+	platformRole?: string
 
 	// Team memberships
 	teams?: UserTeam[]

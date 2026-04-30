@@ -43,7 +43,7 @@ interface NavSection {
 }
 
 export function Sidebar() {
-	const { mode, currentTeam, currentTeamDisplayName, buildPath, isAdminMode, canAccessAdmin, isTeamAdmin } = useTeamContext()
+	const { mode, currentTeam, currentTeamDisplayName, buildPath, isAdminMode, canAccessAdmin, isTeamAdmin, isPlatformViewer, currentTeamRole } = useTeamContext()
 	const { user } = useAuth()
 	const location = useLocation()
 	const navigate = useNavigate()
@@ -227,15 +227,23 @@ export function Sidebar() {
 		}
 	}
 
-	// Accent color:
-	// - Purple for platform admin mode
-	// - Teal for team admin
-	// - Green for regular team member
-	const accentClass = effectiveAdminMode
-		? 'bg-violet-600/20 text-violet-400 border-l-2 border-violet-500'
-		: isTeamAdmin
-			? 'bg-teal-600/20 text-teal-400 border-l-2 border-teal-500'
-			: 'bg-green-600/20 text-green-400 border-l-2 border-green-500'
+	// Accent color based on effective role:
+	// Platform scope: violet (filled for admin, outlined for viewer)
+	// Team scope: teal for admin, orange for operator, outlined teal for viewer, green for member
+	let accentClass: string
+	if (effectiveAdminMode) {
+		accentClass = isPlatformViewer
+			? 'bg-transparent text-violet-400 border-l-2 border-violet-500/40'
+			: 'bg-violet-600/20 text-violet-400 border-l-2 border-violet-500'
+	} else if (currentTeamRole === 'admin' || isTeamAdmin) {
+		accentClass = 'bg-teal-600/20 text-teal-400 border-l-2 border-teal-500'
+	} else if (currentTeamRole === 'operator') {
+		accentClass = 'bg-orange-600/20 text-orange-400 border-l-2 border-orange-500'
+	} else if (currentTeamRole === 'viewer') {
+		accentClass = 'bg-transparent text-teal-400 border-l-2 border-teal-500/40'
+	} else {
+		accentClass = 'bg-green-600/20 text-green-400 border-l-2 border-green-500'
+	}
 
 	return (
 		<aside className="w-64 bg-neutral-900 border-r border-neutral-800 flex flex-col flex-shrink-0">

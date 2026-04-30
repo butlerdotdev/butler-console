@@ -11,6 +11,7 @@ export interface User {
 	role?: string
 	isAdmin?: boolean
 	isPlatformAdmin?: boolean
+	platformRole?: string
 	provider?: string
 }
 

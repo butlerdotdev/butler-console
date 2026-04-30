@@ -12,6 +12,7 @@ import {
 } from '@/api/addons'
 import { gitopsApi } from '@/api/gitops'
 import type { Repository, Branch, GitProviderConfig, GitOpsStatus } from '@/types/gitops'
+import { AddonIcon, AddonStatusBadge, TierPill } from '@/components/addons'
 
 
 interface ManagementAddon {
@@ -509,27 +510,22 @@ function InstalledAddonCard({
 		return () => document.removeEventListener('mousedown', handleClickOutside)
 	}, [])
 
-	const statusColor = addon.status.phase === 'Installed' ? 'text-green-400' : 'text-yellow-400'
-	const statusBg = addon.status.phase === 'Installed' ? 'bg-green-500/10 border border-green-500/30' : 'bg-yellow-500/10 border border-yellow-500/30'
-	const icon = catalogInfo?.icon || getAddonIcon(addon.addon)
-
 	return (
 		<Card className="p-4 hover:border-neutral-600 transition-colors border-green-500/20">
 			<div className="flex items-start justify-between mb-3">
 				<div className="flex items-center gap-3">
-					<div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-						<span className="text-xl">{icon}</span>
-					</div>
+					<AddonIcon name={addon.addon} icon={catalogInfo?.icon} />
 					<div>
-						<h4 className="font-medium text-neutral-100">
-							{catalogInfo?.displayName || addon.addon}
-						</h4>
+						<div className="flex items-center gap-2">
+							<h4 className="font-medium text-neutral-100">
+								{catalogInfo?.displayName || addon.addon}
+							</h4>
+							<TierPill tier={catalogInfo?.tier || (catalogInfo?.platform ? 'infrastructure' : 'apps')} />
+						</div>
 						<p className="text-xs text-neutral-500">{addon.status.installedVersion || addon.version || 'Unknown'}</p>
 					</div>
 				</div>
-				<span className={`px-2 py-1 text-xs rounded-full ${statusBg} ${statusColor}`}>
-					{addon.status.phase}
-				</span>
+				<AddonStatusBadge status={addon.status.phase} />
 			</div>
 
 			{catalogInfo?.description && (
@@ -634,11 +630,12 @@ function AvailableAddonCard({
 		<Card className="p-4 hover:border-neutral-600 transition-colors">
 			<div className="flex items-start justify-between mb-3">
 				<div className="flex items-center gap-3">
-					<div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center">
-						<span className="text-xl">{catalog.icon || '📦'}</span>
-					</div>
+					<AddonIcon name={catalog.name} icon={catalog.icon} />
 					<div>
-						<h4 className="font-medium text-neutral-100">{catalog.displayName}</h4>
+						<div className="flex items-center gap-2">
+							<h4 className="font-medium text-neutral-100">{catalog.displayName}</h4>
+							<TierPill tier={catalog.tier || (catalog.platform ? 'infrastructure' : 'apps')} />
+						</div>
 						<p className="text-xs text-neutral-500">{catalog.defaultVersion}</p>
 					</div>
 				</div>
@@ -1380,20 +1377,3 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, loadingRepos, confi
 	)
 }
 
-// Helpers
-
-function getAddonIcon(name: string): string {
-	const icons: Record<string, string> = {
-		velero: '🛡️',
-		'prometheus-operator': '🔥',
-		tempo: '🔍',
-		jaeger: '🔎',
-		'victoria-metrics': '📊',
-		'victoria-logs': '📋',
-		flux: '🔄',
-		argocd: '🐙',
-		grafana: '📊',
-		loki: '📋',
-	}
-	return icons[name.toLowerCase()] || '📦'
-}

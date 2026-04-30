@@ -8,6 +8,7 @@ import {
 	addonsApi,
 	type AddonDefinition,
 	type AddonCategory,
+	type AddonTier,
 	type CreateAddonDefinitionRequest,
 	CATEGORY_INFO,
 } from '@/api'
@@ -23,6 +24,7 @@ import {
 	ModalFooter,
 	StatusBadge,
 } from '@/components/ui'
+import { AddonIcon, TierPill } from '@/components/addons'
 
 const CATEGORIES: AddonCategory[] = [
 	'cni', 'loadbalancer', 'storage', 'certmanager', 'ingress',
@@ -138,8 +140,10 @@ export function AddonCatalogPage() {
 						<table className="w-full">
 							<thead className="bg-neutral-800/50">
 								<tr>
+									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase w-10"></th>
 									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase">Name</th>
 									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase">Category</th>
+									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase">Tier</th>
 									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase">Chart</th>
 									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase">Version</th>
 									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase">Source</th>
@@ -149,6 +153,9 @@ export function AddonCatalogPage() {
 							<tbody className="divide-y divide-neutral-800">
 								{addons.map((addon) => (
 									<tr key={addon.name} className="hover:bg-neutral-800/30">
+										<td className="px-5 py-4">
+											<AddonIcon name={addon.name} icon={addon.icon} size="sm" />
+										</td>
 										<td className="px-5 py-4">
 											<div>
 												<p className="text-neutral-200 font-medium">{addon.displayName || addon.name}</p>
@@ -160,6 +167,9 @@ export function AddonCatalogPage() {
 												{CATEGORY_INFO[addon.category]?.displayName || addon.category}
 											</span>
 										</td>
+										<td className="px-5 py-4">
+											<TierPill tier={addon.tier || (addon.platform ? 'infrastructure' : 'apps')} />
+										</td>
 										<td className="px-5 py-4 text-sm text-neutral-400 font-mono">
 											{addon.chartName}
 										</td>
@@ -167,7 +177,7 @@ export function AddonCatalogPage() {
 											{addon.defaultVersion}
 										</td>
 										<td className="px-5 py-4">
-											<StatusBadge status={addon.source === 'builtin' ? 'Ready' : 'Custom'} />
+											<StatusBadge status={addon.platform ? 'Platform' : addon.source === 'builtin' ? 'Ready' : 'Custom'} />
 										</td>
 										<td className="px-5 py-4 text-right">
 											{addon.source === 'builtin' ? (
@@ -260,6 +270,8 @@ function AddonDefinitionModal({
 		displayName: '',
 		description: '',
 		category: 'other' as AddonCategory,
+		icon: '',
+		tier: 'auto' as 'auto' | AddonTier,
 		chartRepository: '',
 		chartName: '',
 		defaultVersion: '',
@@ -275,6 +287,8 @@ function AddonDefinitionModal({
 				displayName: initial.displayName,
 				description: initial.description,
 				category: initial.category,
+				icon: initial.icon || '',
+				tier: initial.tier || 'auto',
 				chartRepository: initial.chartRepository,
 				chartName: initial.chartName,
 				defaultVersion: initial.defaultVersion,
@@ -287,6 +301,8 @@ function AddonDefinitionModal({
 				displayName: '',
 				description: '',
 				category: 'other',
+				icon: '',
+				tier: 'auto',
 				chartRepository: '',
 				chartName: '',
 				defaultVersion: '',
@@ -299,6 +315,10 @@ function AddonDefinitionModal({
 		setLastOpen(isOpen)
 	}
 
+	const resolvedTier = form.tier === 'auto'
+		? (form.platform ? 'Infrastructure' : 'Apps')
+		: (form.tier === 'infrastructure' ? 'Infrastructure' : 'Apps')
+
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault()
 		onSave({
@@ -306,6 +326,8 @@ function AddonDefinitionModal({
 			displayName: form.displayName,
 			description: form.description,
 			category: form.category,
+			icon: form.icon || undefined,
+			tier: form.tier === 'auto' ? undefined : form.tier,
 			chartRepository: form.chartRepository,
 			chartName: form.chartName,
 			defaultVersion: form.defaultVersion,
@@ -349,17 +371,55 @@ function AddonDefinitionModal({
 							placeholder="Description of the addon"
 						/>
 					</div>
+					<div className="grid grid-cols-2 gap-4">
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">Category</label>
+							<select
+								value={form.category}
+								onChange={(e) => setForm({ ...form, category: e.target.value as AddonCategory })}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+							>
+								{CATEGORIES.map((cat) => (
+									<option key={cat} value={cat}>{CATEGORY_INFO[cat].displayName}</option>
+								))}
+							</select>
+						</div>
+						<div>
+							<label className="block text-sm font-medium text-neutral-300 mb-1">Icon</label>
+							<div className="flex items-center gap-3">
+								<input
+									value={form.icon}
+									onChange={(e) => setForm({ ...form, icon: e.target.value })}
+									placeholder="🔧"
+									maxLength={8}
+									className="w-20 px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500 text-center text-lg"
+								/>
+								{form.icon && (
+									<div className="w-8 h-8 rounded-lg bg-neutral-800 flex items-center justify-center border border-neutral-700">
+										<span className="text-lg">{form.icon}</span>
+									</div>
+								)}
+								<span className="text-xs text-neutral-500">Emoji, max 8 chars</span>
+							</div>
+						</div>
+					</div>
 					<div>
-						<label className="block text-sm font-medium text-neutral-300 mb-1">Category</label>
+						<label className="block text-sm font-medium text-neutral-300 mb-1">Tier</label>
 						<select
-							value={form.category}
-							onChange={(e) => setForm({ ...form, category: e.target.value as AddonCategory })}
+							value={form.tier}
+							onChange={(e) => setForm({ ...form, tier: e.target.value as 'auto' | AddonTier })}
 							className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
 						>
-							{CATEGORIES.map((cat) => (
-								<option key={cat} value={cat}>{CATEGORY_INFO[cat].displayName}</option>
-							))}
+							<option value="auto">Auto</option>
+							<option value="infrastructure">Infrastructure</option>
+							<option value="apps">App</option>
 						</select>
+						<p className="text-xs text-neutral-500 mt-1">
+							{form.tier === 'auto'
+								? `Will resolve to: ${resolvedTier}`
+								: `Override \u2014 will be set to: ${resolvedTier}`
+							}
+						</p>
 					</div>
 					<div className="grid grid-cols-2 gap-4">
 						<Input

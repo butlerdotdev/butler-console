@@ -57,7 +57,7 @@ export type {
 	ProviderPresetKey,
 } from './identity-providers'
 
-export type { AddonDefinition, InstalledAddon, CatalogResponse, AddonCategory, CreateAddonDefinitionRequest } from './addons'
+export type { AddonDefinition, AddonTier, InstalledAddon, CatalogResponse, AddonCategory, CreateAddonDefinitionRequest } from './addons'
 export { CATEGORY_INFO } from './addons'
 
 export type {

@@ -34,6 +34,11 @@ function useBannerVariant(): { variant: BannerVariant; teamName?: string } | nul
 		return { variant: 'team-admin', teamName: currentTeamDisplayName || undefined }
 	}
 
+	// Platform viewers always see shadow banner regardless of route context
+	if (isPlatformViewer) {
+		return { variant: 'shadow' }
+	}
+
 	return null
 }
 

@@ -6,7 +6,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { useTeamContext } from '@/hooks/useTeamContext'
 import { useEnvContext } from '@/hooks/useEnvContext'
-import { useAuth } from '@/hooks/useAuth'
 import { clustersApi, type Cluster } from '@/api'
 import { ENVIRONMENT_LABEL } from '@/types/environments'
 import { Card, StatusBadge, Spinner, FadeIn, Modal, ModalHeader, ModalBody, ModalFooter, Button } from '@/components/ui'
@@ -105,7 +104,6 @@ export function AdminClustersPage() {
 	useDocumentTitle('All Clusters')
 	const { buildPath, canMutate } = useTeamContext()
 	const { currentEnv } = useEnvContext()
-	const { user } = useAuth()
 	const navigate = useNavigate()
 
 	const [management, setManagement] = useState<ManagementClusterInfo | null>(null)

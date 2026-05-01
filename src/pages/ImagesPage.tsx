@@ -188,7 +188,7 @@ export function ImagesPage() {
 							Sync your first OS image from Butler Image Factory to an
 							infrastructure provider.
 						</p>
-						<Button onClick={() => setShowCreateModal(true)}>Sync Image</Button>
+						{canMutate && <Button onClick={() => setShowCreateModal(true)}>Sync Image</Button>}
 					</Card>
 				) : (
 					<>

@@ -40,7 +40,7 @@ function normalizeTeam(t: RawTeam | null | undefined): NormalizedTeam | null {
 
 export function TeamSwitcher() {
 	const { user } = useAuth()
-	const { mode, currentTeam, canAccessAdmin, switchToTeam, switchToAdmin } = useTeamContext()
+	const { mode, currentTeam, canAccessAdmin, isPlatformViewer, switchToTeam, switchToAdmin } = useTeamContext()
 	const [isOpen, setIsOpen] = useState(false)
 	const containerRef = useRef<HTMLDivElement>(null)
 
@@ -64,13 +64,13 @@ export function TeamSwitcher() {
 
 	// Get display label for current context
 	const currentLabel = useMemo(() => {
-		if (mode === 'admin') return 'Admin View'
+		if (mode === 'admin') return isPlatformViewer ? 'Shadow View' : 'Admin View'
 		if (mode === 'team' && currentTeam) {
 			const team = teams.find((t) => t.name === currentTeam)
 			return team?.displayName || currentTeam
 		}
 		return 'Select Team'
-	}, [mode, currentTeam, teams])
+	}, [mode, currentTeam, teams, isPlatformViewer])
 
 	const handleSelect = (teamName: string) => {
 		switchToTeam(teamName)
@@ -138,8 +138,8 @@ export function TeamSwitcher() {
 									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
 								</svg>
 								<div className="flex-1 text-left">
-									<div className="font-medium">Admin View</div>
-									<div className="text-xs text-neutral-500">Manage platform</div>
+									<div className="font-medium">{isPlatformViewer ? 'Shadow View' : 'Admin View'}</div>
+									<div className="text-xs text-neutral-500">{isPlatformViewer ? 'Read-only platform view' : 'Manage platform'}</div>
 								</div>
 								{mode === 'admin' && (
 									<svg className="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

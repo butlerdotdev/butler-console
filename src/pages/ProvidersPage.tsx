@@ -174,6 +174,7 @@ export function ProvidersPage() {
 								validationResult={validationResults[`${selectedProvider.metadata.namespace}/${selectedProvider.metadata.name}`]}
 								onValidate={() => handleValidate(selectedProvider)}
 								isValidating={validating === `${selectedProvider.metadata.namespace}/${selectedProvider.metadata.name}`}
+								canMutate={canMutate}
 							/>
 						</ModalBody>
 						<ModalFooter>
@@ -393,12 +394,14 @@ function ProviderDetail({
 	provider,
 	validationResult,
 	onValidate,
-	isValidating
+	isValidating,
+	canMutate
 }: {
 	provider: Provider
 	validationResult?: ValidateResponse
 	onValidate: () => void
 	isValidating: boolean
+	canMutate: boolean
 }) {
 	const type = provider.spec.provider
 	const [networks, setNetworks] = useState<NetworkInfo[]>([])
@@ -464,9 +467,11 @@ function ProviderDetail({
 							<p className="text-sm text-neutral-500">Not tested</p>
 						)}
 					</div>
-					<Button variant="secondary" onClick={onValidate} disabled={isValidating}>
-						{isValidating ? 'Testing...' : 'Test Connection'}
-					</Button>
+					{canMutate && (
+						<Button variant="secondary" onClick={onValidate} disabled={isValidating}>
+							{isValidating ? 'Testing...' : 'Test Connection'}
+						</Button>
+					)}
 				</div>
 			</div>
 

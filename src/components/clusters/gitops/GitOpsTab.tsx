@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, Spinner, Button } from '@/components/ui';
 import { useToast } from '@/hooks/useToast';
+import { useTeamContext } from '@/hooks/useTeamContext';
 import { gitopsApi } from '@/api/gitops';
 import type {
 	GitProviderConfig,
@@ -23,6 +24,7 @@ import { EnableGitOpsModal } from './EnableGitOpsModal';
 
 export function GitOpsTab() {
 	const { namespace, name } = useParams<{ namespace: string; name: string }>();
+	const { canMutate } = useTeamContext();
 	const { success, error: showError } = useToast();
 
 	// State
@@ -217,20 +219,22 @@ export function GitOpsTab() {
 								}`}>
 								{gitopsEngine?.ready ? 'Ready' : 'Degraded'}
 							</span>
-							<Button
-								variant="danger"
-								size="sm"
-								onClick={() => setShowDisableConfirm(true)}
-							>
-								Disable GitOps
-							</Button>
+							{canMutate && (
+								<Button
+									variant="danger"
+									size="sm"
+									onClick={() => setShowDisableConfirm(true)}
+								>
+									Disable GitOps
+								</Button>
+							)}
 						</div>
 					</div>
 				</Card>
 			)}
 
 			{/* Enable GitOps Banner - Show when NOT installed */}
-			{!isGitOpsInstalled && (
+			{!isGitOpsInstalled && canMutate && (
 				<Card className="p-6 border-dashed border-2 border-neutral-700 bg-neutral-900/50">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-4">
@@ -314,25 +318,27 @@ export function GitOpsTab() {
 							</p>
 						</div>
 					</div>
-					<div className="flex items-center gap-2">
-						<Button
-							variant="secondary"
-							size="sm"
-							onClick={() => setReconfiguring(true)}
-						>
-							Reconfigure
-						</Button>
-						{isGitOpsInstalled && (
+					{canMutate && (
+						<div className="flex items-center gap-2">
 							<Button
 								variant="secondary"
 								size="sm"
-								onClick={() => setShowMigrateAll(true)}
-								disabled={allReleases.length === 0}
+								onClick={() => setReconfiguring(true)}
 							>
-								Export All to GitOps
+								Reconfigure
 							</Button>
-						)}
-					</div>
+							{isGitOpsInstalled && (
+								<Button
+									variant="secondary"
+									size="sm"
+									onClick={() => setShowMigrateAll(true)}
+									disabled={allReleases.length === 0}
+								>
+									Export All to GitOps
+								</Button>
+							)}
+						</div>
+					)}
 				</div>
 			</Card>
 
@@ -397,7 +403,7 @@ export function GitOpsTab() {
 								<DiscoveredReleaseCard
 									key={`${release.namespace}/${release.name}`}
 									release={release}
-									onExport={() => setExportRelease(release)}
+									onExport={canMutate ? () => setExportRelease(release) : undefined}
 								/>
 							))}
 						</div>

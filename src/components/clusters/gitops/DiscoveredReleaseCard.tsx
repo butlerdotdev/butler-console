@@ -9,7 +9,7 @@ import { getCategoryLabel } from '@/types/gitops';
 
 interface DiscoveredReleaseCardProps {
 	release: DiscoveredRelease;
-	onExport: () => void;
+	onExport?: () => void;
 }
 
 export function DiscoveredReleaseCard({ release, onExport }: DiscoveredReleaseCardProps) {
@@ -75,14 +75,16 @@ export function DiscoveredReleaseCard({ release, onExport }: DiscoveredReleaseCa
 				</div>
 
 				{/* Export Button */}
-				<Button
-					variant="secondary"
-					size="sm"
-					onClick={onExport}
-					className="flex-shrink-0"
-				>
-					Export
-				</Button>
+				{onExport && (
+					<Button
+						variant="secondary"
+						size="sm"
+						onClick={onExport}
+						className="flex-shrink-0"
+					>
+						Export
+					</Button>
+				)}
 			</div>
 
 			{/* Values Preview (collapsed) */}

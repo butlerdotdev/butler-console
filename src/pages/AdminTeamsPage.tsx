@@ -4,7 +4,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { useAuth } from '@/hooks'
 import { useTeamContext } from '@/hooks/useTeamContext'
 import { useToast } from '@/hooks/useToast'
 import { Button, Input, Card, Modal, ModalHeader, ModalBody, ModalFooter, FadeIn, Spinner } from '@/components/ui'
@@ -23,7 +22,6 @@ interface Team {
 export function AdminTeamsPage() {
 	useDocumentTitle('Teams')
 
-	const { user } = useAuth()
 	const { canMutate } = useTeamContext()
 	const toast = useToast()
 	const [teams, setTeams] = useState<Team[]>([])

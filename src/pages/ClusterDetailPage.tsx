@@ -5,7 +5,6 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { useTeamContext } from '@/hooks/useTeamContext'
-import { useAuth } from '@/hooks/useAuth'
 import { clustersApi, stewardApi, type Cluster, type TenantControlPlane, type Node, type Addon, type ClusterEvent, type MachineRequest, type LoadBalancerRequest } from '@/api'
 import { ENVIRONMENT_LABEL } from '@/types/environments'
 import { Card, Spinner, StatusBadge, Button, FadeIn } from '@/components/ui'
@@ -43,8 +42,7 @@ export function ClusterDetailPage() {
 	const { namespace, name } = useParams<{ namespace: string; name: string }>()
 	const navigate = useNavigate()
 	const { success, error: showError } = useToast()
-	const { buildPath, currentTeam, canMutate } = useTeamContext()
-	const { user } = useAuth()
+	const { buildPath, canMutate } = useTeamContext()
 	const isAdmin = canMutate
 
 	// URL-based tab persistence
@@ -433,6 +431,7 @@ export function ClusterDetailPage() {
 							type="tenant"
 							namespace={clusterNamespace}
 							cluster={clusterName}
+							readOnly={!canMutate}
 						/>
 					</Card>
 				)}

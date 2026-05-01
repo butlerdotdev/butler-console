@@ -11,6 +11,7 @@ export interface AddonDefinition {
 	description: string
 	category: AddonCategory
 	icon?: string
+	iconData?: string
 	tier?: AddonTier
 	chartRepository: string
 	chartName: string
@@ -120,6 +121,7 @@ export interface CreateAddonDefinitionRequest {
 	description: string
 	category: AddonCategory
 	icon?: string
+	iconData?: string
 	tier?: AddonTier
 	chartRepository: string
 	chartName: string

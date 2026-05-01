@@ -1,12 +1,12 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 interface AddonIconProps {
 	name: string
 	icon?: string
+	iconData?: string
 	size?: 'sm' | 'md' | 'lg'
 	className?: string
 }
@@ -17,18 +17,17 @@ const SIZE_CLASSES = {
 	lg: { container: 'w-12 h-12', img: 'w-8 h-8', text: 'text-2xl' },
 }
 
-export function AddonIcon({ name, icon, size = 'md', className }: AddonIconProps) {
-	const [svgFailed, setSvgFailed] = useState(false)
+export function AddonIcon({ name, icon, iconData, size = 'md', className }: AddonIconProps) {
 	const s = SIZE_CLASSES[size]
+	const hasIcon = !!iconData
 
 	return (
-		<div className={cn(s.container, 'rounded-lg bg-neutral-800 flex items-center justify-center flex-shrink-0', className)}>
-			{!svgFailed ? (
+		<div className={cn(s.container, 'rounded-lg flex items-center justify-center flex-shrink-0', hasIcon ? 'bg-white' : 'bg-neutral-800', className)}>
+			{hasIcon ? (
 				<img
-					src={`/addon-icons/${name}.svg`}
-					alt=""
+					src={`data:image/svg+xml;base64,${iconData}`}
+					alt={name}
 					className={s.img}
-					onError={() => setSvgFailed(true)}
 				/>
 			) : (
 				<span className={s.text}>{icon || '📦'}</span>

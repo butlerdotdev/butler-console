@@ -158,7 +158,7 @@ export function AddonCatalogPage() {
 								{addons.map((addon) => (
 									<tr key={addon.name} className="hover:bg-neutral-800/30">
 										<td className="px-5 py-4">
-											<AddonIcon name={addon.name} icon={addon.icon} size="sm" />
+											<AddonIcon name={addon.name} icon={addon.icon} iconData={addon.iconData} size="sm" />
 										</td>
 										<td className="px-5 py-4">
 											<div>

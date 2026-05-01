@@ -514,7 +514,7 @@ function InstalledAddonCard({
 		<Card className="p-4 hover:border-neutral-600 transition-colors border-green-500/20">
 			<div className="flex items-start justify-between mb-3">
 				<div className="flex items-center gap-3">
-					<AddonIcon name={addon.addon} icon={catalogInfo?.icon} />
+					<AddonIcon name={addon.addon} icon={catalogInfo?.icon} iconData={catalogInfo?.iconData} />
 					<div>
 						<div className="flex items-center gap-2">
 							<h4 className="font-medium text-neutral-100">
@@ -630,7 +630,7 @@ function AvailableAddonCard({
 		<Card className="p-4 hover:border-neutral-600 transition-colors">
 			<div className="flex items-start justify-between mb-3">
 				<div className="flex items-center gap-3">
-					<AddonIcon name={catalog.name} icon={catalog.icon} />
+					<AddonIcon name={catalog.name} icon={catalog.icon} iconData={catalog.iconData} />
 					<div>
 						<div className="flex items-center gap-2">
 							<h4 className="font-medium text-neutral-100">{catalog.displayName}</h4>

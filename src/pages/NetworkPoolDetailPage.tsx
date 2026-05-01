@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import { networksApi } from '@/api/networks'
 import { Card, Spinner, Button, FadeIn, StatusBadge } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
@@ -18,6 +19,7 @@ import type { NetworkPool, IPAllocation } from '@/types/networks'
 export function NetworkPoolDetailPage() {
 	const { namespace, name } = useParams<{ namespace: string; name: string }>()
 	const navigate = useNavigate()
+	const { canMutate } = useTeamContext()
 	const { success, error: showError } = useToast()
 
 	useDocumentTitle(name ? `${name} - Network Pool` : 'Network Pool')
@@ -160,9 +162,11 @@ export function NetworkPoolDetailPage() {
 							<p className="text-neutral-400 mt-1">{pool.metadata.namespace}</p>
 						</div>
 					</div>
-					<Button variant="secondary" onClick={() => setShowEditModal(true)}>
-						Edit Pool
-					</Button>
+					{canMutate && (
+						<Button variant="secondary" onClick={() => setShowEditModal(true)}>
+							Edit Pool
+						</Button>
+					)}
 				</div>
 
 				{/* Network Layout Bar */}
@@ -282,12 +286,14 @@ export function NetworkPoolDetailPage() {
 												{alloc.spec.count || '-'}
 											</td>
 											<td className="px-4 py-3 text-right">
-												<button
-													onClick={() => setReleaseTarget(alloc)}
-													className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
-												>
-													Release
-												</button>
+												{canMutate && (
+													<button
+														onClick={() => setReleaseTarget(alloc)}
+														className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
+													>
+														Release
+													</button>
+												)}
 											</td>
 										</tr>
 									)
@@ -395,40 +401,42 @@ export function NetworkPoolDetailPage() {
 			</div>
 
 			{/* Release Confirmation Modal */}
-			<Modal isOpen={!!releaseTarget} onClose={() => !releasing && setReleaseTarget(null)}>
-				<ModalHeader>
-					<div className="flex items-center gap-3">
-						<div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
-							<svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-							</svg>
+			{canMutate && (
+				<Modal isOpen={!!releaseTarget} onClose={() => !releasing && setReleaseTarget(null)}>
+					<ModalHeader>
+						<div className="flex items-center gap-3">
+							<div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+								<svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+								</svg>
+							</div>
+							<div>
+								<h2 className="text-lg font-semibold text-neutral-100">Release Allocation</h2>
+								<p className="text-sm text-neutral-400">Return IPs to the pool</p>
+							</div>
 						</div>
-						<div>
-							<h2 className="text-lg font-semibold text-neutral-100">Release Allocation</h2>
-							<p className="text-sm text-neutral-400">Return IPs to the pool</p>
-						</div>
-					</div>
-				</ModalHeader>
-				<ModalBody>
-					<p className="text-neutral-300">
-						Are you sure you want to release allocation{' '}
-						<span className="font-mono font-semibold text-red-400">{releaseTarget?.metadata.name}</span>?
-					</p>
-					<p className="text-sm text-neutral-500 mt-2">
-						The IP addresses will be returned to the pool and can be re-allocated.
-					</p>
-				</ModalBody>
-				<ModalFooter>
-					<Button variant="secondary" onClick={() => setReleaseTarget(null)} disabled={releasing}>
-						Cancel
-					</Button>
-					<Button variant="danger" onClick={handleRelease} disabled={releasing}>
-						{releasing ? 'Releasing...' : 'Release Allocation'}
-					</Button>
-				</ModalFooter>
-			</Modal>
+					</ModalHeader>
+					<ModalBody>
+						<p className="text-neutral-300">
+							Are you sure you want to release allocation{' '}
+							<span className="font-mono font-semibold text-red-400">{releaseTarget?.metadata.name}</span>?
+						</p>
+						<p className="text-sm text-neutral-500 mt-2">
+							The IP addresses will be returned to the pool and can be re-allocated.
+						</p>
+					</ModalBody>
+					<ModalFooter>
+						<Button variant="secondary" onClick={() => setReleaseTarget(null)} disabled={releasing}>
+							Cancel
+						</Button>
+						<Button variant="danger" onClick={handleRelease} disabled={releasing}>
+							{releasing ? 'Releasing...' : 'Release Allocation'}
+						</Button>
+					</ModalFooter>
+				</Modal>
+			)}
 			{/* Edit Pool Modal */}
-			{pool && (
+			{canMutate && pool && (
 				<EditNetworkPoolModal
 					isOpen={showEditModal}
 					onClose={() => setShowEditModal(false)}

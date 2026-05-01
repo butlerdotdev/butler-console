@@ -7,6 +7,7 @@ import { useDocumentTitle } from '@/hooks'
 import { identityProvidersApi, type IdentityProvider, type TestDiscoveryResponse, type CreateIdentityProviderRequest } from '@/api/identity-providers'
 import { Card, Button, StatusBadge, FadeIn, Spinner, Modal } from '@/components/ui'
 import { useToast } from '@/hooks/useToast'
+import { useTeamContext } from '@/hooks/useTeamContext'
 
 // Provider icons
 function GoogleIcon({ className }: { className?: string }) {
@@ -93,9 +94,10 @@ interface ProviderDetailModalProps {
 	onValidate: (name: string) => void
 	onEdit: () => void
 	validating: boolean
+	canMutate: boolean
 }
 
-function ProviderDetailModal({ provider, isOpen, onClose, onValidate, onEdit, validating }: ProviderDetailModalProps) {
+function ProviderDetailModal({ provider, isOpen, onClose, onValidate, onEdit, validating, canMutate }: ProviderDetailModalProps) {
 	if (!provider) return null
 
 	const issuerURL = provider.spec.oidc?.issuerURL || ''
@@ -208,9 +210,11 @@ function ProviderDetailModal({ provider, isOpen, onClose, onValidate, onEdit, va
 					<Button variant="secondary" onClick={onClose}>
 						Close
 					</Button>
-					<Button variant="secondary" onClick={onEdit}>
-						Edit
-					</Button>
+					{canMutate && (
+						<Button variant="secondary" onClick={onEdit}>
+							Edit
+						</Button>
+					)}
 					<Button
 						onClick={() => onValidate(provider.metadata.name)}
 						disabled={validating}
@@ -260,6 +264,7 @@ function DeleteModal({ provider, isOpen, onClose, onConfirm, deleting }: DeleteM
 export function IdentityProvidersPage() {
 	useDocumentTitle('Identity Providers')
 	const toast = useToast()
+	const { canMutate } = useTeamContext()
 
 	const [providers, setProviders] = useState<IdentityProvider[]>([])
 	const [loading, setLoading] = useState(true)
@@ -383,14 +388,16 @@ export function IdentityProvidersPage() {
 							Configure SSO authentication providers for Butler Console
 						</p>
 					</div>
-					<Link to="/admin/identity-providers/create">
-						<Button>
-							<svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-							</svg>
-							Add Provider
-						</Button>
-					</Link>
+					{canMutate && (
+						<Link to="/admin/identity-providers/create">
+							<Button>
+								<svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+								</svg>
+								Add Provider
+							</Button>
+						</Link>
+					)}
 				</div>
 
 				{/* Error State */}
@@ -414,9 +421,11 @@ export function IdentityProvidersPage() {
 							Add an OIDC identity provider to enable SSO authentication for your users.
 							Butler supports Google Workspace, Microsoft Entra ID, Okta, and other OIDC providers.
 						</p>
-						<Link to="/admin/identity-providers/create">
-							<Button>Add Your First Provider</Button>
-						</Link>
+						{canMutate && (
+							<Link to="/admin/identity-providers/create">
+								<Button>Add Your First Provider</Button>
+							</Link>
+						)}
 					</Card>
 				)}
 
@@ -463,9 +472,11 @@ export function IdentityProvidersPage() {
 											<Button variant="secondary" size="sm" onClick={() => openDetail(provider)}>
 												View
 											</Button>
-											<Button variant="danger" size="sm" onClick={() => openDelete(provider)}>
-												Delete
-											</Button>
+											{canMutate && (
+												<Button variant="danger" size="sm" onClick={() => openDelete(provider)}>
+													Delete
+												</Button>
+											)}
 										</div>
 									</div>
 								</Card>
@@ -483,9 +494,10 @@ export function IdentityProvidersPage() {
 				onValidate={handleValidate}
 				onEdit={() => selectedProvider && openEdit(selectedProvider)}
 				validating={validating}
+				canMutate={canMutate}
 			/>
 
-			{editModalOpen && selectedProvider && (
+			{canMutate && editModalOpen && selectedProvider && (
 				<EditIdentityProviderModal
 					provider={selectedProvider}
 					isOpen={editModalOpen}
@@ -494,13 +506,15 @@ export function IdentityProvidersPage() {
 				/>
 			)}
 
-			<DeleteModal
-				provider={selectedProvider}
-				isOpen={deleteModalOpen}
-				onClose={() => setDeleteModalOpen(false)}
-				onConfirm={handleDelete}
-				deleting={deleting}
-			/>
+			{canMutate && (
+				<DeleteModal
+					provider={selectedProvider}
+					isOpen={deleteModalOpen}
+					onClose={() => setDeleteModalOpen(false)}
+					onConfirm={handleDelete}
+					deleting={deleting}
+				/>
+			)}
 		</FadeIn>
 	)
 }

@@ -9,6 +9,7 @@ import { clustersApi, type Cluster } from '@/api'
 import { Card, Spinner, Button, FadeIn, StatusBadge, Input } from '@/components/ui'
 import { PipelineDiagram } from '@/components/observability/PipelineDiagram'
 import { useToast } from '@/hooks/useToast'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import type {
 	ObservabilityConfig,
 	ObservabilityStatus,
@@ -17,6 +18,7 @@ import type {
 
 export function ObservabilityPage() {
 	useDocumentTitle('Observability')
+	const { canMutate } = useTeamContext()
 	const { success, error: showError } = useToast()
 	const [searchParams, setSearchParams] = useSearchParams()
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -343,7 +345,8 @@ export function ObservabilityPage() {
 										<select
 											value={selectedCluster}
 											onChange={(e) => setSelectedCluster(e.target.value)}
-											className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500/40"
+											disabled={!canMutate}
+											className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-green-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
 										>
 											<option value="">Select a cluster...</option>
 											{clusters.map((c) => (
@@ -379,6 +382,7 @@ export function ObservabilityPage() {
 											value={logEndpoint}
 											onChange={(e) => setLogEndpoint(e.target.value)}
 											placeholder="http://vector-aggregator.vector.svc:8080"
+											disabled={!canMutate}
 										/>
 										<p className="mt-1 text-xs text-neutral-500">
 											Where tenant Vector agents send logs. Typically the aggregator&apos;s HTTP source
@@ -394,6 +398,7 @@ export function ObservabilityPage() {
 											value={metricEndpoint}
 											onChange={(e) => setMetricEndpoint(e.target.value)}
 											placeholder="http://victoria-metrics.monitoring.svc:8428/api/v1/write"
+											disabled={!canMutate}
 										/>
 										<p className="mt-1 text-xs text-neutral-500">
 											Prometheus remote-write URL. Tenant Prometheus instances forward metrics here
@@ -409,6 +414,7 @@ export function ObservabilityPage() {
 											value={traceEndpoint}
 											onChange={(e) => setTraceEndpoint(e.target.value)}
 											placeholder="tempo.tracing.svc:4317"
+											disabled={!canMutate}
 										/>
 										<p className="mt-1 text-xs text-neutral-500">
 											OTLP gRPC endpoint for traces. OTEL Collectors on tenant clusters forward traces here
@@ -416,9 +422,11 @@ export function ObservabilityPage() {
 										</p>
 									</div>
 
-									<Button onClick={handleSetupPipeline} disabled={setupSubmitting || (!!selectedClusterPhase && selectedClusterPhase !== 'Ready')}>
-										{setupSubmitting ? 'Registering...' : 'Register Pipeline'}
-									</Button>
+									{canMutate && (
+										<Button onClick={handleSetupPipeline} disabled={setupSubmitting || (!!selectedClusterPhase && selectedClusterPhase !== 'Ready')}>
+											{setupSubmitting ? 'Registering...' : 'Register Pipeline'}
+										</Button>
+									)}
 								</div>
 							</div>
 						</Card>
@@ -458,7 +466,7 @@ export function ObservabilityPage() {
 										<h2 className="text-lg font-medium text-neutral-100">Pipeline</h2>
 										<div className="flex items-center gap-3">
 											<StatusBadge status={status.pipeline.clusterPhase} />
-											{!editingPipeline && (
+											{canMutate && !editingPipeline && (
 												<Button
 													variant="ghost"
 													size="sm"
@@ -467,15 +475,17 @@ export function ObservabilityPage() {
 													Edit
 												</Button>
 											)}
-											<Button
-												variant="ghost"
-												size="sm"
-												onClick={handleDeregisterPipeline}
-												disabled={deregistering}
-												className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-											>
-												{deregistering ? 'Deregistering...' : 'Deregister'}
-											</Button>
+											{canMutate && (
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={handleDeregisterPipeline}
+													disabled={deregistering}
+													className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+												>
+													{deregistering ? 'Deregistering...' : 'Deregister'}
+												</Button>
+											)}
 										</div>
 									</div>
 									{editingPipeline ? (
@@ -496,6 +506,7 @@ export function ObservabilityPage() {
 													value={editLogEndpoint}
 													onChange={(e) => setEditLogEndpoint(e.target.value)}
 													placeholder="http://vector-aggregator:8080"
+													disabled={!canMutate}
 												/>
 											</div>
 											<div>
@@ -506,6 +517,7 @@ export function ObservabilityPage() {
 													value={editMetricEndpoint}
 													onChange={(e) => setEditMetricEndpoint(e.target.value)}
 													placeholder="http://victoria-metrics:8428/api/v1/write"
+													disabled={!canMutate}
 												/>
 											</div>
 											<div>
@@ -516,15 +528,18 @@ export function ObservabilityPage() {
 													value={editTraceEndpoint}
 													onChange={(e) => setEditTraceEndpoint(e.target.value)}
 													placeholder="tempo.tracing.svc:4317"
+													disabled={!canMutate}
 												/>
 											</div>
 											<div className="flex justify-end gap-2 pt-2">
 												<Button variant="ghost" size="sm" onClick={() => setEditingPipeline(false)} disabled={editSubmitting}>
 													Cancel
 												</Button>
-												<Button size="sm" onClick={handleSavePipelineEdit} disabled={editSubmitting}>
-													{editSubmitting ? 'Saving...' : 'Save'}
-												</Button>
+												{canMutate && (
+													<Button size="sm" onClick={handleSavePipelineEdit} disabled={editSubmitting}>
+														{editSubmitting ? 'Saving...' : 'Save'}
+													</Button>
+												)}
 											</div>
 										</div>
 									) : (
@@ -620,7 +635,7 @@ export function ObservabilityPage() {
 												type="checkbox"
 												checked={autoEnrollVector}
 												onChange={(e) => setAutoEnrollVector(e.target.checked)}
-												disabled={!config?.pipeline?.logEndpoint}
+												disabled={!canMutate || !config?.pipeline?.logEndpoint}
 												className="mt-0.5 rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 disabled:opacity-40"
 											/>
 											<div>
@@ -636,7 +651,7 @@ export function ObservabilityPage() {
 												type="checkbox"
 												checked={autoEnrollPrometheus}
 												onChange={(e) => setAutoEnrollPrometheus(e.target.checked)}
-												disabled={!config?.pipeline?.metricEndpoint}
+												disabled={!canMutate || !config?.pipeline?.metricEndpoint}
 												className="mt-0.5 rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 disabled:opacity-40"
 											/>
 											<div>
@@ -652,7 +667,7 @@ export function ObservabilityPage() {
 												type="checkbox"
 												checked={autoEnrollOtel}
 												onChange={(e) => setAutoEnrollOtel(e.target.checked)}
-												disabled={!config?.pipeline?.traceEndpoint}
+												disabled={!canMutate || !config?.pipeline?.traceEndpoint}
 												className="mt-0.5 rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 disabled:opacity-40"
 											/>
 											<div>
@@ -675,7 +690,8 @@ export function ObservabilityPage() {
 													type="checkbox"
 													checked={defaultPodLogs}
 													onChange={(e) => setDefaultPodLogs(e.target.checked)}
-													className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500"
+													disabled={!canMutate}
+													className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 disabled:opacity-40"
 												/>
 												Pod logs
 											</label>
@@ -684,7 +700,8 @@ export function ObservabilityPage() {
 													type="checkbox"
 													checked={defaultJournald}
 													onChange={(e) => setDefaultJournald(e.target.checked)}
-													className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500"
+													disabled={!canMutate}
+													className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 disabled:opacity-40"
 												/>
 												Systemd journal
 											</label>
@@ -693,7 +710,8 @@ export function ObservabilityPage() {
 													type="checkbox"
 													checked={defaultK8sEvents}
 													onChange={(e) => setDefaultK8sEvents(e.target.checked)}
-													className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500"
+													disabled={!canMutate}
+													className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 disabled:opacity-40"
 												/>
 												Kubernetes events
 											</label>
@@ -708,6 +726,7 @@ export function ObservabilityPage() {
 												onChange={(e) => setDefaultRetention(e.target.value)}
 												placeholder="e.g., 2h"
 												className="max-w-[140px]"
+												disabled={!canMutate}
 											/>
 											<p className="mt-1 text-xs text-neutral-500">
 												Buffer period before forwarding via remote-write.
@@ -715,15 +734,17 @@ export function ObservabilityPage() {
 										</div>
 									</div>
 								</div>
-								<div className="mt-5">
-									<Button
-										size="sm"
-										onClick={handleSaveCollectionConfig}
-										disabled={savingConfig}
-									>
-										{savingConfig ? 'Saving...' : 'Save Defaults'}
-									</Button>
-								</div>
+								{canMutate && (
+									<div className="mt-5">
+										<Button
+											size="sm"
+											onClick={handleSaveCollectionConfig}
+											disabled={savingConfig}
+										>
+											{savingConfig ? 'Saving...' : 'Save Defaults'}
+										</Button>
+									</div>
+								)}
 							</div>
 						</Card>
 

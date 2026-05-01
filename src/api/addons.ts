@@ -3,12 +3,16 @@
 
 import { apiClient } from './client'
 
+export type AddonTier = 'infrastructure' | 'apps'
+
 export interface AddonDefinition {
 	name: string
 	displayName: string
 	description: string
 	category: AddonCategory
 	icon?: string
+	iconData?: string
+	tier?: AddonTier
 	chartRepository: string
 	chartName: string
 	defaultVersion: string
@@ -117,6 +121,8 @@ export interface CreateAddonDefinitionRequest {
 	description: string
 	category: AddonCategory
 	icon?: string
+	iconData?: string
+	tier?: AddonTier
 	chartRepository: string
 	chartName: string
 	defaultVersion: string

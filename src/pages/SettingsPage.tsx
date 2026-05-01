@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useDocumentTitle } from '@/hooks'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import { useToast } from '@/hooks/useToast'
 import { Card, Button, FadeIn, Spinner, Input } from '@/components/ui'
 import { configApi } from '@/api/config'
@@ -18,6 +19,7 @@ import type {
 
 export function SettingsPage() {
 	useDocumentTitle('Platform Settings')
+	const { canMutate } = useTeamContext()
 	const toast = useToast()
 
 	const [config, setConfig] = useState<ButlerConfigResponse | null>(null)
@@ -172,23 +174,25 @@ export function SettingsPage() {
 				<Card className="p-6">
 					<div className="flex items-center justify-between mb-4">
 						<h2 className="text-lg font-medium text-neutral-50">General Settings</h2>
-						<Button
-							size="sm"
-							onClick={() =>
-								saveSection(
-									{
-										multiTenancy: { mode: multiTenancyMode },
-										defaultNamespace: defaultNamespace,
-										defaultProviderRef: { name: defaultProviderName },
-									},
-									setSavingGeneral,
-									'General settings'
-								)
-							}
-							disabled={savingGeneral}
-						>
-							{savingGeneral ? 'Saving...' : 'Save'}
-						</Button>
+						{canMutate && (
+							<Button
+								size="sm"
+								onClick={() =>
+									saveSection(
+										{
+											multiTenancy: { mode: multiTenancyMode },
+											defaultNamespace: defaultNamespace,
+											defaultProviderRef: { name: defaultProviderName },
+										},
+										setSavingGeneral,
+										'General settings'
+									)
+								}
+								disabled={savingGeneral}
+							>
+								{savingGeneral ? 'Saving...' : 'Save'}
+							</Button>
+						)}
 					</div>
 					<div className="space-y-4">
 						<div>
@@ -198,7 +202,8 @@ export function SettingsPage() {
 							<select
 								value={multiTenancyMode}
 								onChange={(e) => setMultiTenancyMode(e.target.value)}
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+								disabled={!canMutate}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
 							>
 								<option value="Disabled">Disabled</option>
 								<option value="Optional">Optional</option>
@@ -214,12 +219,14 @@ export function SettingsPage() {
 							value={defaultNamespace}
 							onChange={(e) => setDefaultNamespace(e.target.value)}
 							placeholder="butler-tenants"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="Default Provider"
 							value={defaultProviderName}
 							onChange={(e) => setDefaultProviderName(e.target.value)}
 							placeholder="ProviderConfig name (e.g. harvester-prod)"
+							disabled={!canMutate}
 						/>
 					</div>
 				</Card>
@@ -228,26 +235,28 @@ export function SettingsPage() {
 				<Card className="p-6">
 					<div className="flex items-center justify-between mb-4">
 						<h2 className="text-lg font-medium text-neutral-50">Control Plane Exposure</h2>
-						<Button
-							size="sm"
-							onClick={() => {
-								const exposure: ControlPlaneExposureInfo = {
-									mode: exposureMode,
-									hostname: exposureHostname,
-									ingressClassName: exposureIngressClass,
-									controllerType: exposureControllerType,
-									gatewayRef: exposureGatewayRef,
-								}
-								saveSection(
-									{ controlPlaneExposure: exposure },
-									setSavingExposure,
-									'Control plane exposure'
-								)
-							}}
-							disabled={savingExposure}
-						>
-							{savingExposure ? 'Saving...' : 'Save'}
-						</Button>
+						{canMutate && (
+							<Button
+								size="sm"
+								onClick={() => {
+									const exposure: ControlPlaneExposureInfo = {
+										mode: exposureMode,
+										hostname: exposureHostname,
+										ingressClassName: exposureIngressClass,
+										controllerType: exposureControllerType,
+										gatewayRef: exposureGatewayRef,
+									}
+									saveSection(
+										{ controlPlaneExposure: exposure },
+										setSavingExposure,
+										'Control plane exposure'
+									)
+								}}
+								disabled={savingExposure}
+							>
+								{savingExposure ? 'Saving...' : 'Save'}
+							</Button>
+						)}
 					</div>
 					<div className="space-y-4">
 						<div>
@@ -257,7 +266,8 @@ export function SettingsPage() {
 							<select
 								value={exposureMode}
 								onChange={(e) => setExposureMode(e.target.value)}
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+								disabled={!canMutate}
+								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
 							>
 								<option value="LoadBalancer">LoadBalancer (1 IP per tenant)</option>
 								<option value="Ingress">Ingress (shared IP, SNI routing)</option>
@@ -270,6 +280,7 @@ export function SettingsPage() {
 								value={exposureHostname}
 								onChange={(e) => setExposureHostname(e.target.value)}
 								placeholder="*.k8s.platform.example.com"
+								disabled={!canMutate}
 							/>
 						)}
 						{exposureMode === 'Ingress' && (
@@ -279,6 +290,7 @@ export function SettingsPage() {
 									value={exposureIngressClass}
 									onChange={(e) => setExposureIngressClass(e.target.value)}
 									placeholder="haproxy"
+									disabled={!canMutate}
 								/>
 								<div>
 									<label className="block text-sm font-medium text-neutral-300 mb-1">
@@ -287,7 +299,8 @@ export function SettingsPage() {
 									<select
 										value={exposureControllerType}
 										onChange={(e) => setExposureControllerType(e.target.value)}
-										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+										disabled={!canMutate}
+										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
 									>
 										<option value="">Select controller type</option>
 										<option value="haproxy">HAProxy</option>
@@ -304,6 +317,7 @@ export function SettingsPage() {
 								value={exposureGatewayRef}
 								onChange={(e) => setExposureGatewayRef(e.target.value)}
 								placeholder="namespace/gateway-name"
+								disabled={!canMutate}
 							/>
 						)}
 						{config.status.tcpProxyRequired && (
@@ -318,19 +332,21 @@ export function SettingsPage() {
 				<Card className="p-6">
 					<div className="flex items-center justify-between mb-4">
 						<h2 className="text-lg font-medium text-neutral-50">Default Addon Versions</h2>
-						<Button
-							size="sm"
-							onClick={() =>
-								saveSection(
-									{ defaultAddonVersions: addonVersions },
-									setSavingAddons,
-									'Addon versions'
-								)
-							}
-							disabled={savingAddons}
-						>
-							{savingAddons ? 'Saving...' : 'Save'}
-						</Button>
+						{canMutate && (
+							<Button
+								size="sm"
+								onClick={() =>
+									saveSection(
+										{ defaultAddonVersions: addonVersions },
+										setSavingAddons,
+										'Addon versions'
+									)
+								}
+								disabled={savingAddons}
+							>
+								{savingAddons ? 'Saving...' : 'Save'}
+							</Button>
+						)}
 					</div>
 					<p className="text-xs text-neutral-500 mb-4">
 						Default versions used when tenant clusters don't specify their own.
@@ -343,6 +359,7 @@ export function SettingsPage() {
 								setAddonVersions({ ...addonVersions, cilium: e.target.value })
 							}
 							placeholder="1.16.1"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="MetalLB"
@@ -351,6 +368,7 @@ export function SettingsPage() {
 								setAddonVersions({ ...addonVersions, metallb: e.target.value })
 							}
 							placeholder="0.14.8"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="cert-manager"
@@ -359,6 +377,7 @@ export function SettingsPage() {
 								setAddonVersions({ ...addonVersions, certManager: e.target.value })
 							}
 							placeholder="1.15.3"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="Longhorn"
@@ -367,6 +386,7 @@ export function SettingsPage() {
 								setAddonVersions({ ...addonVersions, longhorn: e.target.value })
 							}
 							placeholder="1.7.2"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="Traefik"
@@ -375,6 +395,7 @@ export function SettingsPage() {
 								setAddonVersions({ ...addonVersions, traefik: e.target.value })
 							}
 							placeholder="31.1.1"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="FluxCD"
@@ -383,6 +404,7 @@ export function SettingsPage() {
 								setAddonVersions({ ...addonVersions, fluxcd: e.target.value })
 							}
 							placeholder="2.14.0"
+							disabled={!canMutate}
 						/>
 					</div>
 				</Card>
@@ -391,19 +413,21 @@ export function SettingsPage() {
 				<Card className="p-6">
 					<div className="flex items-center justify-between mb-4">
 						<h2 className="text-lg font-medium text-neutral-50">Default Team Limits</h2>
-						<Button
-							size="sm"
-							onClick={() =>
-								saveSection(
-									{ defaultTeamLimits: teamLimits },
-									setSavingLimits,
-									'Team limits'
-								)
-							}
-							disabled={savingLimits}
-						>
-							{savingLimits ? 'Saving...' : 'Save'}
-						</Button>
+						{canMutate && (
+							<Button
+								size="sm"
+								onClick={() =>
+									saveSection(
+										{ defaultTeamLimits: teamLimits },
+										setSavingLimits,
+										'Team limits'
+									)
+								}
+								disabled={savingLimits}
+							>
+								{savingLimits ? 'Saving...' : 'Save'}
+							</Button>
+						)}
 					</div>
 					<p className="text-xs text-neutral-500 mb-4">
 						Default resource limits applied to new teams. Can be overridden per team.
@@ -420,6 +444,7 @@ export function SettingsPage() {
 								})
 							}
 							placeholder="10"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="Max Workers Per Cluster"
@@ -434,6 +459,7 @@ export function SettingsPage() {
 								})
 							}
 							placeholder="20"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="Max Total CPU"
@@ -442,6 +468,7 @@ export function SettingsPage() {
 								setTeamLimits({ ...teamLimits, maxTotalCPU: e.target.value })
 							}
 							placeholder="100 (cores)"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="Max Total Memory"
@@ -450,6 +477,7 @@ export function SettingsPage() {
 								setTeamLimits({ ...teamLimits, maxTotalMemory: e.target.value })
 							}
 							placeholder="256Gi"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="Max Total Storage"
@@ -458,6 +486,7 @@ export function SettingsPage() {
 								setTeamLimits({ ...teamLimits, maxTotalStorage: e.target.value })
 							}
 							placeholder="1Ti"
+							disabled={!canMutate}
 						/>
 					</div>
 				</Card>
@@ -468,19 +497,21 @@ export function SettingsPage() {
 						<h2 className="text-lg font-medium text-neutral-50">
 							Default Control Plane Resources
 						</h2>
-						<Button
-							size="sm"
-							onClick={() =>
-								saveSection(
-									{ defaultControlPlaneResources: cpResources },
-									setSavingResources,
-									'Control plane resources'
-								)
-							}
-							disabled={savingResources}
-						>
-							{savingResources ? 'Saving...' : 'Save'}
-						</Button>
+						{canMutate && (
+							<Button
+								size="sm"
+								onClick={() =>
+									saveSection(
+										{ defaultControlPlaneResources: cpResources },
+										setSavingResources,
+										'Control plane resources'
+									)
+								}
+								disabled={savingResources}
+							>
+								{savingResources ? 'Saving...' : 'Save'}
+							</Button>
+						)}
 					</div>
 					<p className="text-xs text-neutral-500 mb-4">
 						Default resource requests/limits for tenant control plane components. Applied to new
@@ -491,16 +522,19 @@ export function SettingsPage() {
 							label="API Server"
 							value={cpResources.apiServer}
 							onChange={(v) => setCPResources({ ...cpResources, apiServer: v })}
+							disabled={!canMutate}
 						/>
 						<CPResourceRow
 							label="Controller Manager"
 							value={cpResources.controllerManager}
 							onChange={(v) => setCPResources({ ...cpResources, controllerManager: v })}
+							disabled={!canMutate}
 						/>
 						<CPResourceRow
 							label="Scheduler"
 							value={cpResources.scheduler}
 							onChange={(v) => setCPResources({ ...cpResources, scheduler: v })}
+							disabled={!canMutate}
 						/>
 					</div>
 				</Card>
@@ -509,21 +543,23 @@ export function SettingsPage() {
 				<Card className="p-6">
 					<div className="flex items-center justify-between mb-4">
 						<h2 className="text-lg font-medium text-neutral-50">Image Factory</h2>
-						<Button
-							size="sm"
-							onClick={() => {
-								const factory: ImageFactoryInfo = {
-									url: factoryURL,
-									credentialsRef: factoryCredRef,
-									defaultSchematicID: factorySchematicID,
-									autoSync: factoryAutoSync,
-								}
-								saveSection({ imageFactory: factory }, setSavingFactory, 'Image factory')
-							}}
-							disabled={savingFactory}
-						>
-							{savingFactory ? 'Saving...' : 'Save'}
-						</Button>
+						{canMutate && (
+							<Button
+								size="sm"
+								onClick={() => {
+									const factory: ImageFactoryInfo = {
+										url: factoryURL,
+										credentialsRef: factoryCredRef,
+										defaultSchematicID: factorySchematicID,
+										autoSync: factoryAutoSync,
+									}
+									saveSection({ imageFactory: factory }, setSavingFactory, 'Image factory')
+								}}
+								disabled={savingFactory}
+							>
+								{savingFactory ? 'Saving...' : 'Save'}
+							</Button>
+						)}
 					</div>
 					<div className="space-y-4">
 						<Input
@@ -531,18 +567,21 @@ export function SettingsPage() {
 							value={factoryURL}
 							onChange={(e) => setFactoryURL(e.target.value)}
 							placeholder="https://factory.butlerlabs.dev"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="Credentials Secret"
 							value={factoryCredRef}
 							onChange={(e) => setFactoryCredRef(e.target.value)}
 							placeholder="Secret name containing API key"
+							disabled={!canMutate}
 						/>
 						<Input
 							label="Default Schematic ID"
 							value={factorySchematicID}
 							onChange={(e) => setFactorySchematicID(e.target.value)}
 							placeholder="SHA-256 hex string"
+							disabled={!canMutate}
 						/>
 						<div className="flex items-center justify-between">
 							<div>
@@ -556,6 +595,7 @@ export function SettingsPage() {
 									type="checkbox"
 									checked={factoryAutoSync}
 									onChange={(e) => setFactoryAutoSync(e.target.checked)}
+									disabled={!canMutate}
 									className="sr-only peer"
 								/>
 								<div className="w-11 h-6 bg-neutral-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600" />
@@ -568,19 +608,21 @@ export function SettingsPage() {
 				<Card className="p-6">
 					<div className="flex items-center justify-between mb-4">
 						<h2 className="text-lg font-medium text-neutral-50">Audit Log</h2>
-						<Button
-							size="sm"
-							onClick={() =>
-								saveSection(
-									{ audit: { enabled: auditEnabled, webhookURL: auditWebhookURL || undefined, bufferSize: auditBufferSize } },
-									setSavingAudit,
-									'Audit configuration'
-								)
-							}
-							disabled={savingAudit}
-						>
-							{savingAudit ? 'Saving...' : 'Save'}
-						</Button>
+						{canMutate && (
+							<Button
+								size="sm"
+								onClick={() =>
+									saveSection(
+										{ audit: { enabled: auditEnabled, webhookURL: auditWebhookURL || undefined, bufferSize: auditBufferSize } },
+										setSavingAudit,
+										'Audit configuration'
+									)
+								}
+								disabled={savingAudit}
+							>
+								{savingAudit ? 'Saving...' : 'Save'}
+							</Button>
+						)}
 					</div>
 					<p className="text-xs text-neutral-500 mb-4">
 						Configure audit event recording. Events are always emitted as structured logs.
@@ -597,6 +639,7 @@ export function SettingsPage() {
 									type="checkbox"
 									checked={auditEnabled}
 									onChange={(e) => setAuditEnabled(e.target.checked)}
+									disabled={!canMutate}
 									className="sr-only peer"
 								/>
 								<div className="w-11 h-6 bg-neutral-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600" />
@@ -608,6 +651,7 @@ export function SettingsPage() {
 								value={auditWebhookURL}
 								onChange={(e) => setAuditWebhookURL(e.target.value)}
 								placeholder="https://siem.company.com/api/v1/audit"
+								disabled={!canMutate}
 							/>
 							<p className="text-xs text-neutral-500 mt-1">
 								POST audit events to this URL for external integration (SIEM, log aggregator, etc). Leave empty to disable.
@@ -620,6 +664,7 @@ export function SettingsPage() {
 								value={String(auditBufferSize)}
 								onChange={(e) => setAuditBufferSize(parseInt(e.target.value) || 10000)}
 								placeholder="10000"
+								disabled={!canMutate}
 							/>
 							<p className="text-xs text-neutral-500 mt-1">
 								In-memory ring buffer capacity for recent audit queries in the console. Default 10,000.
@@ -632,19 +677,21 @@ export function SettingsPage() {
 				<Card className="p-6">
 					<div className="flex items-center justify-between mb-4">
 						<h2 className="text-lg font-medium text-neutral-50">Notifications</h2>
-						<Button
-							size="sm"
-							onClick={() =>
-								saveSection(
-									{ notifications: { webhookURL: notificationWebhookURL || undefined } },
-									setSavingNotifications,
-									'Notification configuration'
-								)
-							}
-							disabled={savingNotifications}
-						>
-							{savingNotifications ? 'Saving...' : 'Save'}
-						</Button>
+						{canMutate && (
+							<Button
+								size="sm"
+								onClick={() =>
+									saveSection(
+										{ notifications: { webhookURL: notificationWebhookURL || undefined } },
+										setSavingNotifications,
+										'Notification configuration'
+									)
+								}
+								disabled={savingNotifications}
+							>
+								{savingNotifications ? 'Saving...' : 'Save'}
+							</Button>
+						)}
 					</div>
 					<p className="text-xs text-neutral-500 mb-4">
 						Forward real-time notifications to external systems (Slack, PagerDuty, Microsoft Teams, etc).
@@ -655,6 +702,7 @@ export function SettingsPage() {
 							value={notificationWebhookURL}
 							onChange={(e) => setNotificationWebhookURL(e.target.value)}
 							placeholder="https://hooks.slack.com/services/..."
+							disabled={!canMutate}
 						/>
 						<p className="text-xs text-neutral-500 mt-1">
 							POST notifications to this URL. Leave empty to disable.
@@ -666,15 +714,17 @@ export function SettingsPage() {
 				<Card className="p-6">
 					<div className="flex items-center justify-between mb-4">
 						<h2 className="text-lg font-medium text-neutral-50">SSH Authorized Key</h2>
-						<Button
-							size="sm"
-							onClick={() =>
-								saveSection({ sshAuthorizedKey: sshKey }, setSavingSSH, 'SSH key')
-							}
-							disabled={savingSSH}
-						>
-							{savingSSH ? 'Saving...' : 'Save'}
-						</Button>
+						{canMutate && (
+							<Button
+								size="sm"
+								onClick={() =>
+									saveSection({ sshAuthorizedKey: sshKey }, setSavingSSH, 'SSH key')
+								}
+								disabled={savingSSH}
+							>
+								{savingSSH ? 'Saving...' : 'Save'}
+							</Button>
+						)}
 					</div>
 					<p className="text-xs text-neutral-500 mb-4">
 						Default SSH public key injected into non-Talos worker nodes for diagnostic access. Can
@@ -685,7 +735,8 @@ export function SettingsPage() {
 						onChange={(e) => setSSHKey(e.target.value)}
 						rows={3}
 						placeholder="ssh-ed25519 AAAA..."
-						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm resize-none"
+						disabled={!canMutate}
+						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm resize-none disabled:opacity-50 disabled:cursor-not-allowed"
 					/>
 				</Card>
 			</div>
@@ -705,9 +756,10 @@ interface CPResourceRowProps {
 		requests?: { cpu?: string; memory?: string }
 		limits?: { cpu?: string; memory?: string }
 	}) => void
+	disabled?: boolean
 }
 
-function CPResourceRow({ label, value, onChange }: CPResourceRowProps) {
+function CPResourceRow({ label, value, onChange, disabled }: CPResourceRowProps) {
 	const requests = value?.requests || {}
 	const limits = value?.limits || {}
 
@@ -725,6 +777,7 @@ function CPResourceRow({ label, value, onChange }: CPResourceRowProps) {
 						})
 					}
 					placeholder="100m"
+					disabled={disabled}
 				/>
 				<Input
 					label="Request Memory"
@@ -736,6 +789,7 @@ function CPResourceRow({ label, value, onChange }: CPResourceRowProps) {
 						})
 					}
 					placeholder="256Mi"
+					disabled={disabled}
 				/>
 				<Input
 					label="Limit CPU"
@@ -747,6 +801,7 @@ function CPResourceRow({ label, value, onChange }: CPResourceRowProps) {
 						})
 					}
 					placeholder="2"
+					disabled={disabled}
 				/>
 				<Input
 					label="Limit Memory"
@@ -758,6 +813,7 @@ function CPResourceRow({ label, value, onChange }: CPResourceRowProps) {
 						})
 					}
 					placeholder="1Gi"
+					disabled={disabled}
 				/>
 			</div>
 		</div>

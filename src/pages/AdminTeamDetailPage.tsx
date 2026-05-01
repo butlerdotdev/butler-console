@@ -7,6 +7,7 @@ import { useDocumentTitle } from '@/hooks'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
 import { usePermissionWarning } from '@/hooks/usePermissionWarning'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import { clustersApi, type Cluster } from '@/api'
 import {
 	Button,
@@ -95,6 +96,7 @@ export function AdminTeamDetailPage() {
 
 	const toast = useToast()
 	const { user } = useAuth()
+	const { canMutate } = useTeamContext()
 	const { checkAndWarn } = usePermissionWarning()
 	const [team, setTeam] = useState<TeamDetails | null>(null)
 	const [members, setMembers] = useState<TeamMember[]>([])
@@ -594,18 +596,20 @@ export function AdminTeamDetailPage() {
 							<p className="text-neutral-400 mt-1">@{team.name}</p>
 						</div>
 					</div>
-					<Button
-						variant="danger"
-						size="sm"
-						onClick={() => setShowDeleteTeamModal(true)}
-						disabled={clusters.length > 0}
-						title={clusters.length > 0 ? 'Delete all clusters before removing this team' : undefined}
-					>
-						<svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-						</svg>
-						Delete Team
-					</Button>
+					{canMutate && (
+						<Button
+							variant="danger"
+							size="sm"
+							onClick={() => setShowDeleteTeamModal(true)}
+							disabled={clusters.length > 0}
+							title={clusters.length > 0 ? 'Delete all clusters before removing this team' : undefined}
+						>
+							<svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+							</svg>
+							Delete Team
+						</Button>
+					)}
 				</div>
 
 				{/* Team Info */}
@@ -679,26 +683,28 @@ export function AdminTeamDetailPage() {
 							Quick Actions
 						</h3>
 						<div className="space-y-2">
-							<Button
-								className="w-full justify-start"
-								variant="secondary"
-								onClick={() => setShowAddMemberModal(true)}
-							>
-								<svg
-									className="w-4 h-4 mr-2"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
+							{canMutate && (
+								<Button
+									className="w-full justify-start"
+									variant="secondary"
+									onClick={() => setShowAddMemberModal(true)}
 								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={2}
-										d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-									/>
-								</svg>
-								Add Member
-							</Button>
+									<svg
+										className="w-4 h-4 mr-2"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											strokeLinecap="round"
+											strokeLinejoin="round"
+											strokeWidth={2}
+											d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+										/>
+									</svg>
+									Add Member
+								</Button>
+							)}
 							<Link to={`/t/${team.name}`} className="block">
 								<Button className="w-full justify-start" variant="secondary">
 									<svg
@@ -733,9 +739,11 @@ export function AdminTeamDetailPage() {
 						<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide">
 							Resource Usage
 						</h3>
-						<Button size="sm" variant="secondary" onClick={() => setShowEditLimitsModal(true)}>
-							Edit Limits
-						</Button>
+						{canMutate && (
+							<Button size="sm" variant="secondary" onClick={() => setShowEditLimitsModal(true)}>
+								Edit Limits
+							</Button>
+						)}
 					</div>
 					{team.resourceUsage ? (
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
@@ -790,9 +798,11 @@ export function AdminTeamDetailPage() {
 						<h3 className="text-sm font-medium text-neutral-400 uppercase tracking-wide">
 							Cluster Defaults
 						</h3>
-						<Button size="sm" variant="secondary" onClick={() => setShowEditDefaultsModal(true)}>
-							Edit Defaults
-						</Button>
+						{canMutate && (
+							<Button size="sm" variant="secondary" onClick={() => setShowEditDefaultsModal(true)}>
+								Edit Defaults
+							</Button>
+						)}
 					</div>
 					{team.clusterDefaults ? (
 						<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -838,22 +848,24 @@ export function AdminTeamDetailPage() {
 				<Card className="overflow-hidden">
 					<div className="px-5 py-4 border-b border-neutral-800 flex items-center justify-between">
 						<h2 className="text-lg font-medium text-neutral-100">Members</h2>
-						<Button size="sm" onClick={() => setShowAddMemberModal(true)}>
-							<svg
-								className="w-4 h-4 mr-1"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M12 4v16m8-8H4"
-								/>
-							</svg>
-							Add Member
-						</Button>
+						{canMutate && (
+							<Button size="sm" onClick={() => setShowAddMemberModal(true)}>
+								<svg
+									className="w-4 h-4 mr-1"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M12 4v16m8-8H4"
+									/>
+								</svg>
+								Add Member
+							</Button>
+						)}
 					</div>
 
 					{members.length === 0 ? (
@@ -909,7 +921,8 @@ export function AdminTeamDetailPage() {
 													<select
 														value={member.role}
 														onChange={(e) => handleChangeRole(member, e.target.value)}
-														className="text-sm px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+														disabled={!canMutate}
+														className="text-sm px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
 													>
 														<option value="viewer">Viewer</option>
 														<option value="operator">Operator</option>
@@ -923,7 +936,8 @@ export function AdminTeamDetailPage() {
 												<select
 													value={member.role}
 													onChange={(e) => handleChangeRole(member, e.target.value)}
-													className="text-sm px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+													disabled={!canMutate}
+													className="text-sm px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
 												>
 													<option value="viewer">Viewer</option>
 													<option value="operator">Operator</option>
@@ -937,20 +951,24 @@ export function AdminTeamDetailPage() {
 													via group
 												</span>
 											) : member.source === 'elevated' ? (
-												<button
-													onClick={() => setMemberToRemove(member)}
-													className="text-sm text-amber-400 hover:text-amber-300"
-													title={member.removeNote}
-												>
-													Remove Elevation
-												</button>
+												canMutate && (
+													<button
+														onClick={() => setMemberToRemove(member)}
+														className="text-sm text-amber-400 hover:text-amber-300"
+														title={member.removeNote}
+													>
+														Remove Elevation
+													</button>
+												)
 											) : (
-												<button
-													onClick={() => setMemberToRemove(member)}
-													className="text-sm text-red-400 hover:text-red-300"
-												>
-													Remove
-												</button>
+												canMutate && (
+													<button
+														onClick={() => setMemberToRemove(member)}
+														className="text-sm text-red-400 hover:text-red-300"
+													>
+														Remove
+													</button>
+												)
 											)}
 										</td>
 									</tr>
@@ -969,22 +987,24 @@ export function AdminTeamDetailPage() {
 								Automatically grant access to users based on their IdP groups
 							</p>
 						</div>
-						<Button size="sm" onClick={() => setShowAddGroupSyncModal(true)}>
-							<svg
-								className="w-4 h-4 mr-1"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M12 4v16m8-8H4"
-								/>
-							</svg>
-							Add Group
-						</Button>
+						{canMutate && (
+							<Button size="sm" onClick={() => setShowAddGroupSyncModal(true)}>
+								<svg
+									className="w-4 h-4 mr-1"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M12 4v16m8-8H4"
+									/>
+								</svg>
+								Add Group
+							</Button>
+						)}
 					</div>
 
 					{groupSyncs.length === 0 ? (
@@ -1029,7 +1049,8 @@ export function AdminTeamDetailPage() {
 											<select
 												value={group.role}
 												onChange={(e) => handleChangeGroupRole(group, e.target.value)}
-												className="text-sm px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+												disabled={!canMutate}
+												className="text-sm px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:opacity-50 disabled:cursor-not-allowed"
 											>
 												<option value="viewer">Viewer</option>
 												<option value="operator">Operator</option>
@@ -1037,12 +1058,14 @@ export function AdminTeamDetailPage() {
 											</select>
 										</td>
 										<td className="px-5 py-4 text-right">
-											<button
-												onClick={() => setGroupSyncToRemove(group)}
-												className="text-sm text-red-400 hover:text-red-300"
-											>
-												Remove
-											</button>
+											{canMutate && (
+												<button
+													onClick={() => setGroupSyncToRemove(group)}
+													className="text-sm text-red-400 hover:text-red-300"
+												>
+													Remove
+												</button>
+											)}
 										</td>
 									</tr>
 								))}
@@ -1123,262 +1146,276 @@ export function AdminTeamDetailPage() {
 			</div>
 
 			{/* Add Member Modal */}
-			<Modal isOpen={showAddMemberModal} onClose={() => setShowAddMemberModal(false)}>
-				<ModalHeader>
-					<h2 className="text-lg font-semibold text-neutral-100">Add Team Member</h2>
-				</ModalHeader>
-				<form onSubmit={handleAddMember}>
+			{canMutate && (
+				<Modal isOpen={showAddMemberModal} onClose={() => setShowAddMemberModal(false)}>
+					<ModalHeader>
+						<h2 className="text-lg font-semibold text-neutral-100">Add Team Member</h2>
+					</ModalHeader>
+					<form onSubmit={handleAddMember}>
+						<ModalBody className="space-y-4">
+							{groupSyncs.length > 0 && (
+								<div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+									<p className="text-sm text-blue-200">
+										If this user already has access via a group, you can only add them with a higher role to elevate their permissions.
+									</p>
+								</div>
+							)}
+
+							<Input
+								id="memberEmail"
+								label="User Email"
+								type="email"
+								value={newMemberEmail}
+								onChange={(e) => setNewMemberEmail(e.target.value)}
+								placeholder="user@example.com"
+								required
+							/>
+
+							<div>
+								<label className="block text-sm font-medium text-neutral-300 mb-1">
+									Role
+								</label>
+								<select
+									value={newMemberRole}
+									onChange={(e) =>
+										setNewMemberRole(e.target.value as 'admin' | 'operator' | 'viewer')
+									}
+									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+								>
+									<option value="viewer">Viewer - Can view resources</option>
+									<option value="operator">Operator - Can manage clusters</option>
+									<option value="admin">Admin - Full team access</option>
+								</select>
+							</div>
+						</ModalBody>
+						<ModalFooter>
+							<Button
+								type="button"
+								variant="secondary"
+								onClick={() => setShowAddMemberModal(false)}
+							>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={addingMember}>
+								{addingMember ? 'Adding...' : 'Add Member'}
+							</Button>
+						</ModalFooter>
+					</form>
+				</Modal>
+			)}
+
+			{/* Remove Member Confirmation */}
+			{canMutate && (
+				<Modal isOpen={!!memberToRemove} onClose={() => setMemberToRemove(null)}>
+					<ModalHeader>
+						<h2 className="text-lg font-semibold text-neutral-100">
+							{memberToRemove?.source === 'elevated' ? 'Remove Elevation' : 'Remove Member'}
+						</h2>
+					</ModalHeader>
+					<ModalBody>
+						{memberToRemove?.source === 'elevated' ? (
+							<>
+								<p className="text-neutral-400">
+									Remove elevated access for{' '}
+									<strong className="text-neutral-200">{memberToRemove?.email}</strong>?
+								</p>
+								<p className="text-sm text-amber-400/80 mt-2">
+									They will revert to {memberToRemove?.groupRole} access via {memberToRemove?.groupName}.
+								</p>
+							</>
+						) : (
+							<p className="text-neutral-400">
+								Are you sure you want to remove{' '}
+								<strong className="text-neutral-200">{memberToRemove?.email}</strong> from{' '}
+								<strong className="text-neutral-200">{team.displayName || team.name}</strong>?
+							</p>
+						)}
+					</ModalBody>
+					<ModalFooter>
+						<Button variant="secondary" onClick={() => setMemberToRemove(null)}>
+							Cancel
+						</Button>
+						<Button variant="danger" onClick={handleRemoveMember} disabled={removing}>
+							{removing ? 'Removing...' : memberToRemove?.source === 'elevated' ? 'Remove Elevation' : 'Remove Member'}
+						</Button>
+					</ModalFooter>
+				</Modal>
+			)}
+
+			{/* Add Group Sync Modal */}
+			{canMutate && (
+				<Modal isOpen={showAddGroupSyncModal} onClose={() => setShowAddGroupSyncModal(false)}>
+					<ModalHeader>
+						<h2 className="text-lg font-semibold text-neutral-100">Add Group Sync</h2>
+					</ModalHeader>
+					<form onSubmit={handleAddGroupSync}>
+						<ModalBody className="space-y-4">
+							<Input
+								id="groupName"
+								label="Group Name"
+								value={newGroupName}
+								onChange={(e) => setNewGroupName(e.target.value)}
+								placeholder="engineering-platform"
+								required
+							/>
+							<p className="text-xs text-neutral-500 -mt-2">
+								The group name as it appears in your identity provider (e.g., AD group name, Google group, Okta group)
+							</p>
+
+							<div>
+								<label className="block text-sm font-medium text-neutral-300 mb-1">
+									Identity Provider (Optional)
+								</label>
+								<select
+									value={newGroupIdP}
+									onChange={(e) => setNewGroupIdP(e.target.value)}
+									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+								>
+									<option value="">Any identity provider</option>
+									{identityProviders.map((idp) => (
+										<option key={idp.name} value={idp.name}>
+											{idp.displayName || idp.name}
+										</option>
+									))}
+								</select>
+								<p className="text-xs text-neutral-500 mt-1">
+									Restrict this mapping to a specific IdP, or leave as "Any" to match groups from any provider
+								</p>
+							</div>
+
+							<div>
+								<label className="block text-sm font-medium text-neutral-300 mb-1">
+									Role
+								</label>
+								<select
+									value={newGroupRole}
+									onChange={(e) =>
+										setNewGroupRole(e.target.value as 'admin' | 'operator' | 'viewer')
+									}
+									className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
+								>
+									<option value="viewer">Viewer - Can view resources</option>
+									<option value="operator">Operator - Can manage clusters</option>
+									<option value="admin">Admin - Full team access</option>
+								</select>
+							</div>
+						</ModalBody>
+						<ModalFooter>
+							<Button
+								type="button"
+								variant="secondary"
+								onClick={() => setShowAddGroupSyncModal(false)}
+							>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={addingGroupSync}>
+								{addingGroupSync ? 'Adding...' : 'Add Group Sync'}
+							</Button>
+						</ModalFooter>
+					</form>
+				</Modal>
+			)}
+
+			{/* Remove Group Sync Confirmation */}
+			{canMutate && (
+				<Modal isOpen={!!groupSyncToRemove} onClose={() => setGroupSyncToRemove(null)}>
+					<ModalHeader>
+						<h2 className="text-lg font-semibold text-neutral-100">Remove Group Sync</h2>
+					</ModalHeader>
+					<ModalBody>
+						<p className="text-neutral-400">
+							Are you sure you want to remove the group sync for{' '}
+							<strong className="text-neutral-200 font-mono">{groupSyncToRemove?.name}</strong>
+							{groupSyncToRemove?.identityProvider && (
+								<>
+									{' '}from <strong className="text-neutral-200">{groupSyncToRemove.identityProvider}</strong>
+								</>
+							)}
+							?
+						</p>
+						<p className="text-sm text-neutral-500 mt-2">
+							Users from this group will lose access unless they have direct membership or match another group sync.
+						</p>
+					</ModalBody>
+					<ModalFooter>
+						<Button variant="secondary" onClick={() => setGroupSyncToRemove(null)}>
+							Cancel
+						</Button>
+						<Button variant="danger" onClick={handleRemoveGroupSync} disabled={removingGroupSync}>
+							{removingGroupSync ? 'Removing...' : 'Remove Group Sync'}
+						</Button>
+					</ModalFooter>
+				</Modal>
+			)}
+			{/* Edit Resource Limits Modal */}
+			{canMutate && (
+				<EditResourceLimitsModal
+					isOpen={showEditLimitsModal}
+					onClose={() => setShowEditLimitsModal(false)}
+					onSave={handleSaveLimits}
+					currentLimits={team.resourceLimits}
+					saving={savingLimits}
+				/>
+			)}
+
+			{/* Edit Cluster Defaults Modal */}
+			{canMutate && (
+				<EditClusterDefaultsModal
+					isOpen={showEditDefaultsModal}
+					onClose={() => setShowEditDefaultsModal(false)}
+					onSave={handleSaveDefaults}
+					currentDefaults={team.clusterDefaults}
+					saving={savingDefaults}
+				/>
+			)}
+
+			{/* Delete Team Confirmation */}
+			{canMutate && (
+				<Modal isOpen={showDeleteTeamModal} onClose={() => { setShowDeleteTeamModal(false); setDeleteConfirmName('') }}>
+					<ModalHeader>
+						<h2 className="text-lg font-semibold text-neutral-100">Delete Team</h2>
+					</ModalHeader>
 					<ModalBody className="space-y-4">
-						{groupSyncs.length > 0 && (
-							<div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-								<p className="text-sm text-blue-200">
-									If this user already has access via a group, you can only add them with a higher role to elevate their permissions.
+						<p className="text-neutral-400">
+							This will permanently delete{' '}
+							<strong className="text-neutral-200">{team.displayName || team.name}</strong> and
+							its namespace. This action cannot be undone.
+						</p>
+						{clusters.length > 0 && (
+							<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+								<p className="text-sm text-red-300">
+									This team has <strong>{clusters.length} cluster{clusters.length !== 1 ? 's' : ''}</strong> that
+									will be affected. Ensure all clusters are deleted before removing the team.
 								</p>
 							</div>
 						)}
-
-						<Input
-							id="memberEmail"
-							label="User Email"
-							type="email"
-							value={newMemberEmail}
-							onChange={(e) => setNewMemberEmail(e.target.value)}
-							placeholder="user@example.com"
-							required
-						/>
-
-						<div>
-							<label className="block text-sm font-medium text-neutral-300 mb-1">
-								Role
-							</label>
-							<select
-								value={newMemberRole}
-								onChange={(e) =>
-									setNewMemberRole(e.target.value as 'admin' | 'operator' | 'viewer')
-								}
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-							>
-								<option value="viewer">Viewer - Can view resources</option>
-								<option value="operator">Operator - Can manage clusters</option>
-								<option value="admin">Admin - Full team access</option>
-							</select>
-						</div>
-					</ModalBody>
-					<ModalFooter>
-						<Button
-							type="button"
-							variant="secondary"
-							onClick={() => setShowAddMemberModal(false)}
-						>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={addingMember}>
-							{addingMember ? 'Adding...' : 'Add Member'}
-						</Button>
-					</ModalFooter>
-				</form>
-			</Modal>
-
-			{/* Remove Member Confirmation */}
-			<Modal isOpen={!!memberToRemove} onClose={() => setMemberToRemove(null)}>
-				<ModalHeader>
-					<h2 className="text-lg font-semibold text-neutral-100">
-						{memberToRemove?.source === 'elevated' ? 'Remove Elevation' : 'Remove Member'}
-					</h2>
-				</ModalHeader>
-				<ModalBody>
-					{memberToRemove?.source === 'elevated' ? (
-						<>
-							<p className="text-neutral-400">
-								Remove elevated access for{' '}
-								<strong className="text-neutral-200">{memberToRemove?.email}</strong>?
+						{members.length > 0 && (
+							<p className="text-sm text-neutral-500">
+								{members.length} member{members.length !== 1 ? 's' : ''} will lose access.
 							</p>
-							<p className="text-sm text-amber-400/80 mt-2">
-								They will revert to {memberToRemove?.groupRole} access via {memberToRemove?.groupName}.
-							</p>
-						</>
-					) : (
-						<p className="text-neutral-400">
-							Are you sure you want to remove{' '}
-							<strong className="text-neutral-200">{memberToRemove?.email}</strong> from{' '}
-							<strong className="text-neutral-200">{team.displayName || team.name}</strong>?
-						</p>
-					)}
-				</ModalBody>
-				<ModalFooter>
-					<Button variant="secondary" onClick={() => setMemberToRemove(null)}>
-						Cancel
-					</Button>
-					<Button variant="danger" onClick={handleRemoveMember} disabled={removing}>
-						{removing ? 'Removing...' : memberToRemove?.source === 'elevated' ? 'Remove Elevation' : 'Remove Member'}
-					</Button>
-				</ModalFooter>
-			</Modal>
-
-			{/* Add Group Sync Modal */}
-			<Modal isOpen={showAddGroupSyncModal} onClose={() => setShowAddGroupSyncModal(false)}>
-				<ModalHeader>
-					<h2 className="text-lg font-semibold text-neutral-100">Add Group Sync</h2>
-				</ModalHeader>
-				<form onSubmit={handleAddGroupSync}>
-					<ModalBody className="space-y-4">
-						<Input
-							id="groupName"
-							label="Group Name"
-							value={newGroupName}
-							onChange={(e) => setNewGroupName(e.target.value)}
-							placeholder="engineering-platform"
-							required
-						/>
-						<p className="text-xs text-neutral-500 -mt-2">
-							The group name as it appears in your identity provider (e.g., AD group name, Google group, Okta group)
-						</p>
-
-						<div>
-							<label className="block text-sm font-medium text-neutral-300 mb-1">
-								Identity Provider (Optional)
-							</label>
-							<select
-								value={newGroupIdP}
-								onChange={(e) => setNewGroupIdP(e.target.value)}
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-							>
-								<option value="">Any identity provider</option>
-								{identityProviders.map((idp) => (
-									<option key={idp.name} value={idp.name}>
-										{idp.displayName || idp.name}
-									</option>
-								))}
-							</select>
-							<p className="text-xs text-neutral-500 mt-1">
-								Restrict this mapping to a specific IdP, or leave as "Any" to match groups from any provider
-							</p>
-						</div>
-
-						<div>
-							<label className="block text-sm font-medium text-neutral-300 mb-1">
-								Role
-							</label>
-							<select
-								value={newGroupRole}
-								onChange={(e) =>
-									setNewGroupRole(e.target.value as 'admin' | 'operator' | 'viewer')
-								}
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-							>
-								<option value="viewer">Viewer - Can view resources</option>
-								<option value="operator">Operator - Can manage clusters</option>
-								<option value="admin">Admin - Full team access</option>
-							</select>
-						</div>
-					</ModalBody>
-					<ModalFooter>
-						<Button
-							type="button"
-							variant="secondary"
-							onClick={() => setShowAddGroupSyncModal(false)}
-						>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={addingGroupSync}>
-							{addingGroupSync ? 'Adding...' : 'Add Group Sync'}
-						</Button>
-					</ModalFooter>
-				</form>
-			</Modal>
-
-			{/* Remove Group Sync Confirmation */}
-			<Modal isOpen={!!groupSyncToRemove} onClose={() => setGroupSyncToRemove(null)}>
-				<ModalHeader>
-					<h2 className="text-lg font-semibold text-neutral-100">Remove Group Sync</h2>
-				</ModalHeader>
-				<ModalBody>
-					<p className="text-neutral-400">
-						Are you sure you want to remove the group sync for{' '}
-						<strong className="text-neutral-200 font-mono">{groupSyncToRemove?.name}</strong>
-						{groupSyncToRemove?.identityProvider && (
-							<>
-								{' '}from <strong className="text-neutral-200">{groupSyncToRemove.identityProvider}</strong>
-							</>
 						)}
-						?
-					</p>
-					<p className="text-sm text-neutral-500 mt-2">
-						Users from this group will lose access unless they have direct membership or match another group sync.
-					</p>
-				</ModalBody>
-				<ModalFooter>
-					<Button variant="secondary" onClick={() => setGroupSyncToRemove(null)}>
-						Cancel
-					</Button>
-					<Button variant="danger" onClick={handleRemoveGroupSync} disabled={removingGroupSync}>
-						{removingGroupSync ? 'Removing...' : 'Remove Group Sync'}
-					</Button>
-				</ModalFooter>
-			</Modal>
-			{/* Edit Resource Limits Modal */}
-			<EditResourceLimitsModal
-				isOpen={showEditLimitsModal}
-				onClose={() => setShowEditLimitsModal(false)}
-				onSave={handleSaveLimits}
-				currentLimits={team.resourceLimits}
-				saving={savingLimits}
-			/>
-
-			{/* Edit Cluster Defaults Modal */}
-			<EditClusterDefaultsModal
-				isOpen={showEditDefaultsModal}
-				onClose={() => setShowEditDefaultsModal(false)}
-				onSave={handleSaveDefaults}
-				currentDefaults={team.clusterDefaults}
-				saving={savingDefaults}
-			/>
-
-			{/* Delete Team Confirmation */}
-			<Modal isOpen={showDeleteTeamModal} onClose={() => { setShowDeleteTeamModal(false); setDeleteConfirmName('') }}>
-				<ModalHeader>
-					<h2 className="text-lg font-semibold text-neutral-100">Delete Team</h2>
-				</ModalHeader>
-				<ModalBody className="space-y-4">
-					<p className="text-neutral-400">
-						This will permanently delete{' '}
-						<strong className="text-neutral-200">{team.displayName || team.name}</strong> and
-						its namespace. This action cannot be undone.
-					</p>
-					{clusters.length > 0 && (
-						<div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-							<p className="text-sm text-red-300">
-								This team has <strong>{clusters.length} cluster{clusters.length !== 1 ? 's' : ''}</strong> that
-								will be affected. Ensure all clusters are deleted before removing the team.
-							</p>
-						</div>
-					)}
-					{members.length > 0 && (
-						<p className="text-sm text-neutral-500">
-							{members.length} member{members.length !== 1 ? 's' : ''} will lose access.
-						</p>
-					)}
-					<Input
-						id="deleteConfirm"
-						label={`Type "${teamName}" to confirm`}
-						value={deleteConfirmName}
-						onChange={(e) => setDeleteConfirmName(e.target.value)}
-						placeholder={teamName}
-					/>
-				</ModalBody>
-				<ModalFooter>
-					<Button variant="secondary" onClick={() => { setShowDeleteTeamModal(false); setDeleteConfirmName('') }}>
-						Cancel
-					</Button>
-					<Button
-						variant="danger"
-						onClick={handleDeleteTeam}
-						disabled={deletingTeam || deleteConfirmName !== teamName}
-					>
-						{deletingTeam ? 'Deleting...' : 'Delete Team'}
-					</Button>
-				</ModalFooter>
-			</Modal>
+						<Input
+							id="deleteConfirm"
+							label={`Type "${teamName}" to confirm`}
+							value={deleteConfirmName}
+							onChange={(e) => setDeleteConfirmName(e.target.value)}
+							placeholder={teamName}
+						/>
+					</ModalBody>
+					<ModalFooter>
+						<Button variant="secondary" onClick={() => { setShowDeleteTeamModal(false); setDeleteConfirmName('') }}>
+							Cancel
+						</Button>
+						<Button
+							variant="danger"
+							onClick={handleDeleteTeam}
+							disabled={deletingTeam || deleteConfirmName !== teamName}
+						>
+							{deletingTeam ? 'Deleting...' : 'Delete Team'}
+						</Button>
+					</ModalFooter>
+				</Modal>
+			)}
 		</FadeIn>
 	)
 }

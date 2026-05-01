@@ -13,6 +13,7 @@ import {
 } from '@/api/addons'
 import { gitopsApi } from '@/api/gitops'
 import type { Repository, Branch, GitProviderConfig } from '@/types/gitops'
+import { AddonIcon, AddonStatusBadge, TierPill } from '@/components/addons'
 
 
 interface SchemaField {
@@ -756,24 +757,20 @@ function GitOpsEditWarningModal({ addon, action, onClose, onProceed }: GitOpsEdi
 // Platform Addon Card (Read-only)
 
 function PlatformAddonCard({ addon }: { addon: SimpleAddon }) {
-	const statusColor = getStatusColor(addon.status)
-	const statusBg = getStatusBgColor(addon.status)
-
 	return (
 		<Card className="p-4 hover:border-neutral-600 transition-colors">
 			<div className="flex items-start justify-between">
 				<div className="flex items-center gap-3">
-					<div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-						<span className="text-xl">{getPlatformAddonIcon(addon.name)}</span>
-					</div>
+					<AddonIcon name={addon.name} />
 					<div>
-						<h4 className="font-medium text-neutral-100">{addon.displayName || addon.name}</h4>
+						<div className="flex items-center gap-2">
+							<h4 className="font-medium text-neutral-100">{addon.displayName || addon.name}</h4>
+							<TierPill tier="infrastructure" />
+						</div>
 						<p className="text-xs text-neutral-500">{addon.version || 'Unknown version'}</p>
 					</div>
 				</div>
-				<span className={`px-2 py-1 text-xs rounded-full ${statusBg} ${statusColor}`}>
-					{addon.status}
-				</span>
+				<AddonStatusBadge status={addon.status} />
 			</div>
 		</Card>
 	)
@@ -811,30 +808,26 @@ function InstalledAddonCard({
 		return () => document.removeEventListener('mousedown', handleClickOutside)
 	}, [])
 
-	const statusColor = getStatusColor(addon.status)
-	const statusBg = getStatusBgColor(addon.status)
-	const icon = catalogInfo?.icon || getOptionalAddonIcon(addon.name)
 	const isGitOpsManaged = addon.managedBy === 'gitops'
 
 	return (
 		<Card className={`p-4 hover:border-neutral-600 transition-colors ${isGitOpsManaged ? 'border-purple-500/30' : 'border-green-500/20'}`}>
 			<div className="flex items-start justify-between mb-3">
 				<div className="flex items-center gap-3">
-					<div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isGitOpsManaged ? 'bg-purple-500/10' : 'bg-green-500/10'}`}>
-						<span className="text-xl">{icon}</span>
-					</div>
+					<AddonIcon name={addon.name} icon={catalogInfo?.icon} iconData={catalogInfo?.iconData} />
 					<div>
-						<h4 className="font-medium text-neutral-100">
-							{catalogInfo?.displayName || addon.displayName || addon.name}
-						</h4>
+						<div className="flex items-center gap-2">
+							<h4 className="font-medium text-neutral-100">
+								{catalogInfo?.displayName || addon.displayName || addon.name}
+							</h4>
+							<TierPill tier={catalogInfo?.tier || (catalogInfo?.platform ? 'infrastructure' : 'apps')} />
+						</div>
 						<p className="text-xs text-neutral-500">{addon.version || 'Unknown version'}</p>
 					</div>
 				</div>
 
 				<div className="flex items-center gap-2">
-					<span className={`px-2 py-1 text-xs rounded-full ${statusBg} ${statusColor}`}>
-						{addon.status}
-					</span>
+					<AddonStatusBadge status={addon.status} />
 					{isGitOpsManaged && (
 						<span className="px-2 py-1 text-xs rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30">
 							GitOps
@@ -937,11 +930,12 @@ function AvailableAddonCard({
 		<Card className="p-4 hover:border-neutral-600 transition-colors">
 			<div className="flex items-start justify-between mb-3">
 				<div className="flex items-center gap-3">
-					<div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-						<span className="text-xl">{catalog.icon || '📦'}</span>
-					</div>
+					<AddonIcon name={catalog.name} icon={catalog.icon} iconData={catalog.iconData} />
 					<div>
-						<h4 className="font-medium text-neutral-100">{catalog.displayName}</h4>
+						<div className="flex items-center gap-2">
+							<h4 className="font-medium text-neutral-100">{catalog.displayName}</h4>
+							<TierPill tier={catalog.tier || (catalog.platform ? 'infrastructure' : 'apps')} />
+						</div>
 						<p className="text-xs text-neutral-500">{catalog.defaultVersion}</p>
 					</div>
 				</div>
@@ -2130,68 +2124,6 @@ function MigrateToGitOpsModal({ addon, isOpen, repositories, loadingRepos, clust
 	)
 }
 
-// Helpers
-
-function getStatusColor(status: string): string {
-	switch (status) {
-		case 'Installed':
-		case 'Healthy':
-			return 'text-green-400'
-		case 'Installing':
-		case 'Upgrading':
-		case 'Pending':
-			return 'text-yellow-400'
-		case 'Failed':
-		case 'Degraded':
-			return 'text-red-400'
-		default:
-			return 'text-neutral-400'
-	}
-}
-
-function getStatusBgColor(status: string): string {
-	switch (status) {
-		case 'Installed':
-		case 'Healthy':
-			return 'bg-green-500/10 border border-green-500/30'
-		case 'Installing':
-		case 'Upgrading':
-		case 'Pending':
-			return 'bg-yellow-500/10 border border-yellow-500/30'
-		case 'Failed':
-		case 'Degraded':
-			return 'bg-red-500/10 border border-red-500/30'
-		default:
-			return 'bg-neutral-500/10 border border-neutral-500/30'
-	}
-}
-
-
-function getPlatformAddonIcon(name: string): string {
-	const icons: Record<string, string> = {
-		cilium: '🌐',
-		metallb: '⚖️',
-		'cert-manager': '🔒',
-		longhorn: '💾',
-		traefik: '🚪',
-		'metrics-server': '📈',
-	}
-	return icons[name.toLowerCase()] || '📦'
-}
-
-function getOptionalAddonIcon(name: string): string {
-	const icons: Record<string, string> = {
-		velero: '🛡️',
-		'prometheus-operator': '🔥',
-		tempo: '🔍',
-		jaeger: '🔎',
-		'victoria-metrics': '📊',
-		'victoria-logs': '📋',
-		flux: '🔄',
-		argocd: '🐙',
-	}
-	return icons[name.toLowerCase()] || '📦'
-}
 
 
 function getMockValuesSchema(addonName: string): ValuesSchema {

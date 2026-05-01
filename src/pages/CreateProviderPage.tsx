@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import { providersApi, type CreateProviderRequest } from '@/api/providers'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
 import { ProviderIcon } from '@/components/providers/ProviderIcon'
@@ -15,6 +16,7 @@ const ON_PREM_TYPES: ProviderType[] = ['harvester', 'nutanix', 'proxmox']
 export function CreateProviderPage() {
 	useDocumentTitle('Add Provider')
 	const navigate = useNavigate()
+	const { canMutate } = useTeamContext()
 	const { success, error: showError } = useToast()
 
 	const [providerType, setProviderType] = useState<ProviderType>('harvester')
@@ -310,6 +312,26 @@ export function CreateProviderPage() {
 		if (providerType === 'azure') return !!(azureSubscriptionId && azureTenantId && azureClientId && azureClientSecret)
 		if (providerType === 'gcp') return !!(gcpProjectId && gcpRegion && gcpServiceAccount)
 		return false
+	}
+
+	if (!canMutate) {
+		return (
+			<FadeIn>
+				<div className="max-w-xl mx-auto">
+					<div className="mb-6">
+						<h1 className="text-2xl font-semibold text-neutral-50">Add Provider</h1>
+						<p className="text-neutral-400 mt-1">Configure connection to an infrastructure provider</p>
+					</div>
+					<Card className="p-8 text-center">
+						<h3 className="text-lg font-medium text-neutral-200 mb-2">Read-Only Access</h3>
+						<p className="text-neutral-400 mb-4">You do not have permission to create providers.</p>
+						<Button variant="secondary" onClick={() => navigate('/providers')}>
+							Back to Providers
+						</Button>
+					</Card>
+				</div>
+			</FadeIn>
+		)
 	}
 
 	return (

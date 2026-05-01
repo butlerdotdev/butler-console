@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import { networksApi } from '@/api/networks'
 import { Card, Spinner, Button, FadeIn } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
@@ -16,6 +17,7 @@ import type { NetworkPool } from '@/types/networks'
 
 export function NetworkPoolsPage() {
 	useDocumentTitle('Network Pools')
+	const { canMutate } = useTeamContext()
 	const { success, error: showError } = useToast()
 
 	const [pools, setPools] = useState<NetworkPool[]>([])
@@ -86,12 +88,14 @@ export function NetworkPoolsPage() {
 						<h1 className="text-2xl font-semibold text-neutral-50">Network Pools</h1>
 						<p className="text-neutral-400 mt-1">IP address pools for tenant cluster IPAM</p>
 					</div>
-					<Button onClick={() => setShowCreateModal(true)}>
-						<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-						</svg>
-						Create Pool
-					</Button>
+					{canMutate && (
+						<Button onClick={() => setShowCreateModal(true)}>
+							<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+							</svg>
+							Create Pool
+						</Button>
+					)}
 				</div>
 
 				{pools.length === 0 ? (
@@ -101,7 +105,7 @@ export function NetworkPoolsPage() {
 						</div>
 						<h3 className="text-lg font-medium text-neutral-200 mb-2">No Network Pools</h3>
 						<p className="text-neutral-400 mb-4">Create your first IP address pool for tenant cluster networking.</p>
-						<Button onClick={() => setShowCreateModal(true)}>Create Pool</Button>
+						{canMutate && <Button onClick={() => setShowCreateModal(true)}>Create Pool</Button>}
 					</Card>
 				) : (
 					<div className="grid gap-4">
@@ -110,6 +114,7 @@ export function NetworkPoolsPage() {
 								key={pool.metadata.uid || `${pool.metadata.namespace}/${pool.metadata.name}`}
 								pool={pool}
 								onDelete={(e) => { e.stopPropagation(); setDeleteTarget(pool) }}
+								canMutate={canMutate}
 							/>
 						))}
 					</div>
@@ -117,45 +122,49 @@ export function NetworkPoolsPage() {
 			</div>
 
 			{/* Create Modal */}
-			<CreateNetworkPoolModal
-				isOpen={showCreateModal}
-				onClose={() => setShowCreateModal(false)}
-				onCreated={() => { setShowCreateModal(false); loadPools() }}
-			/>
+			{canMutate && (
+				<CreateNetworkPoolModal
+					isOpen={showCreateModal}
+					onClose={() => setShowCreateModal(false)}
+					onCreated={() => { setShowCreateModal(false); loadPools() }}
+				/>
+			)}
 
 			{/* Delete Confirmation Modal */}
-			<Modal isOpen={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)}>
-				<ModalHeader>
-					<div className="flex items-center gap-3">
-						<div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
-							<svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-							</svg>
+			{canMutate && (
+				<Modal isOpen={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)}>
+					<ModalHeader>
+						<div className="flex items-center gap-3">
+							<div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+								<svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+								</svg>
+							</div>
+							<div>
+								<h2 className="text-lg font-semibold text-neutral-100">Delete Network Pool</h2>
+								<p className="text-sm text-neutral-400">This action cannot be undone</p>
+							</div>
 						</div>
-						<div>
-							<h2 className="text-lg font-semibold text-neutral-100">Delete Network Pool</h2>
-							<p className="text-sm text-neutral-400">This action cannot be undone</p>
-						</div>
-					</div>
-				</ModalHeader>
-				<ModalBody>
-					<p className="text-neutral-300">
-						Are you sure you want to delete network pool{' '}
-						<span className="font-mono font-semibold text-red-400">{deleteTarget?.metadata.name}</span>?
-					</p>
-					<p className="text-sm text-neutral-500 mt-2">
-						This pool cannot be deleted if it has active IP allocations.
-					</p>
-				</ModalBody>
-				<ModalFooter>
-					<Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>
-						Cancel
-					</Button>
-					<Button variant="danger" onClick={handleDelete} disabled={deleting}>
-						{deleting ? 'Deleting...' : 'Delete Pool'}
-					</Button>
-				</ModalFooter>
-			</Modal>
+					</ModalHeader>
+					<ModalBody>
+						<p className="text-neutral-300">
+							Are you sure you want to delete network pool{' '}
+							<span className="font-mono font-semibold text-red-400">{deleteTarget?.metadata.name}</span>?
+						</p>
+						<p className="text-sm text-neutral-500 mt-2">
+							This pool cannot be deleted if it has active IP allocations.
+						</p>
+					</ModalBody>
+					<ModalFooter>
+						<Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+							Cancel
+						</Button>
+						<Button variant="danger" onClick={handleDelete} disabled={deleting}>
+							{deleting ? 'Deleting...' : 'Delete Pool'}
+						</Button>
+					</ModalFooter>
+				</Modal>
+			)}
 		</FadeIn>
 	)
 }
@@ -163,6 +172,7 @@ export function NetworkPoolsPage() {
 interface PoolCardProps {
 	pool: NetworkPool
 	onDelete: (e: React.MouseEvent) => void
+	canMutate: boolean
 }
 
 const MINI_BAR_COLORS: Record<string, string> = {
@@ -173,7 +183,7 @@ const MINI_BAR_COLORS: Record<string, string> = {
 	unassigned: 'bg-neutral-800/60',
 }
 
-function PoolCard({ pool, onDelete }: PoolCardProps) {
+function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 	const { name, namespace, creationTimestamp } = pool.metadata
 	const { cidr } = pool.spec
 	const status = pool.status
@@ -245,15 +255,17 @@ function PoolCard({ pool, onDelete }: PoolCardProps) {
 							<p className="text-xs text-neutral-500 uppercase tracking-wide">Age</p>
 							<p className="text-sm text-neutral-200">{age}</p>
 						</div>
-						<button
-							onClick={onDelete}
-							className="p-2 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-							title="Delete pool"
-						>
-							<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-							</svg>
-						</button>
+						{canMutate && (
+							<button
+								onClick={onDelete}
+								className="p-2 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+								title="Delete pool"
+							>
+								<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+								</svg>
+							</button>
+						)}
 					</div>
 				</div>
 

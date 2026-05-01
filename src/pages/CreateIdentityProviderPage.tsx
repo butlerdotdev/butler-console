@@ -13,6 +13,7 @@ import {
 } from '@/api/identity-providers'
 import { Card, Button, Input, FadeIn } from '@/components/ui'
 import { useToast } from '@/hooks/useToast'
+import { useTeamContext } from '@/hooks/useTeamContext'
 
 // Provider icons (same as in list page)
 function GoogleIcon({ className }: { className?: string }) {
@@ -93,6 +94,7 @@ export function CreateIdentityProviderPage() {
 	useDocumentTitle('Add Identity Provider')
 	const navigate = useNavigate()
 	const toast = useToast()
+	const { canMutate } = useTeamContext()
 
 	// Form state
 	const [selectedPreset, setSelectedPreset] = useState<PresetOption | null>(null)
@@ -323,6 +325,7 @@ export function CreateIdentityProviderPage() {
 									onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
 									placeholder="google-workspace"
 									required
+									disabled={!canMutate}
 								/>
 								<p className="mt-1 text-xs text-neutral-500">Unique identifier (lowercase, alphanumeric, hyphens only)</p>
 							</div>
@@ -333,6 +336,7 @@ export function CreateIdentityProviderPage() {
 									value={displayName}
 									onChange={(e) => setDisplayName(e.target.value)}
 									placeholder="Google Workspace"
+									disabled={!canMutate}
 								/>
 								<p className="mt-1 text-xs text-neutral-500">Shown on the login button</p>
 							</div>
@@ -353,6 +357,7 @@ export function CreateIdentityProviderPage() {
 										}}
 										placeholder="https://accounts.google.com"
 										required
+										disabled={!canMutate}
 									/>
 									<p className="mt-1 text-xs text-neutral-500">
 										{selectedPreset === 'microsoft'
@@ -387,6 +392,7 @@ export function CreateIdentityProviderPage() {
 									onChange={(e) => setClientID(e.target.value)}
 									placeholder="your-client-id"
 									required
+									disabled={!canMutate}
 								/>
 								<p className="mt-1 text-xs text-neutral-500">OAuth2 Client ID from your identity provider</p>
 							</div>
@@ -399,6 +405,7 @@ export function CreateIdentityProviderPage() {
 									onChange={(e) => setClientSecret(e.target.value)}
 									placeholder="••••••••••••••••"
 									required
+									disabled={!canMutate}
 								/>
 								<p className="mt-1 text-xs text-neutral-500">OAuth2 Client Secret (stored securely as a Kubernetes Secret)</p>
 							</div>
@@ -410,6 +417,7 @@ export function CreateIdentityProviderPage() {
 									onChange={(e) => setRedirectURL(e.target.value)}
 									placeholder="https://butler.example.com/api/auth/callback"
 									required
+									disabled={!canMutate}
 								/>
 								<p className="mt-1 text-xs text-neutral-500">Must match the redirect URI in your identity provider settings</p>
 							</div>
@@ -421,6 +429,7 @@ export function CreateIdentityProviderPage() {
 										value={hostedDomain}
 										onChange={(e) => setHostedDomain(e.target.value)}
 										placeholder="example.com"
+										disabled={!canMutate}
 									/>
 									<p className="mt-1 text-xs text-neutral-500">Restrict login to a specific Google Workspace domain</p>
 								</div>
@@ -453,6 +462,7 @@ export function CreateIdentityProviderPage() {
 											value={scopes}
 											onChange={(e) => setScopes(e.target.value)}
 											placeholder="openid, email, profile"
+											disabled={!canMutate}
 										/>
 										<p className="mt-1 text-xs text-neutral-500">Comma-separated OAuth2 scopes to request</p>
 									</div>
@@ -463,6 +473,7 @@ export function CreateIdentityProviderPage() {
 											value={groupsClaim}
 											onChange={(e) => setGroupsClaim(e.target.value)}
 											placeholder="groups"
+											disabled={!canMutate}
 										/>
 										<p className="mt-1 text-xs text-neutral-500">JWT claim containing group memberships (leave empty to disable)</p>
 									</div>
@@ -473,6 +484,7 @@ export function CreateIdentityProviderPage() {
 											value={emailClaim}
 											onChange={(e) => setEmailClaim(e.target.value)}
 											placeholder="email"
+											disabled={!canMutate}
 										/>
 										<p className="mt-1 text-xs text-neutral-500">JWT claim containing the user's email</p>
 									</div>
@@ -490,9 +502,11 @@ export function CreateIdentityProviderPage() {
 							>
 								Cancel
 							</Button>
-							<Button type="submit" disabled={creating}>
-								{creating ? 'Creating...' : 'Create Provider'}
-							</Button>
+							{canMutate && (
+								<Button type="submit" disabled={creating}>
+									{creating ? 'Creating...' : 'Create Provider'}
+								</Button>
+							)}
 						</div>
 					</Card>
 				</form>

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { useAuth } from '@/hooks'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import { useToast } from '@/hooks/useToast'
 import { Button, Input, Card, Modal, ModalHeader, ModalBody, ModalFooter, FadeIn, Spinner } from '@/components/ui'
 
@@ -23,13 +24,13 @@ export function AdminTeamsPage() {
 	useDocumentTitle('Teams')
 
 	const { user } = useAuth()
+	const { canMutate } = useTeamContext()
 	const toast = useToast()
 	const [teams, setTeams] = useState<Team[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState('')
 
-	// Check if current user is admin of any team
-	const isAdmin = user?.isPlatformAdmin || user?.teams?.some(t => t.role === 'admin') || false
+	const isAdmin = canMutate
 
 	// Create team modal
 	const [showCreateModal, setShowCreateModal] = useState(false)

@@ -352,34 +352,38 @@ export function ClusterDetailPage() {
 						>
 							Download Kubeconfig
 						</Button>
-						<Button
-							variant="secondary"
-							onClick={() => setShowEditModal(true)}
-							disabled={phase === 'Failed' || phase === 'Deleting'}
-						>
-							Edit
-						</Button>
-						<Button
-							variant="secondary"
-							onClick={() => setShowScaleModal(true)}
-						>
-							Scale Workers
-						</Button>
-						{availableEnvs.length > 0 && (
-							<Button
-								variant="secondary"
-								onClick={() => setShowChangeEnvModal(true)}
-								disabled={phase === 'Deleting'}
-							>
-								Change Environment
-							</Button>
+						{isAdmin && (
+							<>
+								<Button
+									variant="secondary"
+									onClick={() => setShowEditModal(true)}
+									disabled={phase === 'Failed' || phase === 'Deleting'}
+								>
+									Edit
+								</Button>
+								<Button
+									variant="secondary"
+									onClick={() => setShowScaleModal(true)}
+								>
+									Scale Workers
+								</Button>
+								{availableEnvs.length > 0 && (
+									<Button
+										variant="secondary"
+										onClick={() => setShowChangeEnvModal(true)}
+										disabled={phase === 'Deleting'}
+									>
+										Change Environment
+									</Button>
+								)}
+								<Button
+									variant="danger"
+									onClick={() => setShowDeleteModal(true)}
+								>
+									Delete
+								</Button>
+							</>
 						)}
-						<Button
-							variant="danger"
-							onClick={() => setShowDeleteModal(true)}
-						>
-							Delete
-						</Button>
 					</div>
 				</div>
 

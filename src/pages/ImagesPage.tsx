@@ -9,11 +9,13 @@ import { Card, Spinner, Button, FadeIn } from '@/components/ui'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { useToast } from '@/hooks/useToast'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import type { ImageSync, CreateImageSyncRequest, UpdateImageSyncRequest, FactoryCatalogEntry } from '@/types/imagesync'
 
 export function ImagesPage() {
 	useDocumentTitle('Images')
 	const { success, error: showError } = useToast()
+	const { canMutate } = useTeamContext()
 
 	const [imageSyncs, setImageSyncs] = useState<ImageSync[]>([])
 	const [loading, setLoading] = useState(true)
@@ -154,22 +156,24 @@ export function ImagesPage() {
 							Sync OS images from Butler Image Factory to infrastructure providers
 						</p>
 					</div>
-					<Button onClick={() => setShowCreateModal(true)}>
-						<svg
-							className="w-4 h-4 mr-2"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth={2}
-								d="M12 4v16m8-8H4"
-							/>
-						</svg>
-						Sync Image
-					</Button>
+					{canMutate && (
+						<Button onClick={() => setShowCreateModal(true)}>
+							<svg
+								className="w-4 h-4 mr-2"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									strokeWidth={2}
+									d="M12 4v16m8-8H4"
+								/>
+							</svg>
+							Sync Image
+						</Button>
+					)}
 				</div>
 
 				{imageSyncs.length === 0 ? (
@@ -188,7 +192,7 @@ export function ImagesPage() {
 					</Card>
 				) : (
 					<>
-					{selectedIds.size > 0 && (
+					{canMutate && selectedIds.size > 0 && (
 						<Card className="p-3 flex items-center justify-between bg-blue-500/5 border border-blue-500/20">
 							<span className="text-sm text-neutral-200">
 								{selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''} selected
@@ -208,6 +212,7 @@ export function ImagesPage() {
 							<table className="w-full">
 								<thead>
 									<tr className="border-b border-neutral-800">
+										{canMutate && (
 										<th className="w-10 px-4 py-3">
 											<input
 												type="checkbox"
@@ -216,6 +221,7 @@ export function ImagesPage() {
 												className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 focus:ring-offset-0"
 											/>
 										</th>
+									)}
 										<th className="text-left px-4 py-3 text-xs font-medium text-neutral-500 uppercase tracking-wide">
 											Name
 										</th>
@@ -253,6 +259,7 @@ export function ImagesPage() {
 											onEdit={() => setEditTarget(img)}
 											selected={selectedIds.has(id)}
 											onToggleSelect={() => toggleSelect(id)}
+											canMutate={canMutate}
 										/>
 										)
 									})}
@@ -265,75 +272,79 @@ export function ImagesPage() {
 			</div>
 
 			{/* Create Modal */}
-			<SyncImageModal
-				isOpen={showCreateModal}
-				onClose={() => setShowCreateModal(false)}
-				onCreated={() => {
-					setShowCreateModal(false)
-					loadImages()
-				}}
-				existingImageSyncs={imageSyncs}
-			/>
+			{canMutate && (
+				<SyncImageModal
+					isOpen={showCreateModal}
+					onClose={() => setShowCreateModal(false)}
+					onCreated={() => {
+						setShowCreateModal(false)
+						loadImages()
+					}}
+					existingImageSyncs={imageSyncs}
+				/>
+			)}
 
 			{/* Delete Confirmation Modal */}
-			<Modal isOpen={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)}>
-				<ModalHeader>
-					<div className="flex items-center gap-3">
-						<div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
-							<svg
-								className="w-5 h-5 text-red-500"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-								/>
-							</svg>
+			{canMutate && (
+				<Modal isOpen={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)}>
+					<ModalHeader>
+						<div className="flex items-center gap-3">
+							<div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+								<svg
+									className="w-5 h-5 text-red-500"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+									/>
+								</svg>
+							</div>
+							<div>
+								<h2 className="text-lg font-semibold text-neutral-100">
+									Delete Image Sync
+								</h2>
+								<p className="text-sm text-neutral-400">
+									This action cannot be undone
+								</p>
+							</div>
 						</div>
-						<div>
-							<h2 className="text-lg font-semibold text-neutral-100">
-								Delete Image Sync
-							</h2>
-							<p className="text-sm text-neutral-400">
-								This action cannot be undone
-							</p>
-						</div>
-					</div>
-				</ModalHeader>
-				<ModalBody>
-					<p className="text-neutral-300">
-						Are you sure you want to delete image sync{' '}
-						<span className="font-mono font-semibold text-red-400">
-							{deleteTarget?.metadata.name}
-						</span>
-						?
-					</p>
-					{deleteTarget?.status?.providerImageRef && (
-						<p className="text-sm text-neutral-500 mt-2">
-							The synced image on the provider will not be removed.
+					</ModalHeader>
+					<ModalBody>
+						<p className="text-neutral-300">
+							Are you sure you want to delete image sync{' '}
+							<span className="font-mono font-semibold text-red-400">
+								{deleteTarget?.metadata.name}
+							</span>
+							?
 						</p>
-					)}
-				</ModalBody>
-				<ModalFooter>
-					<Button
-						variant="secondary"
-						onClick={() => setDeleteTarget(null)}
-						disabled={deleting}
-					>
-						Cancel
-					</Button>
-					<Button variant="danger" onClick={handleDelete} disabled={deleting}>
-						{deleting ? 'Deleting...' : 'Delete'}
-					</Button>
-				</ModalFooter>
-			</Modal>
+						{deleteTarget?.status?.providerImageRef && (
+							<p className="text-sm text-neutral-500 mt-2">
+								The synced image on the provider will not be removed.
+							</p>
+						)}
+					</ModalBody>
+					<ModalFooter>
+						<Button
+							variant="secondary"
+							onClick={() => setDeleteTarget(null)}
+							disabled={deleting}
+						>
+							Cancel
+						</Button>
+						<Button variant="danger" onClick={handleDelete} disabled={deleting}>
+							{deleting ? 'Deleting...' : 'Delete'}
+						</Button>
+					</ModalFooter>
+				</Modal>
+			)}
 
 			{/* Edit Modal */}
-			{editTarget && (
+			{canMutate && editTarget && (
 				<EditImageSyncModal
 					isOpen={!!editTarget}
 					onClose={() => setEditTarget(null)}
@@ -358,9 +369,10 @@ interface ImageSyncRowProps {
 	onEdit: () => void
 	selected: boolean
 	onToggleSelect: () => void
+	canMutate: boolean
 }
 
-function ImageSyncRow({ imageSync, onDelete, onEdit, selected, onToggleSelect }: ImageSyncRowProps) {
+function ImageSyncRow({ imageSync, onDelete, onEdit, selected, onToggleSelect, canMutate }: ImageSyncRowProps) {
 	const { metadata, spec, status } = imageSync
 	const phase = status?.phase || 'Unknown'
 	const factoryRef = spec.factoryRef
@@ -381,14 +393,16 @@ function ImageSyncRow({ imageSync, onDelete, onEdit, selected, onToggleSelect }:
 
 	return (
 		<tr className={`hover:bg-neutral-800/30 transition-colors ${selected ? 'bg-blue-500/5' : ''}`}>
-			<td className="w-10 px-4 py-3">
-				<input
-					type="checkbox"
-					checked={selected}
-					onChange={onToggleSelect}
-					className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 focus:ring-offset-0"
-				/>
-			</td>
+			{canMutate && (
+				<td className="w-10 px-4 py-3">
+					<input
+						type="checkbox"
+						checked={selected}
+						onChange={onToggleSelect}
+						className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 focus:ring-offset-0"
+					/>
+				</td>
+			)}
 			<td className="px-4 py-3">
 				<div className="flex items-center gap-3">
 					<div className="w-8 h-8 rounded-lg bg-neutral-800 flex items-center justify-center flex-shrink-0">
@@ -442,26 +456,28 @@ function ImageSyncRow({ imageSync, onDelete, onEdit, selected, onToggleSelect }:
 				<span className="text-sm text-neutral-400">{age}</span>
 			</td>
 			<td className="px-4 py-3 text-right">
-				<div className="flex items-center justify-end gap-1">
-					<button
-						onClick={(e) => { e.stopPropagation(); onEdit() }}
-						className="p-1.5 text-neutral-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
-						title="Edit image sync"
-					>
-						<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-						</svg>
-					</button>
-					<button
-						onClick={(e) => { e.stopPropagation(); onDelete() }}
-						className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-						title="Delete image sync"
-					>
-						<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-						</svg>
-					</button>
-				</div>
+				{canMutate && (
+					<div className="flex items-center justify-end gap-1">
+						<button
+							onClick={(e) => { e.stopPropagation(); onEdit() }}
+							className="p-1.5 text-neutral-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+							title="Edit image sync"
+						>
+							<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+							</svg>
+						</button>
+						<button
+							onClick={(e) => { e.stopPropagation(); onDelete() }}
+							className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+							title="Delete image sync"
+						>
+							<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+							</svg>
+						</button>
+					</div>
+				)}
 			</td>
 		</tr>
 	)

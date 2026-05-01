@@ -34,6 +34,10 @@ export interface TeamContextValue {
 	/** Whether user is a platform admin (can mutate) vs platform viewer (read-only) */
 	isPlatformViewer: boolean
 
+	/** Whether user can perform mutations in the current admin context.
+	 *  True for platform admins, false for platform viewers. */
+	canMutate: boolean
+
 	/** Whether user is an admin of the current team (team-level admin, not platform admin) */
 	isTeamAdmin: boolean
 

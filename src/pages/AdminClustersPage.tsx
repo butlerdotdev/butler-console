@@ -103,7 +103,7 @@ function saveCollapsed(set: Set<string>) {
 
 export function AdminClustersPage() {
 	useDocumentTitle('All Clusters')
-	const { buildPath } = useTeamContext()
+	const { buildPath, canMutate } = useTeamContext()
 	const { currentEnv } = useEnvContext()
 	const { user } = useAuth()
 	const navigate = useNavigate()
@@ -147,8 +147,8 @@ export function AdminClustersPage() {
 		})
 	}, [])
 
-	// Permission check - platform admin or team admin
-	const isAdmin = user?.isPlatformAdmin || user?.teams?.some(t => t.role === 'admin') || false
+	// Permission check - use canMutate from context (false for platform viewers)
+	const isAdmin = canMutate
 
 	const fetchTeams = useCallback(async () => {
 		try {

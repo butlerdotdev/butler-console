@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button, Input, Card, Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui'
 import { useDocumentTitle } from '@/hooks'
 import { useAuth } from '@/hooks'
+import { useTeamContext } from '@/hooks/useTeamContext'
 
 interface User {
 	username: string
@@ -29,12 +30,12 @@ export function UsersPage() {
 	useDocumentTitle('User Management')
 
 	const { user: currentUser } = useAuth()
+	const { canMutate } = useTeamContext()
 	const [users, setUsers] = useState<User[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState('')
 
-	// Check if current user can manage users (platform admin OR team admin)
-	const isAdmin = currentUser?.isPlatformAdmin || currentUser?.teams?.some(t => t.role === 'admin') || false
+	const isAdmin = canMutate
 
 	// Create user modal
 	const [showCreateModal, setShowCreateModal] = useState(false)

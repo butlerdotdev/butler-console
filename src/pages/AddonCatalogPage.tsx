@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useDocumentTitle } from '@/hooks'
 import { useToast } from '@/hooks/useToast'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import {
 	addonsApi,
 	type AddonDefinition,
@@ -34,6 +35,7 @@ const CATEGORIES: AddonCategory[] = [
 export function AddonCatalogPage() {
 	useDocumentTitle('Addon Catalog')
 	const toast = useToast()
+	const { canMutate } = useTeamContext()
 	const toastRef = useRef(toast)
 	toastRef.current = toast
 
@@ -123,12 +125,14 @@ export function AddonCatalogPage() {
 							Manage addon definitions available for tenant clusters
 						</p>
 					</div>
-					<Button onClick={() => setShowCreateModal(true)}>
-						<svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-						</svg>
-						Add Definition
-					</Button>
+					{canMutate && (
+						<Button onClick={() => setShowCreateModal(true)}>
+							<svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+							</svg>
+							Add Definition
+						</Button>
+					)}
 				</div>
 
 				{addons.length === 0 ? (
@@ -182,7 +186,7 @@ export function AddonCatalogPage() {
 										<td className="px-5 py-4 text-right">
 											{addon.source === 'builtin' ? (
 												<span className="text-xs text-neutral-500">managed</span>
-											) : (
+											) : canMutate ? (
 												<div className="flex items-center justify-end gap-2">
 													<button
 														onClick={() => setEditAddon(addon)}
@@ -197,7 +201,7 @@ export function AddonCatalogPage() {
 														Delete
 													</button>
 												</div>
-											)}
+											) : null}
 										</td>
 									</tr>
 								))}
@@ -207,15 +211,17 @@ export function AddonCatalogPage() {
 				)}
 			</div>
 
-			<AddonDefinitionModal
-				isOpen={showCreateModal}
-				onClose={() => setShowCreateModal(false)}
-				onSave={handleCreate}
-				saving={saving}
-				title="Create Addon Definition"
-			/>
+			{canMutate && (
+				<AddonDefinitionModal
+					isOpen={showCreateModal}
+					onClose={() => setShowCreateModal(false)}
+					onSave={handleCreate}
+					saving={saving}
+					title="Create Addon Definition"
+				/>
+			)}
 
-			{editAddon && (
+			{canMutate && editAddon && (
 				<AddonDefinitionModal
 					isOpen={true}
 					onClose={() => setEditAddon(null)}
@@ -226,26 +232,28 @@ export function AddonCatalogPage() {
 				/>
 			)}
 
-			<Modal isOpen={!!deleteAddon} onClose={() => setDeleteAddon(null)}>
-				<ModalHeader>
-					<h2 className="text-lg font-semibold text-neutral-100">Delete Addon Definition</h2>
-				</ModalHeader>
-				<ModalBody>
-					<p className="text-neutral-400">
-						Are you sure you want to delete{' '}
-						<strong className="text-neutral-200">{deleteAddon?.displayName || deleteAddon?.name}</strong>?
-					</p>
-					<p className="text-sm text-neutral-500 mt-2">
-						This will not affect clusters that already have this addon installed.
-					</p>
-				</ModalBody>
-				<ModalFooter>
-					<Button variant="secondary" onClick={() => setDeleteAddon(null)}>Cancel</Button>
-					<Button variant="danger" onClick={handleDelete} disabled={deleting}>
-						{deleting ? 'Deleting...' : 'Delete'}
-					</Button>
-				</ModalFooter>
-			</Modal>
+			{canMutate && (
+				<Modal isOpen={!!deleteAddon} onClose={() => setDeleteAddon(null)}>
+					<ModalHeader>
+						<h2 className="text-lg font-semibold text-neutral-100">Delete Addon Definition</h2>
+					</ModalHeader>
+					<ModalBody>
+						<p className="text-neutral-400">
+							Are you sure you want to delete{' '}
+							<strong className="text-neutral-200">{deleteAddon?.displayName || deleteAddon?.name}</strong>?
+						</p>
+						<p className="text-sm text-neutral-500 mt-2">
+							This will not affect clusters that already have this addon installed.
+						</p>
+					</ModalBody>
+					<ModalFooter>
+						<Button variant="secondary" onClick={() => setDeleteAddon(null)}>Cancel</Button>
+						<Button variant="danger" onClick={handleDelete} disabled={deleting}>
+							{deleting ? 'Deleting...' : 'Delete'}
+						</Button>
+					</ModalFooter>
+				</Modal>
+			)}
 		</FadeIn>
 	)
 }

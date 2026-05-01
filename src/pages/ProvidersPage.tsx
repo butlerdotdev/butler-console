@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import { providersApi, type Provider, type ValidateResponse, type NetworkInfo, type CreateProviderRequest, type CAInfoResponse } from '@/api/providers'
 import { Card, Spinner, Button, FadeIn } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
@@ -11,6 +12,7 @@ import { useToast } from '@/hooks/useToast'
 
 export function ProvidersPage() {
 	useDocumentTitle('Providers')
+	const { canMutate } = useTeamContext()
 	const { success, error: showError } = useToast()
 
 	const [providers, setProviders] = useState<Provider[]>([])
@@ -106,14 +108,16 @@ export function ProvidersPage() {
 						<h1 className="text-2xl font-semibold text-neutral-50">Providers</h1>
 						<p className="text-neutral-400 mt-1">Infrastructure provider configurations for cluster provisioning</p>
 					</div>
-					<Link to="/providers/create">
-						<Button>
-							<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-							</svg>
-							Add Provider
-						</Button>
-					</Link>
+					{canMutate && (
+						<Link to="/providers/create">
+							<Button>
+								<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+								</svg>
+								Add Provider
+							</Button>
+						</Link>
+					)}
 				</div>
 
 				{providers.length === 0 ? (
@@ -125,9 +129,11 @@ export function ProvidersPage() {
 						</div>
 						<h3 className="text-lg font-medium text-neutral-200 mb-2">No Providers</h3>
 						<p className="text-neutral-400 mb-4">Get started by adding your first infrastructure provider.</p>
-						<Link to="/providers/create">
-							<Button>Add Provider</Button>
-						</Link>
+						{canMutate && (
+							<Link to="/providers/create">
+								<Button>Add Provider</Button>
+							</Link>
+						)}
 					</Card>
 				) : (
 					<div className="grid gap-4">
@@ -140,6 +146,7 @@ export function ProvidersPage() {
 								onClick={() => setSelectedProvider(provider)}
 								isValidating={validating === `${provider.metadata.namespace}/${provider.metadata.name}`}
 								validationResult={validationResults[`${provider.metadata.namespace}/${provider.metadata.name}`]}
+								canMutate={canMutate}
 							/>
 						))}
 					</div>
@@ -173,17 +180,21 @@ export function ProvidersPage() {
 							<Button variant="secondary" onClick={() => setSelectedProvider(null)}>
 								Close
 							</Button>
-							<Button
-								onClick={() => { setEditProvider(selectedProvider); setSelectedProvider(null) }}
-							>
-								Edit
-							</Button>
-							<Button
-								variant="danger"
-								onClick={() => { setSelectedProvider(null); setDeleteTarget(selectedProvider) }}
-							>
-								Delete
-							</Button>
+							{canMutate && (
+								<Button
+									onClick={() => { setEditProvider(selectedProvider); setSelectedProvider(null) }}
+								>
+									Edit
+								</Button>
+							)}
+							{canMutate && (
+								<Button
+									variant="danger"
+									onClick={() => { setSelectedProvider(null); setDeleteTarget(selectedProvider) }}
+								>
+									Delete
+								</Button>
+							)}
 						</ModalFooter>
 					</>
 				)}
@@ -209,38 +220,40 @@ export function ProvidersPage() {
 			)}
 
 			{/* Delete Confirmation Modal */}
-			<Modal isOpen={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)}>
-				<ModalHeader>
-					<div className="flex items-center gap-3">
-						<div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
-							<svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-							</svg>
+			{canMutate && (
+				<Modal isOpen={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)}>
+					<ModalHeader>
+						<div className="flex items-center gap-3">
+							<div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+								<svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+								</svg>
+							</div>
+							<div>
+								<h2 className="text-lg font-semibold text-neutral-100">Delete Provider</h2>
+								<p className="text-sm text-neutral-400">This action cannot be undone</p>
+							</div>
 						</div>
-						<div>
-							<h2 className="text-lg font-semibold text-neutral-100">Delete Provider</h2>
-							<p className="text-sm text-neutral-400">This action cannot be undone</p>
-						</div>
-					</div>
-				</ModalHeader>
-				<ModalBody>
-					<p className="text-neutral-300">
-						Are you sure you want to delete provider{' '}
-						<span className="font-mono font-semibold text-red-400">{deleteTarget?.metadata.name}</span>?
-					</p>
-					<p className="text-sm text-neutral-500 mt-2">
-						This will also delete the associated credentials secret. Any clusters using this provider will not be affected.
-					</p>
-				</ModalBody>
-				<ModalFooter>
-					<Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>
-						Cancel
-					</Button>
-					<Button variant="danger" onClick={handleDelete} disabled={deleting}>
-						{deleting ? 'Deleting...' : 'Delete Provider'}
-					</Button>
-				</ModalFooter>
-			</Modal>
+					</ModalHeader>
+					<ModalBody>
+						<p className="text-neutral-300">
+							Are you sure you want to delete provider{' '}
+							<span className="font-mono font-semibold text-red-400">{deleteTarget?.metadata.name}</span>?
+						</p>
+						<p className="text-sm text-neutral-500 mt-2">
+							This will also delete the associated credentials secret. Any clusters using this provider will not be affected.
+						</p>
+					</ModalBody>
+					<ModalFooter>
+						<Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+							Cancel
+						</Button>
+						<Button variant="danger" onClick={handleDelete} disabled={deleting}>
+							{deleting ? 'Deleting...' : 'Delete Provider'}
+						</Button>
+					</ModalFooter>
+				</Modal>
+			)}
 		</FadeIn>
 	)
 }
@@ -252,9 +265,10 @@ interface ProviderCardProps {
 	onClick: () => void
 	isValidating: boolean
 	validationResult?: ValidateResponse
+	canMutate: boolean
 }
 
-function ProviderCard({ provider, onValidate, onDelete, onClick, isValidating, validationResult }: ProviderCardProps) {
+function ProviderCard({ provider, onValidate, onDelete, onClick, isValidating, validationResult, canMutate }: ProviderCardProps) {
 	const name = provider.metadata.name
 	const namespace = provider.metadata.namespace
 	const type = provider.spec.provider || 'unknown'
@@ -354,18 +368,22 @@ function ProviderCard({ provider, onValidate, onDelete, onClick, isValidating, v
 						</div>
 					)}
 					<div className="flex items-center gap-2">
-						<Button variant="secondary" onClick={onValidate} disabled={isValidating}>
-							{isValidating ? 'Testing...' : 'Test'}
-						</Button>
-						<button
-							onClick={onDelete}
-							className="p-2 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-							title="Delete provider"
-						>
-							<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-							</svg>
-						</button>
+						{canMutate && (
+							<Button variant="secondary" onClick={onValidate} disabled={isValidating}>
+								{isValidating ? 'Testing...' : 'Test'}
+							</Button>
+						)}
+						{canMutate && (
+							<button
+								onClick={onDelete}
+								className="p-2 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+								title="Delete provider"
+							>
+								<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+								</svg>
+							</button>
+						)}
 					</div>
 				</div>
 			</div>

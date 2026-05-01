@@ -133,6 +133,9 @@ export function TeamContextProvider({ children }: TeamContextProviderProps) {
 	// Current team role (admin, operator, viewer, or undefined)
 	const currentTeamRole = currentTeamInfo?.role
 
+	// Platform admins can mutate; platform viewers cannot
+	const canMutate = canAccessAdmin && !isPlatformViewer
+
 	// Navigation functions
 	const switchToTeam = useCallback(
 		(teamName: string) => {
@@ -189,6 +192,7 @@ export function TeamContextProvider({ children }: TeamContextProviderProps) {
 			isAdminMode: mode === 'admin',
 			canAccessAdmin,
 			isPlatformViewer,
+			canMutate,
 			isTeamAdmin,
 			currentTeamRole,
 			switchToTeam,
@@ -204,6 +208,7 @@ export function TeamContextProvider({ children }: TeamContextProviderProps) {
 			currentTeamNamespace,
 			canAccessAdmin,
 			isPlatformViewer,
+			canMutate,
 			isTeamAdmin,
 			currentTeamRole,
 			switchToTeam,

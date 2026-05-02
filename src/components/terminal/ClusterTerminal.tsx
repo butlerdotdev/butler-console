@@ -13,9 +13,10 @@ interface TerminalProps {
 	cluster: string
 	pod?: string
 	container?: string
+	readOnly?: boolean
 }
 
-export function ClusterTerminal({ type, namespace, cluster, pod, container }: TerminalProps) {
+export function ClusterTerminal({ type, namespace, cluster, pod, container, readOnly }: TerminalProps) {
 	const { preferences } = usePreferences()
 	const terminalRef = useRef<HTMLDivElement>(null)
 	const termRef = useRef<Terminal | null>(null)
@@ -77,12 +78,14 @@ export function ClusterTerminal({ type, namespace, cluster, pod, container }: Te
 			term.writeln('\r\n\x1b[33mDisconnected\x1b[0m')
 		}
 
-		term.onData((data) => {
-			if (ws.readyState === WebSocket.OPEN) {
-				ws.send(JSON.stringify({ type: 'data', data }))
-			}
-		})
-	}, [type, namespace, cluster, pod, container, sendResize])
+		if (!readOnly) {
+			term.onData((data) => {
+				if (ws.readyState === WebSocket.OPEN) {
+					ws.send(JSON.stringify({ type: 'data', data }))
+				}
+			})
+		}
+	}, [type, namespace, cluster, pod, container, readOnly, sendResize])
 
 	useEffect(() => {
 		if (!terminalRef.current) return
@@ -171,6 +174,12 @@ export function ClusterTerminal({ type, namespace, cluster, pod, container }: Te
 					</span>
 					<span className="text-sm text-neutral-600">|</span>
 					<span className="text-sm text-neutral-500">{cluster}</span>
+					{readOnly && (
+						<>
+							<span className="text-sm text-neutral-600">|</span>
+							<span className="px-1.5 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-400 rounded border border-amber-500/30">Read Only</span>
+						</>
+					)}
 				</div>
 				<div className="flex items-center gap-2">
 					{status !== 'connected' && (

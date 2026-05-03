@@ -12,9 +12,9 @@ interface AddonIconProps {
 }
 
 const SIZE_CLASSES = {
-	sm: { container: 'w-6 h-6', img: 'w-4 h-4', text: 'text-sm' },
-	md: { container: 'w-10 h-10', img: 'w-6 h-6', text: 'text-xl' },
-	lg: { container: 'w-12 h-12', img: 'w-8 h-8', text: 'text-2xl' },
+	sm: { container: 'w-12 h-12', img: 'w-8 h-8', text: 'text-xl' },
+	md: { container: 'w-20 h-20', img: 'w-12 h-12', text: 'text-4xl' },
+	lg: { container: 'w-24 h-24', img: 'w-16 h-16', text: 'text-5xl' },
 }
 
 export function AddonIcon({ name, icon, iconData, size = 'md', className }: AddonIconProps) {

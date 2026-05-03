@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { observabilityApi } from '@/api/observability'
 import { addonsApi } from '@/api/addons'
 import { useToast } from '@/hooks/useToast'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -29,6 +30,7 @@ interface ObservabilityTabProps {
 }
 
 export function ObservabilityTab({ clusterNamespace, clusterName, addons, onRefresh }: ObservabilityTabProps) {
+  const { canMutate } = useTeamContext()
   const { success, error: showError } = useToast()
   const [config, setConfig] = useState<ObservabilityConfig | null>(null)
   const [configLoading, setConfigLoading] = useState(true)
@@ -179,19 +181,23 @@ export function ObservabilityTab({ clusterNamespace, clusterName, addons, onRefr
                 <span className="text-xs text-neutral-400">
                   {vectorAgent.version && `v${vectorAgent.version}`}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleUninstall(vectorAgent.name)}
-                  className="text-red-400 hover:text-red-300"
-                >
-                  Remove
-                </Button>
+                {canMutate && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleUninstall(vectorAgent.name)}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
             ) : (
-              <Button size="sm" onClick={() => setShowLogModal(true)}>
-                Enable
-              </Button>
+              canMutate && (
+                <Button size="sm" onClick={() => setShowLogModal(true)}>
+                  Enable
+                </Button>
+              )
             )}
           </div>
         </Card>
@@ -211,19 +217,23 @@ export function ObservabilityTab({ clusterNamespace, clusterName, addons, onRefr
                 <span className="text-xs text-neutral-400">
                   {prometheus.version && `v${prometheus.version}`}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleUninstall(prometheus.name)}
-                  className="text-red-400 hover:text-red-300"
-                >
-                  Remove
-                </Button>
+                {canMutate && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleUninstall(prometheus.name)}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
             ) : (
-              <Button size="sm" onClick={() => setShowMetricsModal(true)}>
-                Enable
-              </Button>
+              canMutate && (
+                <Button size="sm" onClick={() => setShowMetricsModal(true)}>
+                  Enable
+                </Button>
+              )
             )}
           </div>
         </Card>
@@ -243,19 +253,23 @@ export function ObservabilityTab({ clusterNamespace, clusterName, addons, onRefr
                 <span className="text-xs text-neutral-400">
                   {otelCollector.version && `v${otelCollector.version}`}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleUninstall(otelCollector.name)}
-                  className="text-red-400 hover:text-red-300"
-                >
-                  Remove
-                </Button>
+                {canMutate && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleUninstall(otelCollector.name)}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
             ) : (
-              <Button size="sm" onClick={() => setShowTracingModal(true)}>
-                Enable
-              </Button>
+              canMutate && (
+                <Button size="sm" onClick={() => setShowTracingModal(true)}>
+                  Enable
+                </Button>
+              )
             )}
           </div>
         </Card>

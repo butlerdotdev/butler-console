@@ -5,6 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { Card } from '@/components/ui'
 import { ClusterTerminal } from '@/components/terminal'
+import { useTeamContext } from '@/hooks/useTeamContext'
 
 export function TerminalPage() {
 	const { type, namespace, cluster } = useParams<{
@@ -13,6 +14,7 @@ export function TerminalPage() {
 		cluster: string
 	}>()
 	const navigate = useNavigate()
+	const { canMutate } = useTeamContext()
 
 	useDocumentTitle(`Terminal - ${cluster}`)
 
@@ -47,6 +49,7 @@ export function TerminalPage() {
 					type={type as 'management' | 'tenant'}
 					namespace={namespace}
 					cluster={cluster}
+					readOnly={!canMutate}
 				/>
 			</Card>
 		</div>

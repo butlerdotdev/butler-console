@@ -17,7 +17,7 @@ import { CertificateCategorySection } from './CertificateCategory';
 import { RotationModal, CARotationModal } from './RotationModals';
 import { Spinner } from '@/components/ui/Spinner';
 import { useToast } from '@/hooks/useToast';
-import { useAuth } from '@/hooks/useAuth';
+import { useTeamContext } from '@/hooks/useTeamContext';
 
 // Poll interval during rotation (5 seconds)
 const ROTATION_POLL_INTERVAL = 5000;
@@ -26,7 +26,7 @@ const REGULAR_REFRESH_INTERVAL = 60000;
 
 export function CertificatesTab() {
 	const { namespace, name } = useParams<{ namespace: string; name: string }>();
-	const { user } = useAuth();
+	const { canMutate } = useTeamContext();
 	const { success, error: showError } = useToast();
 
 	const [certificates, setCertificates] = useState<ClusterCertificates | null>(null);
@@ -53,10 +53,9 @@ export function CertificatesTab() {
 	// Ref to track poll interval
 	const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-	// Permission checks
-	const isAdmin = user?.isPlatformAdmin || user?.teams?.some((t) => t.role === 'admin') || false;
-	const isOperator =
-		isAdmin || user?.teams?.some((t) => t.role === 'operator' || t.role === 'admin') || false;
+	// Permission checks — canMutate is false for platform viewers
+	const canRotate = canMutate;
+	const canRotateCA = canMutate;
 
 	// Fetch certificates
 	const fetchCertificates = useCallback(async () => {
@@ -281,8 +280,8 @@ export function CertificatesTab() {
 			<CertificateHealthOverview
 				certificates={certificates}
 				onRotate={openRotationModal}
-				canRotate={isOperator && !isRotationActive}
-				canRotateCA={isAdmin && !isRotationActive}
+				canRotate={canRotate && !isRotationActive}
+				canRotateCA={canRotateCA && !isRotationActive}
 			/>
 
 			{/* Certificate categories */}

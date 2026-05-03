@@ -5,6 +5,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, Button, Spinner, SearchableSelect } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { useToast } from '@/hooks/useToast'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import {
 	addonsApi,
 	// type InstalledAddon,
@@ -56,6 +57,7 @@ interface AddonsTabProps {
 // Main Component
 
 export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: AddonsTabProps) {
+	const { canMutate } = useTeamContext()
 	const { success, error: showError } = useToast()
 	const [searchQuery, setSearchQuery] = useState('')
 	const [selectedCategory, setSelectedCategory] = useState<string>('all')
@@ -482,6 +484,7 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 								addon={addon}
 								catalogInfo={catalogInfo}
 								gitopsEnabled={gitopsEnabled}
+								canMutate={canMutate}
 								onConfigure={() => handleConfigureRequest(addon, catalogInfo)}
 								onUninstall={() => handleUninstallRequest(addon)}
 								onMigrateToGitOps={() => setMigrateToGitOps(addon)}
@@ -580,6 +583,7 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 												catalog={catalogItem}
 												installing={installingAddon === catalogItem.name}
 												gitopsEnabled={gitopsEnabled}
+												canMutate={canMutate}
 												onQuickInstall={() => handleQuickInstall(catalogItem)}
 												onConfigureInstall={() => setConfigureAddon(catalogItem)}
 												onGitOpsExport={() => setGitopsExportAddon(catalogItem)}
@@ -782,6 +786,7 @@ interface InstalledAddonCardProps {
 	addon: SimpleAddon
 	catalogInfo?: AddonDefinition
 	gitopsEnabled: boolean
+	canMutate: boolean
 	onConfigure: () => void
 	onUninstall: () => void
 	onMigrateToGitOps: () => void
@@ -791,6 +796,7 @@ function InstalledAddonCard({
 	addon,
 	catalogInfo,
 	gitopsEnabled,
+	canMutate,
 	onConfigure,
 	onUninstall,
 	onMigrateToGitOps,
@@ -841,56 +847,58 @@ function InstalledAddonCard({
 			)}
 
 			{/* Manage Button */}
-			<div className="relative" ref={menuRef}>
-				<Button
-					variant="secondary"
-					size="sm"
-					className="w-full justify-between"
-					onClick={() => setMenuOpen(!menuOpen)}
-				>
-					Manage
-					<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-					</svg>
-				</Button>
+			{canMutate && (
+				<div className="relative" ref={menuRef}>
+					<Button
+						variant="secondary"
+						size="sm"
+						className="w-full justify-between"
+						onClick={() => setMenuOpen(!menuOpen)}
+					>
+						Manage
+						<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+						</svg>
+					</Button>
 
-				{menuOpen && (
-					<div className="absolute top-full left-0 right-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl z-10 overflow-hidden">
-						<DropdownOption
-								icon="⚙️"
-								label="Configure"
-								description={isGitOpsManaged ? "Update values (GitOps warning)" : "Update Helm values"}
+					{menuOpen && (
+						<div className="absolute top-full left-0 right-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl z-10 overflow-hidden">
+							<DropdownOption
+									icon="⚙️"
+									label="Configure"
+									description={isGitOpsManaged ? "Update values (GitOps warning)" : "Update Helm values"}
+									onClick={() => {
+										setMenuOpen(false)
+										onConfigure()
+									}}
+									warning={isGitOpsManaged}
+								/>
+							{gitopsEnabled && !isGitOpsManaged && (
+								<DropdownOption
+									icon="🔄"
+									label="Migrate to GitOps"
+									description="Hand off management to Flux/ArgoCD"
+									onClick={() => {
+										setMenuOpen(false)
+										onMigrateToGitOps()
+									}}
+								/>
+							)}
+							<DropdownOption
+								icon="🗑️"
+								label="Uninstall"
+								description={isGitOpsManaged ? "Remove addon (GitOps warning)" : "Remove this addon"}
 								onClick={() => {
 									setMenuOpen(false)
-									onConfigure()
+									onUninstall()
 								}}
+								destructive
 								warning={isGitOpsManaged}
 							/>
-						{gitopsEnabled && !isGitOpsManaged && (
-							<DropdownOption
-								icon="🔄"
-								label="Migrate to GitOps"
-								description="Hand off management to Flux/ArgoCD"
-								onClick={() => {
-									setMenuOpen(false)
-									onMigrateToGitOps()
-								}}
-							/>
-						)}
-						<DropdownOption
-							icon="🗑️"
-							label="Uninstall"
-							description={isGitOpsManaged ? "Remove addon (GitOps warning)" : "Remove this addon"}
-							onClick={() => {
-								setMenuOpen(false)
-								onUninstall()
-							}}
-							destructive
-							warning={isGitOpsManaged}
-						/>
-					</div>
-				)}
-			</div>
+						</div>
+					)}
+				</div>
+			)}
 		</Card>
 	)
 }
@@ -901,6 +909,7 @@ interface AvailableAddonCardProps {
 	catalog: AddonDefinition
 	installing: boolean
 	gitopsEnabled: boolean
+	canMutate: boolean
 	onQuickInstall: () => void
 	onConfigureInstall: () => void
 	onGitOpsExport: () => void
@@ -909,6 +918,7 @@ interface AvailableAddonCardProps {
 function AvailableAddonCard({
 	catalog,
 	installing,
+	canMutate,
 	onQuickInstall,
 	onConfigureInstall,
 	onGitOpsExport,
@@ -982,69 +992,71 @@ function AvailableAddonCard({
 			)}
 
 			{/* Install Button */}
-			<div className="relative" ref={dropdownRef}>
-				<div className="flex">
-					<Button
-						variant="primary"
-						size="sm"
-						className="flex-1 rounded-r-none"
-						onClick={onQuickInstall}
-						disabled={installing}
-					>
-						{installing ? (
-							<>
-								<Spinner size="sm" className="mr-2" />
-								Installing...
-							</>
-						) : (
-							'Install'
-						)}
-					</Button>
-					<Button
-						variant="primary"
-						size="sm"
-						className="rounded-l-none border-l border-green-600 px-2"
-						onClick={() => setDropdownOpen(!dropdownOpen)}
-						disabled={installing}
-					>
-						<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-						</svg>
-					</Button>
-				</div>
-
-				{dropdownOpen && (
-					<div className="absolute top-full left-0 right-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl z-10 overflow-hidden">
-						<DropdownOption
-							icon="⚡"
-							label="Quick Install"
-							description="Install with default settings"
-							onClick={() => {
-								setDropdownOpen(false)
-								onQuickInstall()
-							}}
-						/>
-						<DropdownOption
-							icon="⚙️"
-							label="Configure & Install"
-							description="Customize Helm values before installing"
-							onClick={() => {
-								setDropdownOpen(false)
-								onConfigureInstall()
-							}}
-						/>
-						<DropdownOption
-							icon="📦"
-							label="Export to GitOps"
-							description="Generate manifests for Flux/ArgoCD"
-							onClick={() => {
-								setDropdownOpen(false)
-								onGitOpsExport()
-							}}
-						/>
+			{canMutate && (
+				<div className="relative" ref={dropdownRef}>
+					<div className="flex">
+						<Button
+							variant="primary"
+							size="sm"
+							className="flex-1 rounded-r-none"
+							onClick={onQuickInstall}
+							disabled={installing}
+						>
+							{installing ? (
+								<>
+									<Spinner size="sm" className="mr-2" />
+									Installing...
+								</>
+							) : (
+								'Install'
+							)}
+						</Button>
+						<Button
+							variant="primary"
+							size="sm"
+							className="rounded-l-none border-l border-green-600 px-2"
+							onClick={() => setDropdownOpen(!dropdownOpen)}
+							disabled={installing}
+						>
+							<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+							</svg>
+						</Button>
 					</div>
-				)}
-			</div>
+
+					{dropdownOpen && (
+						<div className="absolute top-full left-0 right-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl z-10 overflow-hidden">
+							<DropdownOption
+								icon="⚡"
+								label="Quick Install"
+								description="Install with default settings"
+								onClick={() => {
+									setDropdownOpen(false)
+									onQuickInstall()
+								}}
+							/>
+							<DropdownOption
+								icon="⚙️"
+								label="Configure & Install"
+								description="Customize Helm values before installing"
+								onClick={() => {
+									setDropdownOpen(false)
+									onConfigureInstall()
+								}}
+							/>
+							<DropdownOption
+								icon="📦"
+								label="Export to GitOps"
+								description="Generate manifests for Flux/ArgoCD"
+								onClick={() => {
+									setDropdownOpen(false)
+									onGitOpsExport()
+								}}
+							/>
+						</div>
+					)}
+				</div>
+			)}
 		</Card>
 	)
 }

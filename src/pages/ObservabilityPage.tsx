@@ -355,15 +355,17 @@ export function ObservabilityPage() {
 												</option>
 											))}
 										</select>
-										<div className="flex items-center gap-2 mt-2">
-											<span className="text-xs text-neutral-500">or</span>
-											<Link
-												to="/clusters/create?returnTo=/admin/observability"
-												className="text-xs text-green-400 hover:text-green-300"
-											>
-												Create a new cluster
-											</Link>
-										</div>
+										{canMutate && (
+											<div className="flex items-center gap-2 mt-2">
+												<span className="text-xs text-neutral-500">or</span>
+												<Link
+													to="/clusters/create?returnTo=/admin/observability"
+													className="text-xs text-green-400 hover:text-green-300"
+												>
+													Create a new cluster
+												</Link>
+											</div>
+										)}
 										{selectedCluster && selectedClusterPhase && selectedClusterPhase !== 'Ready' && (
 											<div className="flex items-center gap-2 mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
 												<Spinner size="sm" />

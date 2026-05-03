@@ -5,6 +5,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { Card, Button, Spinner, SearchableSelect } from '@/components/ui'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal'
 import { useToast } from '@/hooks/useToast'
+import { useTeamContext } from '@/hooks/useTeamContext'
 import {
 	addonsApi,
 	type AddonDefinition,
@@ -34,6 +35,7 @@ interface ManagementAddonsTabProps {
 // Main Component
 
 export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabProps) {
+	const { canMutate } = useTeamContext()
 	const { success, error: showError } = useToast()
 	const [searchQuery, setSearchQuery] = useState('')
 	const [selectedCategory, setSelectedCategory] = useState<string>('all')
@@ -334,6 +336,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 								addon={addon}
 								catalogInfo={catalogInfo}
 								gitopsEnabled={gitopsEnabled}
+								canMutate={canMutate}
 								onConfigure={() => catalogInfo && setConfigureAddon(catalogInfo)}
 								onUninstall={() => handleUninstall(addon)}
 								onMigrateToGitOps={() => setMigrateToGitOps(addon)}
@@ -421,6 +424,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 												catalog={catalogItem}
 												installing={installingAddon === catalogItem.name}
 												gitopsEnabled={gitopsEnabled}
+												canMutate={canMutate}
 												onQuickInstall={() => handleQuickInstall(catalogItem)}
 												onConfigureInstall={() => setConfigureAddon(catalogItem)}
 												onGitOpsExport={() => setGitopsExportAddon(catalogItem)}
@@ -484,6 +488,7 @@ interface InstalledAddonCardProps {
 	addon: ManagementAddon
 	catalogInfo?: AddonDefinition
 	gitopsEnabled: boolean
+	canMutate: boolean
 	onConfigure: () => void
 	onUninstall: () => void
 	onMigrateToGitOps: () => void
@@ -493,6 +498,7 @@ function InstalledAddonCard({
 	addon,
 	catalogInfo,
 	gitopsEnabled,
+	canMutate,
 	onConfigure,
 	onUninstall,
 	onMigrateToGitOps,
@@ -532,64 +538,66 @@ function InstalledAddonCard({
 				<p className="text-sm text-neutral-400 mb-4 line-clamp-2">{catalogInfo.description}</p>
 			)}
 
-			<div className="relative" ref={menuRef}>
-				<Button
-					variant="secondary"
-					size="sm"
-					className="w-full justify-between"
-					onClick={() => setMenuOpen(!menuOpen)}
-				>
-					Manage
-					<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-					</svg>
-				</Button>
+			{canMutate && (
+				<div className="relative" ref={menuRef}>
+					<Button
+						variant="secondary"
+						size="sm"
+						className="w-full justify-between"
+						onClick={() => setMenuOpen(!menuOpen)}
+					>
+						Manage
+						<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+						</svg>
+					</Button>
 
-				{menuOpen && (
-					<div className="absolute top-full left-0 right-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl z-10 overflow-hidden">
-						{catalogInfo && (
+					{menuOpen && (
+						<div className="absolute top-full left-0 right-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl z-10 overflow-hidden">
+							{catalogInfo && (
+								<button
+									onClick={() => { setMenuOpen(false); onConfigure() }}
+									className="w-full px-4 py-2 text-left hover:bg-neutral-700/50 transition-colors"
+								>
+									<div className="flex items-center gap-3">
+										<span className="text-lg">⚙️</span>
+										<div>
+											<p className="text-sm font-medium text-neutral-200">Configure</p>
+											<p className="text-xs text-neutral-500">Update Helm values</p>
+										</div>
+									</div>
+								</button>
+							)}
+							{gitopsEnabled && (
+								<button
+									onClick={() => { setMenuOpen(false); onMigrateToGitOps() }}
+									className="w-full px-4 py-2 text-left hover:bg-neutral-700/50 transition-colors"
+								>
+									<div className="flex items-center gap-3">
+										<span className="text-lg">🔄</span>
+										<div>
+											<p className="text-sm font-medium text-neutral-200">Migrate to GitOps</p>
+											<p className="text-xs text-neutral-500">Hand off management to Flux/ArgoCD</p>
+										</div>
+									</div>
+								</button>
+							)}
 							<button
-								onClick={() => { setMenuOpen(false); onConfigure() }}
-								className="w-full px-4 py-2 text-left hover:bg-neutral-700/50 transition-colors"
+								onClick={() => { setMenuOpen(false); onUninstall() }}
+								className="w-full px-4 py-2 text-left hover:bg-red-500/10 transition-colors"
 							>
 								<div className="flex items-center gap-3">
-									<span className="text-lg">⚙️</span>
+									<span className="text-lg">🗑️</span>
 									<div>
-										<p className="text-sm font-medium text-neutral-200">Configure</p>
-										<p className="text-xs text-neutral-500">Update Helm values</p>
+										<p className="text-sm font-medium text-red-400">Uninstall</p>
+										<p className="text-xs text-neutral-500">Remove this addon</p>
 									</div>
 								</div>
 							</button>
-						)}
-						{gitopsEnabled && (
-							<button
-								onClick={() => { setMenuOpen(false); onMigrateToGitOps() }}
-								className="w-full px-4 py-2 text-left hover:bg-neutral-700/50 transition-colors"
-							>
-								<div className="flex items-center gap-3">
-									<span className="text-lg">🔄</span>
-									<div>
-										<p className="text-sm font-medium text-neutral-200">Migrate to GitOps</p>
-										<p className="text-xs text-neutral-500">Hand off management to Flux/ArgoCD</p>
-									</div>
-								</div>
-							</button>
-						)}
-						<button
-							onClick={() => { setMenuOpen(false); onUninstall() }}
-							className="w-full px-4 py-2 text-left hover:bg-red-500/10 transition-colors"
-						>
-							<div className="flex items-center gap-3">
-								<span className="text-lg">🗑️</span>
-								<div>
-									<p className="text-sm font-medium text-red-400">Uninstall</p>
-									<p className="text-xs text-neutral-500">Remove this addon</p>
-								</div>
-							</div>
-						</button>
-					</div>
-				)}
-			</div>
+						</div>
+					)}
+				</div>
+			)}
 		</Card>
 	)
 }
@@ -600,6 +608,7 @@ interface AvailableAddonCardProps {
 	catalog: AddonDefinition
 	installing: boolean
 	gitopsEnabled: boolean
+	canMutate: boolean
 	onQuickInstall: () => void
 	onConfigureInstall: () => void
 	onGitOpsExport: () => void
@@ -609,6 +618,7 @@ function AvailableAddonCard({
 	catalog,
 	installing,
 	gitopsEnabled: _gitopsEnabled,
+	canMutate,
 	onQuickInstall,
 	onConfigureInstall,
 	onGitOpsExport,
@@ -671,71 +681,73 @@ function AvailableAddonCard({
 				</div>
 			)}
 
-			<div className="relative" ref={dropdownRef}>
-				<div className="flex">
-					<Button
-						variant="primary"
-						size="sm"
-						className="flex-1 rounded-r-none"
-						onClick={onQuickInstall}
-						disabled={installing}
-					>
-						{installing ? <><Spinner size="sm" className="mr-2" />Installing...</> : 'Install'}
-					</Button>
-					<Button
-						variant="primary"
-						size="sm"
-						className="rounded-l-none border-l border-green-600 px-2"
-						onClick={() => setDropdownOpen(!dropdownOpen)}
-						disabled={installing}
-					>
-						<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-						</svg>
-					</Button>
-				</div>
-
-				{dropdownOpen && (
-					<div className="absolute top-full left-0 right-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl z-10 overflow-hidden">
-						<button
-							onClick={() => { setDropdownOpen(false); onQuickInstall() }}
-							className="w-full px-4 py-2 text-left hover:bg-neutral-700/50 transition-colors"
+			{canMutate && (
+				<div className="relative" ref={dropdownRef}>
+					<div className="flex">
+						<Button
+							variant="primary"
+							size="sm"
+							className="flex-1 rounded-r-none"
+							onClick={onQuickInstall}
+							disabled={installing}
 						>
-							<div className="flex items-center gap-3">
-								<span className="text-lg">⚡</span>
-								<div>
-									<p className="text-sm font-medium text-neutral-200">Quick Install</p>
-									<p className="text-xs text-neutral-500">Install with default settings</p>
-								</div>
-							</div>
-						</button>
-						<button
-							onClick={() => { setDropdownOpen(false); onConfigureInstall() }}
-							className="w-full px-4 py-2 text-left hover:bg-neutral-700/50 transition-colors"
+							{installing ? <><Spinner size="sm" className="mr-2" />Installing...</> : 'Install'}
+						</Button>
+						<Button
+							variant="primary"
+							size="sm"
+							className="rounded-l-none border-l border-green-600 px-2"
+							onClick={() => setDropdownOpen(!dropdownOpen)}
+							disabled={installing}
 						>
-							<div className="flex items-center gap-3">
-								<span className="text-lg">⚙️</span>
-								<div>
-									<p className="text-sm font-medium text-neutral-200">Configure & Install</p>
-									<p className="text-xs text-neutral-500">Customize Helm values before installing</p>
-								</div>
-							</div>
-						</button>
-						<button
-							onClick={() => { setDropdownOpen(false); onGitOpsExport() }}
-							className="w-full px-4 py-2 text-left hover:bg-neutral-700/50 transition-colors"
-						>
-							<div className="flex items-center gap-3">
-								<span className="text-lg">📦</span>
-								<div>
-									<p className="text-sm font-medium text-neutral-200">Export to GitOps</p>
-									<p className="text-xs text-neutral-500">Generate manifests for Flux/ArgoCD</p>
-								</div>
-							</div>
-						</button>
+							<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+							</svg>
+						</Button>
 					</div>
-				)}
-			</div>
+
+					{dropdownOpen && (
+						<div className="absolute top-full left-0 right-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl z-10 overflow-hidden">
+							<button
+								onClick={() => { setDropdownOpen(false); onQuickInstall() }}
+								className="w-full px-4 py-2 text-left hover:bg-neutral-700/50 transition-colors"
+							>
+								<div className="flex items-center gap-3">
+									<span className="text-lg">⚡</span>
+									<div>
+										<p className="text-sm font-medium text-neutral-200">Quick Install</p>
+										<p className="text-xs text-neutral-500">Install with default settings</p>
+									</div>
+								</div>
+							</button>
+							<button
+								onClick={() => { setDropdownOpen(false); onConfigureInstall() }}
+								className="w-full px-4 py-2 text-left hover:bg-neutral-700/50 transition-colors"
+							>
+								<div className="flex items-center gap-3">
+									<span className="text-lg">⚙️</span>
+									<div>
+										<p className="text-sm font-medium text-neutral-200">Configure & Install</p>
+										<p className="text-xs text-neutral-500">Customize Helm values before installing</p>
+									</div>
+								</div>
+							</button>
+							<button
+								onClick={() => { setDropdownOpen(false); onGitOpsExport() }}
+								className="w-full px-4 py-2 text-left hover:bg-neutral-700/50 transition-colors"
+							>
+								<div className="flex items-center gap-3">
+									<span className="text-lg">📦</span>
+									<div>
+										<p className="text-sm font-medium text-neutral-200">Export to GitOps</p>
+										<p className="text-xs text-neutral-500">Generate manifests for Flux/ArgoCD</p>
+									</div>
+								</div>
+							</button>
+						</div>
+					)}
+				</div>
+			)}
 		</Card>
 	)
 }

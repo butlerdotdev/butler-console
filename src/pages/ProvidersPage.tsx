@@ -369,9 +369,11 @@ function ProviderCard({ provider, onValidate, onDelete, onClick, isValidating, v
 						</div>
 					)}
 					<div className="flex items-center gap-2">
-						<Button variant="secondary" onClick={onValidate} disabled={isValidating}>
-							{isValidating ? 'Testing...' : 'Test'}
-						</Button>
+						{canMutate && (
+							<Button variant="secondary" onClick={onValidate} disabled={isValidating}>
+								{isValidating ? 'Testing...' : 'Test'}
+							</Button>
+						)}
 						{canMutate && (
 							<button
 								onClick={onDelete}

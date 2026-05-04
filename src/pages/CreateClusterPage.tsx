@@ -123,6 +123,7 @@ export function CreateClusterPage() {
 	const [error, setError] = useState<string | null>(null)
 	const [envFieldError, setEnvFieldError] = useState<string | null>(null)
 	const [useManualIPs, setUseManualIPs] = useState(false)
+	const [enableIngress, setEnableIngress] = useState(true)
 	const [showAdvancedCP, setShowAdvancedCP] = useState(false)
 
 	// Environment selector state. Required when the team defines any env;
@@ -742,6 +743,10 @@ export function CreateClusterPage() {
 				payload.timeServers = form.timeServers.split(',').map((s: string) => s.trim()).filter(Boolean)
 			}
 
+			if (!enableIngress) {
+				payload.ingressEnabled = false
+			}
+
 			// Ensure the X-Butler-Environment header carries the form's env
 			// choice on this request even if the URL does not. Restore the
 			// context-driven env after the call so the switcher stays the
@@ -1190,6 +1195,22 @@ export function CreateClusterPage() {
 									</div>
 								</div>
 							)}
+						</div>
+
+						{/* Ingress Controller */}
+						<div className="mt-4">
+							<label className="flex items-center gap-2 cursor-pointer">
+								<input
+									type="checkbox"
+									checked={enableIngress}
+									onChange={(e) => setEnableIngress(e.target.checked)}
+									className="w-4 h-4 rounded border-neutral-700 bg-neutral-800 text-green-500 focus:ring-green-500"
+								/>
+								<span className="text-sm text-neutral-300">Install Traefik ingress controller</span>
+							</label>
+							<p className="text-xs text-neutral-500 mt-1 ml-6">
+								Provides IngressRoute support for tenant workloads. Disabling saves 1 LB IP.
+							</p>
 						</div>
 
 						{/* Advanced Options */}

@@ -141,6 +141,10 @@ export interface CreateClusterRequest {
 
 	timeServers?: string[]
 
+	// Ingress controller toggle. Omit for CRD default (enabled).
+	// Send false to disable Traefik installation.
+	ingressEnabled?: boolean
+
 	// Control plane resource overrides (optional)
 	controlPlaneResources?: {
 		apiServer?: {

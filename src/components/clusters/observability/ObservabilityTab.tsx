@@ -57,19 +57,16 @@ export function ObservabilityTab({ clusterNamespace, clusterName, addons, onRefr
     }
   }
 
-  const vectorAgent = addons.find(a => {
-    const n = a.name.toLowerCase()
-    return n === 'vector-agent' || n.startsWith('vector-agent-')
-  })
-  const prometheus = addons.find(a => {
-    const n = a.name.toLowerCase()
-    return n === 'prometheus-operator' || n.startsWith('prometheus-operator-') ||
-      n === 'kube-prometheus-stack' || n.startsWith('kube-prometheus-stack-')
-  })
-  const otelCollector = addons.find(a => {
-    const n = a.name.toLowerCase()
-    return n === 'otel-collector' || n.startsWith('otel-collector-')
-  })
+  const vectorAgent = addons.find(a =>
+    a.addon === 'vector-agent' || a.name === 'vector-agent'
+  )
+  const prometheus = addons.find(a =>
+    a.addon === 'prometheus-operator' || a.addon === 'kube-prometheus-stack' ||
+    a.name === 'prometheus-operator' || a.name === 'kube-prometheus-stack'
+  )
+  const otelCollector = addons.find(a =>
+    a.addon === 'otel-collector' || a.name === 'otel-collector'
+  )
 
   const handleInstallLogCollection = async (values: Record<string, unknown>) => {
     try {

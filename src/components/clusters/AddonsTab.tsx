@@ -215,13 +215,13 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 
 	// Get installed addon names for filtering
 	const installedAddonNames = useMemo(() => {
-		return new Set(installedOptionalAddons.map(a => a.name.toLowerCase()))
+		return new Set(installedOptionalAddons.map(a => (a.addon || a.name).toLowerCase()))
 	}, [installedOptionalAddons])
 
 	// Get catalog info for installed optional addons
 	const installedOptionalWithCatalog = useMemo(() => {
 		return installedOptionalAddons.map(addon => {
-			const catalogInfo = optionalCatalog.find(c => c.name.toLowerCase() === addon.name.toLowerCase())
+			const catalogInfo = optionalCatalog.find(c => c.name.toLowerCase() === (addon.addon || addon.name).toLowerCase())
 			return { addon, catalogInfo }
 		})
 	}, [installedOptionalAddons, optionalCatalog])

@@ -49,6 +49,7 @@ export interface CategoryInfo {
 
 export interface InstalledAddon {
 	name: string
+	addon?: string
 	displayName?: string
 	status: AddonStatus
 	phase?: string

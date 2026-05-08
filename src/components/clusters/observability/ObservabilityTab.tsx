@@ -18,6 +18,7 @@ import type { ObservabilityConfig } from '@/types/observability'
 
 interface SimpleAddon {
   name: string
+  addon?: string
   status: string
   version?: string
 }

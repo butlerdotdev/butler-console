@@ -41,6 +41,7 @@ interface ValuesSchema {
 
 interface SimpleAddon {
 	name: string
+	addon?: string
 	status: string
 	version?: string
 	displayName?: string

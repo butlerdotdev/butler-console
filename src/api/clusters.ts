@@ -203,6 +203,7 @@ export interface Node {
 
 export interface Addon {
 	name: string
+	addon?: string
 	status: string
 	version?: string
 }

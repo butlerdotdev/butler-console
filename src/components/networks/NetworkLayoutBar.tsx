@@ -4,6 +4,7 @@
 import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ipToInt, intToIp, parseCIDR, rangesOverlap } from '@/lib/ip-math'
+import { getEffectiveRanges } from '@/lib/network-pool'
 import type { NetworkPool } from '@/types/networks'
 
 // ---------------------------------------------------------------------------
@@ -92,14 +93,12 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segm
 		}
 	}
 
-	// Tenant allocation range
-	const ta = pool.spec.tenantAllocation
-	let tenantStart = 0
-	let tenantEnd = 0
-	if (ta?.start && ta?.end) {
-		tenantStart = ipToInt(ta.start)
-		tenantEnd = ipToInt(ta.end)
-	}
+	// Tenant allocation ranges
+	const effectiveRanges = getEffectiveRanges(pool.spec.tenantAllocation)
+	const tenantRanges = effectiveRanges.map(r => ({
+		start: ipToInt(r.start),
+		end: ipToInt(r.end),
+	}))
 
 	// Flatten into a sorted list of segments covering the full pool.
 	// Walk through every IP (conceptually) and assign it to the highest-
@@ -121,9 +120,9 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segm
 		boundaries.add(r.start)
 		boundaries.add((r.end + 1) >>> 0)
 	}
-	if (tenantStart && tenantEnd) {
-		boundaries.add(tenantStart)
-		boundaries.add((tenantEnd + 1) >>> 0)
+	for (const range of tenantRanges) {
+		boundaries.add(range.start)
+		boundaries.add((range.end + 1) >>> 0)
 	}
 
 	const sorted = Array.from(boundaries).sort((a, b) => a - b)
@@ -166,13 +165,12 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segm
 		}
 
 		// Check tenant (lower priority than reserved)
-		if (kind === 'unassigned' && tenantStart && tenantEnd) {
-			if (rangesOverlap(clampedStart, clampedEnd, tenantStart, tenantEnd)) {
-				// Split tenant into allocated and available based on allocatedIPs count.
-				// We show the tenant range as one "tenant-available" segment for now
-				// since we don't know the exact allocated sub-ranges at this level.
-				// The detail view (IPAddressMap) shows per-IP allocation status.
-				kind = 'tenant-available'
+		if (kind === 'unassigned') {
+			for (const range of tenantRanges) {
+				if (rangesOverlap(clampedStart, clampedEnd, range.start, range.end)) {
+					kind = 'tenant-available'
+					break
+				}
 			}
 		}
 

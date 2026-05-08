@@ -7,6 +7,11 @@ import type { ObjectMeta, Condition } from './index'
 // NetworkPool CRD
 // ----------------------------------------------------------------------------
 
+export interface AllocationRange {
+	start: string
+	end: string
+}
+
 export interface NetworkPoolSpec {
 	cidr: string
 	reserved?: Array<{
@@ -16,6 +21,7 @@ export interface NetworkPoolSpec {
 	tenantAllocation?: {
 		start?: string
 		end?: string
+		ranges?: AllocationRange[]
 		defaults?: {
 			nodesPerTenant?: number
 			lbPoolPerTenant?: number
@@ -104,6 +110,7 @@ export interface CreateNetworkPoolRequest {
 	tenantAllocation?: {
 		start?: string
 		end?: string
+		ranges?: AllocationRange[]
 		defaults?: {
 			nodesPerTenant?: number
 			lbPoolPerTenant?: number
@@ -119,6 +126,7 @@ export interface UpdateNetworkPoolRequest {
 	tenantAllocation?: {
 		start?: string
 		end?: string
+		ranges?: AllocationRange[]
 		defaults?: {
 			nodesPerTenant?: number
 			lbPoolPerTenant?: number

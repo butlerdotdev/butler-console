@@ -14,6 +14,7 @@ import { NetworkLayoutBar, computePoolLayout } from '@/components/networks/Netwo
 import { EditNetworkPoolModal } from '@/components/networks/EditNetworkPoolModal'
 import { useToast } from '@/hooks/useToast'
 import { cidrSize } from '@/lib/ip-math'
+import { getEffectiveRanges } from '@/lib/network-pool'
 import type { NetworkPool, IPAllocation } from '@/types/networks'
 
 export function NetworkPoolDetailPage() {
@@ -102,10 +103,10 @@ export function NetworkPoolDetailPage() {
 		}
 	}, [pool])
 
-	const tenantRangeLabel = useMemo(() => {
-		const ta = pool?.spec.tenantAllocation
-		if (ta?.start && ta?.end) return `${ta.start} - ${ta.end}`
-		return null
+	const tenantRangeLabels = useMemo(() => {
+		if (!pool) return []
+		const ranges = getEffectiveRanges(pool.spec.tenantAllocation)
+		return ranges.map(r => `${r.start} - ${r.end}`)
 	}, [pool])
 
 	if (loading) {
@@ -188,10 +189,14 @@ export function NetworkPoolDetailPage() {
 				{/* Tenant Allocation Stats */}
 				<div>
 					<h3 className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-1">
-						Tenant Allocation
+						Tenant Allocation{tenantRangeLabels.length > 1 ? ` (${tenantRangeLabels.length} ranges)` : ''}
 					</h3>
-					{tenantRangeLabel && (
-						<p className="text-xs text-neutral-600 font-mono mb-3">{tenantRangeLabel}</p>
+					{tenantRangeLabels.length > 0 && (
+						<div className="text-xs text-neutral-600 font-mono mb-3 space-y-0.5">
+							{tenantRangeLabels.map((label, i) => (
+								<p key={i}>{label}</p>
+							))}
+						</div>
 					)}
 					<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 						<StatCard label="Allocated" value={allocatedIPs.toLocaleString()} />
@@ -370,17 +375,32 @@ export function NetworkPoolDetailPage() {
 							<p className="text-sm text-neutral-500">No tenant allocation configuration</p>
 						) : (
 							<dl className="space-y-3">
-								{pool.spec.tenantAllocation.start && (
-									<div className="flex justify-between">
-										<dt className="text-neutral-400">Start</dt>
-										<dd className="text-neutral-50 font-mono">{pool.spec.tenantAllocation.start}</dd>
+								{pool.spec.tenantAllocation.ranges && pool.spec.tenantAllocation.ranges.length > 0 ? (
+									<div>
+										<dt className="text-neutral-400 mb-1">Ranges</dt>
+										<dd className="space-y-1">
+											{pool.spec.tenantAllocation.ranges.map((r, i) => (
+												<div key={i} className="text-neutral-50 font-mono text-sm">
+													{r.start} - {r.end}
+												</div>
+											))}
+										</dd>
 									</div>
-								)}
-								{pool.spec.tenantAllocation.end && (
-									<div className="flex justify-between">
-										<dt className="text-neutral-400">End</dt>
-										<dd className="text-neutral-50 font-mono">{pool.spec.tenantAllocation.end}</dd>
-									</div>
+								) : (
+									<>
+										{pool.spec.tenantAllocation.start && (
+											<div className="flex justify-between">
+												<dt className="text-neutral-400">Start</dt>
+												<dd className="text-neutral-50 font-mono">{pool.spec.tenantAllocation.start}</dd>
+											</div>
+										)}
+										{pool.spec.tenantAllocation.end && (
+											<div className="flex justify-between">
+												<dt className="text-neutral-400">End</dt>
+												<dd className="text-neutral-50 font-mono">{pool.spec.tenantAllocation.end}</dd>
+											</div>
+										)}
+									</>
 								)}
 								{pool.spec.tenantAllocation.defaults?.nodesPerTenant && (
 									<div className="flex justify-between">

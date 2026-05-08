@@ -6,6 +6,7 @@
 // throws on first mismatch.
 
 import { computePoolLayout } from './NetworkLayoutBar'
+import { ipToInt } from '@/lib/ip-math'
 import type { NetworkPool } from '@/types/networks'
 
 // ---------------------------------------------------------------------------
@@ -15,7 +16,12 @@ import type { NetworkPool } from '@/types/networks'
 function makePool(overrides: {
 	cidr: string
 	reserved?: Array<{ cidr: string; description?: string }>
-	tenantAllocation?: { start: string; end: string }
+	tenantAllocation?: {
+		start?: string
+		end?: string
+		ranges?: Array<{ start: string; end: string }>
+		defaults?: { nodesPerTenant?: number; lbPoolPerTenant?: number }
+	}
 }): NetworkPool {
 	return {
 		metadata: { name: 'test-pool', namespace: 'default' },
@@ -54,7 +60,7 @@ interface LayoutCase {
 const layoutCases: LayoutCase[] = [
 	{
 		name: '/24, no reservations, no tenant range',
-		pool: makePool({ cidr: '192.168.1.0/24' }),
+		pool: makePool({ cidr: '10.1.1.0/24' }),
 		allocatedIPs: 0,
 		expectKinds: {
 			gateway: 1,
@@ -65,8 +71,8 @@ const layoutCases: LayoutCase[] = [
 	{
 		name: '/24 with tenant range, zero allocations',
 		pool: makePool({
-			cidr: '192.168.1.0/24',
-			tenantAllocation: { start: '192.168.1.32', end: '192.168.1.63' },
+			cidr: '10.1.1.0/24',
+			tenantAllocation: { start: '10.1.1.32', end: '10.1.1.63' },
 		}),
 		allocatedIPs: 0,
 		expectKinds: {
@@ -78,8 +84,8 @@ const layoutCases: LayoutCase[] = [
 	{
 		name: '/24 with tenant range, partial allocations',
 		pool: makePool({
-			cidr: '192.168.1.0/24',
-			tenantAllocation: { start: '192.168.1.32', end: '192.168.1.63' },
+			cidr: '10.1.1.0/24',
+			tenantAllocation: { start: '10.1.1.32', end: '10.1.1.63' },
 		}),
 		allocatedIPs: 10,
 		expectKinds: {
@@ -92,8 +98,8 @@ const layoutCases: LayoutCase[] = [
 	{
 		name: '/24 with tenant range, fully allocated',
 		pool: makePool({
-			cidr: '192.168.1.0/24',
-			tenantAllocation: { start: '192.168.1.32', end: '192.168.1.63' },
+			cidr: '10.1.1.0/24',
+			tenantAllocation: { start: '10.1.1.32', end: '10.1.1.63' },
 		}),
 		allocatedIPs: 32,
 		expectKinds: {
@@ -162,6 +168,91 @@ const layoutCases: LayoutCase[] = [
 		},
 		expectTotalSize: 256,
 	},
+	{
+		name: 'single-range pool using ranges field (same result as start/end)',
+		pool: makePool({
+			cidr: '10.1.1.0/24',
+			tenantAllocation: {
+				ranges: [{ start: '10.1.1.32', end: '10.1.1.63' }],
+			},
+		}),
+		allocatedIPs: 10,
+		expectKinds: {
+			gateway: 1,
+			'tenant-allocated': 10,
+			'tenant-available': 22,
+		},
+		expectTotalSize: 256,
+	},
+	{
+		name: 'two-range pool (migrated crop cluster case)',
+		pool: makePool({
+			cidr: '10.92.90.0/23',
+			reserved: [
+				{ cidr: '10.92.90.7/32', description: 'mgmt' },
+				{ cidr: '10.92.90.8/29', description: 'mgmt' },
+				{ cidr: '10.92.90.16/28', description: 'mgmt' },
+				{ cidr: '10.92.91.192/26', description: 'mgmt-extension' },
+			],
+			tenantAllocation: {
+				ranges: [
+					{ start: '10.92.90.32', end: '10.92.90.63' },
+					{ start: '10.92.91.51', end: '10.92.91.191' },
+				],
+			},
+		}),
+		allocatedIPs: 28,
+		expectKinds: {
+			gateway: 1,
+			// Reserved: .7 (1) + .8-.15 (8) + .16-.31 (16) + .91.192-.91.255 (64) = 89
+			reserved: 89,
+			'tenant-allocated': 28,
+			// Tenant available: 32 + 141 - 28 = 145
+			'tenant-available': 145,
+			// Unassigned: 512 - 1 - 89 - 173 = 249
+			// .1-.6 (6) + .64-.255 (192) + .91.0-.91.50 (51) = 249
+			unassigned: 249,
+		},
+		expectTotalSize: 512,
+	},
+	{
+		name: 'three-range pool',
+		pool: makePool({
+			cidr: '10.0.0.0/24',
+			tenantAllocation: {
+				ranges: [
+					{ start: '10.0.0.10', end: '10.0.0.19' },
+					{ start: '10.0.0.30', end: '10.0.0.39' },
+					{ start: '10.0.0.50', end: '10.0.0.59' },
+				],
+			},
+		}),
+		allocatedIPs: 5,
+		expectKinds: {
+			gateway: 1,
+			'tenant-allocated': 5,
+			'tenant-available': 25,
+		},
+		expectTotalSize: 256,
+	},
+	{
+		name: 'ranges takes precedence over start/end',
+		pool: makePool({
+			cidr: '10.1.1.0/24',
+			tenantAllocation: {
+				start: '10.1.1.1',
+				end: '10.1.1.254',
+				ranges: [{ start: '10.1.1.32', end: '10.1.1.63' }],
+			},
+		}),
+		allocatedIPs: 0,
+		expectKinds: {
+			gateway: 1,
+			'tenant-available': 32,
+			// Ranges wins: only 32 IPs are tenant, not 254
+		},
+		expectTotalSize: 256,
+	},
 ]
 
 // ---------------------------------------------------------------------------
@@ -197,10 +288,7 @@ export function validateLayoutCases(): void {
 		for (let i = 1; i < segments.length; i++) {
 			const prev = segments[i - 1]
 			const curr = segments[i]
-			// endIP of previous should be one less than startIP of current
-			// (we can't easily check numerically without ip-math, but we can
-			// verify ordering via the string comparison of start IPs)
-			if (prev.startIP > curr.startIP) {
+			if (ipToInt(prev.startIP) > ipToInt(curr.startIP)) {
 				throw new Error(
 					`[${c.name}] segments not sorted: ${prev.startIP} > ${curr.startIP}`
 				)

@@ -73,9 +73,9 @@ const STATUS_STYLES: Record<BlockStatus, { bg: string; border: string; text: str
 		text: 'text-emerald-400',
 	},
 	reserved: {
-		bg: 'bg-teal-700/40',
-		border: 'border-teal-600/30',
-		text: 'text-teal-400',
+		bg: 'bg-zinc-500/40',
+		border: 'border-zinc-400/30',
+		text: 'text-zinc-400',
 	},
 	'reserved-infra': {
 		bg: 'bg-indigo-500/30',
@@ -808,7 +808,7 @@ export function IPAddressMap({ cidr, reserved = [], allocations, infrastructureA
 					)}
 					{pct(summary.reserved) > 0 && (
 						<div
-							className="h-full bg-teal-600/50 transition-all"
+							className="h-full bg-zinc-500/60 transition-all"
 							style={{ width: `${pct(summary.reserved)}%` }}
 							title={`Reserved: ${summary.reserved + summary.infra} (${summary.reserved} unused)`}
 						/>

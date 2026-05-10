@@ -34,7 +34,7 @@ interface NetworkLayoutBarProps {
 
 const SEGMENT_STYLES: Record<SegmentKind, { bg: string; text: string }> = {
 	gateway: { bg: 'bg-cyan-500/30', text: 'text-cyan-400' },
-	reserved: { bg: 'bg-teal-600/40', text: 'text-teal-400' },
+	reserved: { bg: 'bg-zinc-500/50', text: 'text-zinc-400' },
 	'reserved-infra': { bg: 'bg-indigo-500/50', text: 'text-indigo-400' },
 	'tenant-allocated': { bg: 'bg-amber-500/50', text: 'text-amber-400' },
 	'tenant-available': { bg: 'bg-emerald-500/50', text: 'text-emerald-400' },

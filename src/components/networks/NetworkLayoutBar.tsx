@@ -5,13 +5,13 @@ import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ipToInt, intToIp, parseCIDR, rangesOverlap } from '@/lib/ip-math'
 import { getEffectiveRanges } from '@/lib/network-pool'
-import type { NetworkPool } from '@/types/networks'
+import type { NetworkPool, InfrastructureAllocation } from '@/types/networks'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type SegmentKind = 'gateway' | 'reserved' | 'tenant-allocated' | 'tenant-available' | 'unassigned'
+type SegmentKind = 'gateway' | 'reserved' | 'reserved-infra' | 'tenant-allocated' | 'tenant-available' | 'unassigned'
 
 interface Segment {
 	kind: SegmentKind
@@ -25,6 +25,7 @@ interface Segment {
 interface NetworkLayoutBarProps {
 	pool: NetworkPool
 	allocatedIPs: number
+	infrastructureAllocations?: InfrastructureAllocation[]
 }
 
 // ---------------------------------------------------------------------------
@@ -34,6 +35,7 @@ interface NetworkLayoutBarProps {
 const SEGMENT_STYLES: Record<SegmentKind, { bg: string; text: string }> = {
 	gateway: { bg: 'bg-cyan-500/30', text: 'text-cyan-400' },
 	reserved: { bg: 'bg-neutral-600/60', text: 'text-neutral-400' },
+	'reserved-infra': { bg: 'bg-indigo-500/50', text: 'text-indigo-400' },
 	'tenant-allocated': { bg: 'bg-amber-500/50', text: 'text-amber-400' },
 	'tenant-available': { bg: 'bg-emerald-500/50', text: 'text-emerald-400' },
 	unassigned: { bg: 'bg-neutral-800/60', text: 'text-neutral-500' },
@@ -42,6 +44,7 @@ const SEGMENT_STYLES: Record<SegmentKind, { bg: string; text: string }> = {
 const SEGMENT_LABELS: Record<SegmentKind, string> = {
 	gateway: 'Gateway',
 	reserved: 'Reserved',
+	'reserved-infra': 'Infrastructure',
 	'tenant-allocated': 'Tenant (Allocated)',
 	'tenant-available': 'Tenant (Available)',
 	unassigned: 'Unassigned',
@@ -51,7 +54,7 @@ const SEGMENT_LABELS: Record<SegmentKind, string> = {
 // Layout computation
 // ---------------------------------------------------------------------------
 
-export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segment[] {
+export function computePoolLayout(pool: NetworkPool, allocatedIPs: number, infraAllocations: InfrastructureAllocation[] = []): Segment[] {
 	const poolRange = parseCIDR(pool.spec.cidr)
 	const poolStart = poolRange.start
 	const poolEnd = poolRange.end
@@ -90,6 +93,19 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segm
 					description: r.description,
 				})
 			}
+		}
+	}
+
+	// Infrastructure allocations (individual IPs, higher priority than generic reserved)
+	const parsedInfraIPs = infraAllocations.map(a => ipToInt(a.ip))
+	for (const ip of parsedInfraIPs) {
+		if (ip >= poolStart && ip <= poolEnd) {
+			regions.push({
+				start: ip,
+				end: ip,
+				kind: 'reserved-infra',
+				description: infraAllocations[parsedInfraIPs.indexOf(ip)]?.source,
+			})
 		}
 	}
 
@@ -153,7 +169,18 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segm
 			description = 'Network/gateway address'
 		}
 
-		// Check reserved (next priority, but gateway wins)
+		// Check infrastructure allocations (higher priority than generic reserved)
+		if (kind === 'unassigned') {
+			for (const r of regions) {
+				if (r.kind === 'reserved-infra' && rangesOverlap(clampedStart, clampedEnd, r.start, r.end)) {
+					kind = 'reserved-infra'
+					description = r.description
+					break
+				}
+			}
+		}
+
+		// Check reserved (next priority)
 		if (kind === 'unassigned') {
 			for (const r of regions) {
 				if (r.kind === 'reserved' && rangesOverlap(clampedStart, clampedEnd, r.start, r.end)) {
@@ -264,14 +291,14 @@ function SegmentTooltip({ segment, totalIPs, x, y }: {
 // Component
 // ---------------------------------------------------------------------------
 
-export function NetworkLayoutBar({ pool, allocatedIPs }: NetworkLayoutBarProps) {
+export function NetworkLayoutBar({ pool, allocatedIPs, infrastructureAllocations = [] }: NetworkLayoutBarProps) {
 	const [tooltip, setTooltip] = useState<{ segment: Segment; x: number; y: number } | null>(null)
 
 	const poolSize = useMemo(() => parseCIDR(pool.spec.cidr).size, [pool.spec.cidr])
 
 	const segments = useMemo(
-		() => computePoolLayout(pool, allocatedIPs),
-		[pool, allocatedIPs],
+		() => computePoolLayout(pool, allocatedIPs, infrastructureAllocations),
+		[pool, allocatedIPs, infrastructureAllocations],
 	)
 
 	const handleMouseEnter = (segment: Segment, e: React.MouseEvent) => {

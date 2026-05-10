@@ -4,12 +4,13 @@
 import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ipToInt, intToIp, parseCIDR, rangesOverlap } from '@/lib/ip-math'
+import type { InfrastructureAllocation } from '@/types/networks'
 
 // ----------------------------------------------------------------------------
 // Types
 // ----------------------------------------------------------------------------
 
-type BlockStatus = 'free' | 'reserved' | 'allocated-nodes' | 'allocated-lb' | 'mixed' | 'gateway'
+type BlockStatus = 'free' | 'reserved' | 'reserved-infra' | 'allocated-nodes' | 'allocated-lb' | 'mixed' | 'gateway'
 
 interface Block {
 	start: number
@@ -35,6 +36,7 @@ interface IPAddressMapProps {
 			endAddress?: string
 		}
 	}>
+	infrastructureAllocations?: InfrastructureAllocation[]
 }
 
 interface ParsedAllocationRange {
@@ -53,6 +55,13 @@ interface ParsedReservedRange {
 	description?: string
 }
 
+interface ParsedInfraAllocation {
+	ip: number
+	source: string
+	serviceName: string
+	serviceNamespace: string
+}
+
 // ----------------------------------------------------------------------------
 // Status styling
 // ----------------------------------------------------------------------------
@@ -67,6 +76,11 @@ const STATUS_STYLES: Record<BlockStatus, { bg: string; border: string; text: str
 		bg: 'bg-neutral-700/40',
 		border: 'border-neutral-600/30',
 		text: 'text-neutral-400',
+	},
+	'reserved-infra': {
+		bg: 'bg-indigo-500/30',
+		border: 'border-indigo-500/40',
+		text: 'text-indigo-400',
 	},
 	'allocated-nodes': {
 		bg: 'bg-blue-500/30',
@@ -93,6 +107,7 @@ const STATUS_STYLES: Record<BlockStatus, { bg: string; border: string; text: str
 const STATUS_LABELS: Record<BlockStatus, string> = {
 	free: 'Available',
 	reserved: 'Reserved',
+	'reserved-infra': 'Infrastructure',
 	'allocated-nodes': 'Nodes',
 	'allocated-lb': 'Load Balancer',
 	mixed: 'Mixed',
@@ -107,6 +122,7 @@ function statusDisplayName(status: BlockStatus): string {
 	switch (status) {
 		case 'free': return 'Available'
 		case 'reserved': return 'Reserved'
+		case 'reserved-infra': return 'Infrastructure'
 		case 'allocated-nodes': return 'Allocated (Nodes)'
 		case 'allocated-lb': return 'Allocated (Load Balancer)'
 		case 'mixed': return 'Mixed'
@@ -119,12 +135,25 @@ function classifyIP(
 	poolStart: number,
 	reservedRanges: ParsedReservedRange[],
 	allocationRanges: ParsedAllocationRange[],
+	infraAllocations: ParsedInfraAllocation[] = [],
 ): Block {
 	const label = intToIp(ip)
 
 	// Gateway = first IP in pool
 	if (ip === poolStart) {
 		return { start: ip, end: ip, label, status: 'gateway', description: 'Network/Gateway address' }
+	}
+
+	// Infrastructure allocation takes priority over generic reserved
+	const infraMatch = infraAllocations.find(a => a.ip === ip)
+	if (infraMatch) {
+		return {
+			start: ip,
+			end: ip,
+			label,
+			status: 'reserved-infra',
+			description: `${infraMatch.source} (${infraMatch.serviceNamespace}/${infraMatch.serviceName})`,
+		}
 	}
 
 	const statuses = new Set<BlockStatus>()
@@ -285,6 +314,7 @@ function DrillDownGrid({
 	poolStart,
 	reservedRanges,
 	allocationRanges,
+	infraAllocations,
 	tenantFilter,
 	typeFilter,
 	onBack,
@@ -293,6 +323,7 @@ function DrillDownGrid({
 	poolStart: number
 	reservedRanges: ParsedReservedRange[]
 	allocationRanges: ParsedAllocationRange[]
+	infraAllocations: ParsedInfraAllocation[]
 	tenantFilter: string
 	typeFilter: string
 	onBack: () => void
@@ -306,17 +337,18 @@ function DrillDownGrid({
 		const result: Block[] = []
 		for (let i = 0; i < blockSize; i++) {
 			const ip = (parentBlock.start + i) >>> 0
-			result.push(classifyIP(ip, poolStart, reservedRanges, allocationRanges))
+			result.push(classifyIP(ip, poolStart, reservedRanges, allocationRanges, infraAllocations))
 		}
 		return result
-	}, [parentBlock, poolStart, reservedRanges, allocationRanges])
+	}, [parentBlock, poolStart, reservedRanges, allocationRanges, infraAllocations])
 
 	const summary = useMemo(() => {
-		const counts = { free: 0, reserved: 0, nodes: 0, lb: 0, mixed: 0, gateway: 0, total: ips.length }
+		const counts = { free: 0, reserved: 0, infra: 0, nodes: 0, lb: 0, mixed: 0, gateway: 0, total: ips.length }
 		for (const ip of ips) {
 			switch (ip.status) {
 				case 'free': counts.free++; break
 				case 'reserved': counts.reserved++; break
+				case 'reserved-infra': counts.infra++; break
 				case 'allocated-nodes': counts.nodes++; break
 				case 'allocated-lb': counts.lb++; break
 				case 'mixed': counts.mixed++; break
@@ -443,7 +475,7 @@ function DrillDownGrid({
 // Main Component
 // ----------------------------------------------------------------------------
 
-export function IPAddressMap({ cidr, reserved = [], allocations }: IPAddressMapProps) {
+export function IPAddressMap({ cidr, reserved = [], allocations, infrastructureAllocations = [] }: IPAddressMapProps) {
 	const [tooltip, setTooltip] = useState<{ block: Block; x: number; y: number } | null>(null)
 	const [expandedBlock, setExpandedBlock] = useState<Block | null>(null)
 	const [tenantFilter, setTenantFilter] = useState<string>('')
@@ -514,6 +546,16 @@ export function IPAddressMap({ cidr, reserved = [], allocations }: IPAddressMapP
 		[allocations],
 	)
 
+	const infraAllocations = useMemo(() =>
+		infrastructureAllocations.map(a => ({
+			ip: ipToInt(a.ip),
+			source: a.source,
+			serviceName: a.serviceRef.name,
+			serviceNamespace: a.serviceRef.namespace,
+		})),
+		[infrastructureAllocations],
+	)
+
 	// Build blocks
 	const blocks = useMemo(() => {
 		const blockSize = blockPrefix === pool.prefix
@@ -545,6 +587,21 @@ export function IPAddressMap({ cidr, reserved = [], allocations }: IPAddressMapP
 				continue
 			}
 
+			// Individual IP with infra allocation: short-circuit
+			if (isIndividualIPs) {
+				const infraMatch = infraAllocations.find(a => a.ip === blockStart)
+				if (infraMatch) {
+					result.push({
+						start: blockStart,
+						end: blockEnd,
+						label,
+						status: 'reserved-infra',
+						description: `${infraMatch.source} (${infraMatch.serviceNamespace}/${infraMatch.serviceName})`,
+					})
+					continue
+				}
+			}
+
 			// Collect overlapping statuses
 			const statuses = new Set<BlockStatus>()
 			let matchedAllocationName: string | undefined
@@ -555,6 +612,14 @@ export function IPAddressMap({ cidr, reserved = [], allocations }: IPAddressMapP
 				if (rangesOverlap(blockStart, blockEnd, r.start, r.end)) {
 					statuses.add('reserved')
 					matchedDescription = r.description
+				}
+			}
+
+			// Check infra allocations within aggregate blocks
+			if (!isIndividualIPs) {
+				const hasInfra = infraAllocations.some(a => a.ip >= blockStart && a.ip <= blockEnd)
+				if (hasInfra) {
+					statuses.add('reserved-infra')
 				}
 			}
 
@@ -588,15 +653,16 @@ export function IPAddressMap({ cidr, reserved = [], allocations }: IPAddressMapP
 		}
 
 		return result
-	}, [pool, blockPrefix, isIndividualIPs, reservedRanges, allocationRanges])
+	}, [pool, blockPrefix, isIndividualIPs, reservedRanges, allocationRanges, infraAllocations])
 
 	// Compute summary counts
 	const summary = useMemo(() => {
-		const counts = { free: 0, reserved: 0, nodes: 0, lb: 0, mixed: 0, gateway: 0, total: blocks.length }
+		const counts = { free: 0, reserved: 0, infra: 0, nodes: 0, lb: 0, mixed: 0, gateway: 0, total: blocks.length }
 		for (const b of blocks) {
 			switch (b.status) {
 				case 'free': counts.free++; break
 				case 'reserved': counts.reserved++; break
+				case 'reserved-infra': counts.infra++; break
 				case 'allocated-nodes': counts.nodes++; break
 				case 'allocated-lb': counts.lb++; break
 				case 'mixed': counts.mixed++; break
@@ -733,6 +799,13 @@ export function IPAddressMap({ cidr, reserved = [], allocations }: IPAddressMapP
 							title={`Mixed: ${summary.mixed}`}
 						/>
 					)}
+					{pct(summary.infra) > 0 && (
+						<div
+							className="h-full bg-indigo-500/70 transition-all"
+							style={{ width: `${pct(summary.infra)}%` }}
+							title={`Infrastructure: ${summary.infra}`}
+						/>
+					)}
 					{pct(summary.reserved) > 0 && (
 						<div
 							className="h-full bg-neutral-600/70 transition-all"
@@ -763,6 +836,7 @@ export function IPAddressMap({ cidr, reserved = [], allocations }: IPAddressMapP
 					poolStart={pool.start}
 					reservedRanges={reservedRanges}
 					allocationRanges={allocationRanges}
+					infraAllocations={infraAllocations}
 					tenantFilter={tenantFilter}
 					typeFilter={typeFilter}
 					onBack={() => setExpandedBlock(null)}

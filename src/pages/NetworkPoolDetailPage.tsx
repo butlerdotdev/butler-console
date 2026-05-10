@@ -230,6 +230,7 @@ export function NetworkPoolDetailPage() {
 					<IPAddressMap
 						cidr={pool.spec.cidr}
 						reserved={pool.spec.reserved}
+						tenantAllocation={pool.spec.tenantAllocation}
 						allocations={allocations}
 						infrastructureAllocations={infraAllocations}
 					/>

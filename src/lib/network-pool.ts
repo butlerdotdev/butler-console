@@ -223,7 +223,7 @@ export function computeRangeBreakdown(
 		const infraDetails: InfraDetail[] = []
 		const tenantDetails: TenantDetail[] = []
 
-		if (interval.kind === 'reserved') {
+		if (interval.kind === 'reserved' || interval.kind === 'unassigned') {
 			// Cross-reference infrastructure allocations
 			for (const infra of parsedInfra) {
 				if (infra.ip >= interval.start && infra.ip <= interval.end) {

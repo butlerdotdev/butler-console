@@ -56,6 +56,7 @@ interface RangeCase {
 	expectTotalSize: number
 	expectRangeCount?: number
 	expectInfraInReserved?: number
+	expectInfraInUnassigned?: number
 	expectTenantConsumed?: number
 }
 
@@ -162,6 +163,22 @@ const rangeCases: RangeCase[] = [
 		expectTotalSize: 256,
 		expectTenantConsumed: 5,
 	},
+	{
+		name: 'services in unassigned (DHCP) range',
+		cidr: '10.0.0.0/24',
+		reserved: [{ cidr: '10.0.0.0/28', description: 'mgmt' }],
+		tenantAllocation: { start: '10.0.0.32', end: '10.0.0.63' },
+		allocations: [],
+		infraAllocations: [
+			{ ip: '10.0.0.2', source: 'metallb', serviceRef: { namespace: 'ingress', name: 'traefik' } },
+			{ ip: '10.0.0.100', source: 'metallb', serviceRef: { namespace: 'monitoring', name: 'grafana' } },
+			{ ip: '10.0.0.200', source: 'metallb', serviceRef: { namespace: 'logging', name: 'loki' } },
+		],
+		expectKinds: { gateway: 1, reserved: 15, tenant: 32, unassigned: 208 },
+		expectTotalSize: 256,
+		expectInfraInReserved: 1,
+		expectInfraInUnassigned: 2,
+	},
 ]
 
 // ---------------------------------------------------------------------------
@@ -214,6 +231,18 @@ export function validateRangeBreakdownCases(): void {
 			if (totalInfra !== c.expectInfraInReserved) {
 				throw new Error(
 					`[${c.name}] infra in reserved: got ${totalInfra}, want ${c.expectInfraInReserved}`
+				)
+			}
+		}
+
+		// Verify infra in unassigned ranges
+		if (c.expectInfraInUnassigned !== undefined) {
+			const totalInfra = ranges
+				.filter(r => r.kind === 'unassigned')
+				.reduce((sum, r) => sum + r.infraDetails.length, 0)
+			if (totalInfra !== c.expectInfraInUnassigned) {
+				throw new Error(
+					`[${c.name}] infra in unassigned: got ${totalInfra}, want ${c.expectInfraInUnassigned}`
 				)
 			}
 		}

@@ -321,7 +321,8 @@ function RangeRow({
 	infraAllocations: ParsedInfraAllocation[]
 }) {
 	const kindStyle = RANGE_KIND_STYLES[range.kind]
-	const canExpand = range.kind !== 'unassigned' && range.totalIPs <= 1024
+	const hasServices = range.infraDetails.length > 0
+	const canExpand = range.kind !== 'gateway' && range.totalIPs <= 1024
 	const utilizationPct = range.totalIPs > 0 ? (range.consumedIPs / range.totalIPs) * 100 : 0
 
 	return (
@@ -332,7 +333,7 @@ function RangeRow({
 				className={cn(
 					'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
 					canExpand ? 'hover:bg-neutral-800/50 cursor-pointer' : 'cursor-default',
-					range.kind === 'unassigned' && 'opacity-60',
+					range.kind === 'unassigned' && !hasServices && 'opacity-60',
 				)}
 			>
 				{/* Expand chevron */}
@@ -366,12 +367,12 @@ function RangeRow({
 				)}
 
 				{/* Mini utilization bar */}
-				{range.kind !== 'gateway' && range.kind !== 'unassigned' && (
+				{range.kind !== 'gateway' && (range.kind !== 'unassigned' || hasServices) && (
 					<div className="w-24 h-2 bg-neutral-800 rounded-full overflow-hidden flex-shrink-0 hidden sm:block">
 						<div
 							className={cn(
 								'h-full rounded-full transition-all',
-								range.kind === 'reserved' ? 'bg-indigo-500/60' : 'bg-blue-500/60',
+								range.kind === 'tenant' ? 'bg-blue-500/60' : 'bg-indigo-500/60',
 							)}
 							style={{ width: `${Math.min(utilizationPct, 100)}%` }}
 						/>
@@ -382,10 +383,10 @@ function RangeRow({
 				<span className="text-xs text-neutral-400 font-mono flex-shrink-0 w-32 text-right">
 					{range.kind === 'gateway' ? (
 						'1 IP'
-					) : range.kind === 'unassigned' ? (
-						`${range.totalIPs.toLocaleString()} IPs`
-					) : (
+					) : range.consumedIPs > 0 ? (
 						`${range.consumedIPs}/${range.totalIPs} used`
+					) : (
+						`${range.totalIPs.toLocaleString()} IPs`
 					)}
 				</span>
 			</button>
@@ -393,8 +394,8 @@ function RangeRow({
 			{/* Expanded content */}
 			{expanded && (
 				<div className="px-4 pb-4 space-y-3">
-					{/* Detail summary for reserved ranges */}
-					{range.kind === 'reserved' && range.infraDetails.length > 0 && (
+					{/* Detail summary for ranges with services */}
+					{(range.kind === 'reserved' || range.kind === 'unassigned') && range.infraDetails.length > 0 && (
 						<div className="text-xs text-neutral-400 px-1">
 							{range.infraDetails.length} service{range.infraDetails.length !== 1 ? 's' : ''} allocated,{' '}
 							{range.freeIPs} IP{range.freeIPs !== 1 ? 's' : ''} unused

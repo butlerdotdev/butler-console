@@ -177,8 +177,8 @@ interface PoolCardProps {
 
 const MINI_BAR_COLORS: Record<string, string> = {
 	gateway: 'bg-cyan-500/30',
-	reserved: 'bg-indigo-950/60',
-	'reserved-infra': 'bg-indigo-500/50',
+	reserved: 'bg-slate-500/40',
+	'reserved-infra': 'bg-indigo-400/60',
 	'tenant-allocated': 'bg-amber-500/50',
 	'tenant-available': 'bg-emerald-500/50',
 	unassigned: 'bg-neutral-800/60',

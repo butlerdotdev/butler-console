@@ -1,7 +1,7 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ipToInt, intToIp, parseCIDR } from '@/lib/ip-math'
 import { computeRangeBreakdown } from '@/lib/network-pool'
@@ -456,23 +456,7 @@ export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocation
 		[cidr, reserved, tenantAllocation, allocations, infrastructureAllocations],
 	)
 
-	// Auto-expand reserved ranges that have infra allocations
-	const defaultExpanded = useMemo(() => {
-		const set = new Set<number>()
-		ranges.forEach((r, i) => {
-			if (r.kind === 'reserved' && r.infraDetails.length > 0) {
-				set.add(i)
-			}
-		})
-		return set
-	}, [ranges])
-
-	const [expandedSet, setExpandedSet] = useState<Set<number>>(() => defaultExpanded)
-
-	// Reset expanded state when default changes (pool data refresh)
-	useEffect(() => {
-		setExpandedSet(defaultExpanded)
-	}, [defaultExpanded])
+	const [expandedSet, setExpandedSet] = useState<Set<number>>(new Set())
 
 	const toggleExpanded = (idx: number) => {
 		setExpandedSet(prev => {

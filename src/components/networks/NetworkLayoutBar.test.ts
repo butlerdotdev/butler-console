@@ -7,7 +7,7 @@
 
 import { computePoolLayout } from './NetworkLayoutBar'
 import { ipToInt } from '@/lib/ip-math'
-import type { NetworkPool } from '@/types/networks'
+import type { NetworkPool, InfrastructureAllocation } from '@/types/networks'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -33,7 +33,7 @@ function makePool(overrides: {
 	}
 }
 
-type SegmentKind = 'gateway' | 'reserved' | 'tenant-allocated' | 'tenant-available' | 'unassigned'
+type SegmentKind = 'gateway' | 'reserved' | 'reserved-infra' | 'tenant-allocated' | 'tenant-available' | 'unassigned'
 
 /** Summarize segments into a map of kind -> total IPs */
 function summarize(segments: ReturnType<typeof computePoolLayout>): Record<string, number> {
@@ -52,6 +52,7 @@ interface LayoutCase {
 	name: string
 	pool: NetworkPool
 	allocatedIPs: number
+	infraAllocations?: InfrastructureAllocation[]
 	expectKinds: Partial<Record<SegmentKind, number>>
 	/** Total IPs across all segments must equal CIDR size */
 	expectTotalSize: number
@@ -253,6 +254,45 @@ const layoutCases: LayoutCase[] = [
 		},
 		expectTotalSize: 256,
 	},
+	{
+		name: 'infrastructure allocations split from reserved',
+		pool: makePool({
+			cidr: '10.92.90.0/24',
+			reserved: [
+				{ cidr: '10.92.90.0/27', description: 'Network infrastructure' },
+			],
+			tenantAllocation: { start: '10.92.90.32', end: '10.92.90.63' },
+		}),
+		allocatedIPs: 0,
+		infraAllocations: [
+			{ ip: '10.92.90.2', source: 'MetalLB', serviceRef: { namespace: 'ingress', name: 'nginx' } },
+			{ ip: '10.92.90.5', source: 'MetalLB', serviceRef: { namespace: 'monitoring', name: 'grafana' } },
+		],
+		expectKinds: {
+			gateway: 1,
+			'reserved-infra': 2,
+			reserved: 29,
+			'tenant-available': 32,
+		},
+		expectTotalSize: 256,
+	},
+	{
+		name: 'infra allocations outside reserved range still render as infra',
+		pool: makePool({
+			cidr: '10.0.0.0/24',
+			tenantAllocation: { start: '10.0.0.32', end: '10.0.0.63' },
+		}),
+		allocatedIPs: 0,
+		infraAllocations: [
+			{ ip: '10.0.0.100', source: 'MetalLB', serviceRef: { namespace: 'default', name: 'api-lb' } },
+		],
+		expectKinds: {
+			gateway: 1,
+			'reserved-infra': 1,
+			'tenant-available': 32,
+		},
+		expectTotalSize: 256,
+	},
 ]
 
 // ---------------------------------------------------------------------------
@@ -261,7 +301,7 @@ const layoutCases: LayoutCase[] = [
 
 export function validateLayoutCases(): void {
 	for (const c of layoutCases) {
-		const segments = computePoolLayout(c.pool, c.allocatedIPs)
+		const segments = computePoolLayout(c.pool, c.allocatedIPs, c.infraAllocations)
 
 		// Verify total size
 		const totalSize = segments.reduce((sum, s) => sum + s.size, 0)

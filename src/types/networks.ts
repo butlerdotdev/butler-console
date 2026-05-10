@@ -40,6 +40,11 @@ export interface InfrastructureAllocation {
 	serviceRef: NamespacedObjectReference
 }
 
+export interface NodeAllocation {
+	ip: string
+	nodeName: string
+}
+
 export interface NetworkPoolStatus {
 	totalIPs?: number
 	allocatedIPs?: number
@@ -48,6 +53,7 @@ export interface NetworkPoolStatus {
 	fragmentation?: number
 	largestFreeBlock?: number
 	infrastructureAllocations?: InfrastructureAllocation[]
+	nodeAllocations?: NodeAllocation[]
 	conditions?: Condition[]
 }
 

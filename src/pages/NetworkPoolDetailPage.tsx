@@ -140,6 +140,7 @@ export function NetworkPoolDetailPage() {
 	const largestFreeBlock = status?.largestFreeBlock || 0
 	const allocationCount = status?.allocationCount || 0
 	const infraAllocations = status?.infrastructureAllocations || []
+	const nodeAllocations = status?.nodeAllocations || []
 
 	return (
 		<FadeIn>
@@ -191,7 +192,10 @@ export function NetworkPoolDetailPage() {
 						<StatCard
 							label="DHCP Scope"
 							value={fullPoolStats.unassigned.toLocaleString()}
-							subtitle="Node leases — not tracked"
+							subtitle={nodeAllocations.length > 0
+								? `${nodeAllocations.length} node${nodeAllocations.length !== 1 ? 's' : ''} leased`
+								: 'No lease data available'
+							}
 						/>
 					</div>
 				</div>
@@ -237,6 +241,7 @@ export function NetworkPoolDetailPage() {
 						tenantAllocation={pool.spec.tenantAllocation}
 						allocations={allocations}
 						infrastructureAllocations={infraAllocations}
+						nodeAllocations={nodeAllocations}
 					/>
 				</Card>
 

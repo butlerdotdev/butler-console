@@ -5,14 +5,14 @@ import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ipToInt, intToIp, parseCIDR } from '@/lib/ip-math'
 import { computeRangeBreakdown } from '@/lib/network-pool'
-import type { NetworkPoolSpec, InfrastructureAllocation, IPAllocation } from '@/types/networks'
+import type { NetworkPoolSpec, InfrastructureAllocation, NodeAllocation, IPAllocation } from '@/types/networks'
 import type { PoolRange, PoolRangeKind } from '@/lib/network-pool'
 
 // ----------------------------------------------------------------------------
 // Types
 // ----------------------------------------------------------------------------
 
-type BlockStatus = 'free' | 'reserved' | 'reserved-infra' | 'allocated-nodes' | 'allocated-lb' | 'mixed' | 'gateway'
+type BlockStatus = 'free' | 'reserved' | 'reserved-infra' | 'dhcp-node' | 'allocated-nodes' | 'allocated-lb' | 'mixed' | 'gateway'
 
 interface Block {
 	start: number
@@ -43,6 +43,7 @@ interface IPAddressMapProps {
 		}
 	}>
 	infrastructureAllocations?: InfrastructureAllocation[]
+	nodeAllocations?: NodeAllocation[]
 }
 
 // ----------------------------------------------------------------------------
@@ -54,6 +55,11 @@ const STATUS_STYLES: Record<BlockStatus, { bg: string; border: string; text: str
 		bg: 'bg-emerald-900/40',
 		border: 'border-emerald-700/30',
 		text: 'text-emerald-400',
+	},
+	'dhcp-node': {
+		bg: 'bg-orange-500/30',
+		border: 'border-orange-500/40',
+		text: 'text-orange-400',
 	},
 	reserved: {
 		bg: 'bg-neutral-700/40',
@@ -91,6 +97,7 @@ const STATUS_LABELS: Record<BlockStatus, string> = {
 	free: 'Available',
 	reserved: 'Reserved',
 	'reserved-infra': 'In Use (Service)',
+	'dhcp-node': 'Node (DHCP)',
 	'allocated-nodes': 'Nodes',
 	'allocated-lb': 'Load Balancer',
 	mixed: 'Mixed',
@@ -115,6 +122,11 @@ interface ParsedInfraAllocation {
 	serviceNamespace: string
 }
 
+interface ParsedNodeAllocation {
+	ip: number
+	nodeName: string
+}
+
 interface ParsedAllocationRange {
 	start: number
 	end: number
@@ -129,6 +141,7 @@ function classifyIP(
 	reservedRanges: Array<{ start: number; end: number; description?: string }>,
 	allocationRanges: ParsedAllocationRange[],
 	infraAllocations: ParsedInfraAllocation[],
+	nodeAllocations: ParsedNodeAllocation[] = [],
 ): Block {
 	const label = intToIp(ip)
 
@@ -141,6 +154,14 @@ function classifyIP(
 		return {
 			start: ip, end: ip, label, status: 'reserved-infra',
 			description: `${infraMatch.source} (${infraMatch.serviceNamespace}/${infraMatch.serviceName})`,
+		}
+	}
+
+	const nodeMatch = nodeAllocations.find(a => a.ip === ip)
+	if (nodeMatch) {
+		return {
+			start: ip, end: ip, label, status: 'dhcp-node',
+			description: nodeMatch.nodeName,
 		}
 	}
 
@@ -222,12 +243,14 @@ function IPSubGrid({
 	reservedRanges,
 	allocationRanges,
 	infraAllocations,
+	nodeAllocations,
 }: {
 	range: PoolRange
 	poolStart: number
 	reservedRanges: Array<{ start: number; end: number; description?: string }>
 	allocationRanges: ParsedAllocationRange[]
 	infraAllocations: ParsedInfraAllocation[]
+	nodeAllocations: ParsedNodeAllocation[]
 }) {
 	const [tooltip, setTooltip] = useState<{ block: Block; x: number; y: number } | null>(null)
 
@@ -236,10 +259,10 @@ function IPSubGrid({
 		const count = ((range.endIP - range.startIP + 1) >>> 0)
 		for (let i = 0; i < count; i++) {
 			const ip = (range.startIP + i) >>> 0
-			result.push(classifyIP(ip, poolStart, reservedRanges, allocationRanges, infraAllocations))
+			result.push(classifyIP(ip, poolStart, reservedRanges, allocationRanges, infraAllocations, nodeAllocations))
 		}
 		return result
-	}, [range, poolStart, reservedRanges, allocationRanges, infraAllocations])
+	}, [range, poolStart, reservedRanges, allocationRanges, infraAllocations, nodeAllocations])
 
 	const handleMouseEnter = (block: Block, e: React.MouseEvent) => {
 		const rect = (e.target as HTMLElement).getBoundingClientRect()
@@ -311,6 +334,7 @@ function RangeRow({
 	reservedRanges,
 	allocationRanges,
 	infraAllocations,
+	nodeAllocations,
 }: {
 	range: PoolRange
 	expanded: boolean
@@ -319,9 +343,11 @@ function RangeRow({
 	reservedRanges: Array<{ start: number; end: number; description?: string }>
 	allocationRanges: ParsedAllocationRange[]
 	infraAllocations: ParsedInfraAllocation[]
+	nodeAllocations: ParsedNodeAllocation[]
 }) {
 	const kindStyle = RANGE_KIND_STYLES[range.kind]
 	const hasServices = range.infraDetails.length > 0
+	const hasNodes = range.nodeDetails.length > 0
 	const canExpand = range.kind !== 'gateway' && range.totalIPs <= 1024
 	const utilizationPct = range.totalIPs > 0 ? (range.consumedIPs / range.totalIPs) * 100 : 0
 
@@ -333,7 +359,7 @@ function RangeRow({
 				className={cn(
 					'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
 					canExpand ? 'hover:bg-neutral-800/50 cursor-pointer' : 'cursor-default',
-					range.kind === 'unassigned' && !hasServices && 'opacity-60',
+					range.kind === 'unassigned' && !hasServices && !hasNodes && 'opacity-60',
 				)}
 			>
 				{/* Expand chevron */}
@@ -367,7 +393,7 @@ function RangeRow({
 				)}
 
 				{/* Mini utilization bar */}
-				{range.kind !== 'gateway' && (range.kind !== 'unassigned' || hasServices) && (
+				{range.kind !== 'gateway' && (range.kind !== 'unassigned' || hasServices || hasNodes) && (
 					<div className="w-24 h-2 bg-neutral-800 rounded-full overflow-hidden flex-shrink-0 hidden sm:block">
 						<div
 							className={cn(
@@ -394,11 +420,22 @@ function RangeRow({
 			{/* Expanded content */}
 			{expanded && (
 				<div className="px-4 pb-4 space-y-3">
-					{/* Detail summary for ranges with services */}
-					{(range.kind === 'reserved' || range.kind === 'unassigned') && range.infraDetails.length > 0 && (
-						<div className="text-xs text-neutral-400 px-1">
-							{range.infraDetails.length} service{range.infraDetails.length !== 1 ? 's' : ''} allocated,{' '}
-							{range.freeIPs} IP{range.freeIPs !== 1 ? 's' : ''} unused
+					{/* Detail summary for ranges with services or nodes */}
+					{(range.kind === 'reserved' || range.kind === 'unassigned') && (range.infraDetails.length > 0 || range.nodeDetails.length > 0) && (
+						<div className="text-xs text-neutral-400 px-1 space-y-1">
+							{range.nodeDetails.length > 0 && (
+								<div>
+									{range.nodeDetails.length} node{range.nodeDetails.length !== 1 ? 's' : ''} (DHCP)
+								</div>
+							)}
+							{range.infraDetails.length > 0 && (
+								<div>
+									{range.infraDetails.length} service{range.infraDetails.length !== 1 ? 's' : ''}
+								</div>
+							)}
+							<div className="text-neutral-500">
+								{range.consumedIPs}/{range.totalIPs} used, {range.freeIPs} available
+							</div>
 						</div>
 					)}
 
@@ -434,6 +471,7 @@ function RangeRow({
 						reservedRanges={reservedRanges}
 						allocationRanges={allocationRanges}
 						infraAllocations={infraAllocations}
+						nodeAllocations={nodeAllocations}
 					/>
 				</div>
 			)}
@@ -445,7 +483,7 @@ function RangeRow({
 // Main Component
 // ----------------------------------------------------------------------------
 
-export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocations, infrastructureAllocations = [] }: IPAddressMapProps) {
+export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocations, infrastructureAllocations = [], nodeAllocations = [] }: IPAddressMapProps) {
 	const ranges = useMemo(
 		() => computeRangeBreakdown(
 			cidr,
@@ -453,8 +491,9 @@ export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocation
 			tenantAllocation,
 			allocations as IPAllocation[],
 			infrastructureAllocations,
+			nodeAllocations,
 		),
-		[cidr, reserved, tenantAllocation, allocations, infrastructureAllocations],
+		[cidr, reserved, tenantAllocation, allocations, infrastructureAllocations, nodeAllocations],
 	)
 
 	const [expandedSet, setExpandedSet] = useState<Set<number>>(new Set())
@@ -505,9 +544,17 @@ export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocation
 		[infrastructureAllocations],
 	)
 
+	const parsedNodeAllocations: ParsedNodeAllocation[] = useMemo(() =>
+		nodeAllocations.map(a => ({
+			ip: ipToInt(a.ip),
+			nodeName: a.nodeName,
+		})),
+		[nodeAllocations],
+	)
+
 	// Summary stats
 	const summary = useMemo(() => {
-		let totalReserved = 0, totalInfra = 0, totalTenant = 0, totalTenantUsed = 0, totalUnassigned = 0
+		let totalReserved = 0, totalInfra = 0, totalNodes = 0, totalTenant = 0, totalTenantUsed = 0, totalDhcp = 0, dhcpUsed = 0
 		for (const r of ranges) {
 			if (r.kind === 'reserved') {
 				totalReserved += r.totalIPs
@@ -516,10 +563,12 @@ export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocation
 				totalTenant += r.totalIPs
 				totalTenantUsed += r.consumedIPs
 			} else if (r.kind === 'unassigned') {
-				totalUnassigned += r.totalIPs
+				totalDhcp += r.totalIPs
+				dhcpUsed += r.consumedIPs
+				totalNodes += r.nodeDetails.length
 			}
 		}
-		return { totalReserved, totalInfra, totalTenant, totalTenantUsed, totalUnassigned }
+		return { totalReserved, totalInfra, totalNodes, totalTenant, totalTenantUsed, totalDhcp, dhcpUsed }
 	}, [ranges])
 
 	return (
@@ -529,7 +578,8 @@ export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocation
 				<h3 className="text-sm font-medium text-neutral-200">IP Address Map</h3>
 				<span className="text-xs text-neutral-500">
 					{ranges.length} range{ranges.length !== 1 ? 's' : ''} &middot;{' '}
-					{summary.totalInfra > 0 && `${summary.totalInfra} in use &middot; `}
+					{summary.totalInfra > 0 && `${summary.totalInfra} services &middot; `}
+					{summary.totalNodes > 0 && `${summary.totalNodes} nodes &middot; `}
 					{summary.totalTenantUsed}/{summary.totalTenant} tenant IPs used
 				</span>
 			</div>
@@ -546,6 +596,7 @@ export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocation
 						reservedRanges={reservedRanges}
 						allocationRanges={allocationRanges}
 						infraAllocations={infraAllocations}
+						nodeAllocations={parsedNodeAllocations}
 					/>
 				))}
 			</div>

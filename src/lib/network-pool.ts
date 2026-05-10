@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ipToInt, intToIp, parseCIDR, rangesOverlap } from '@/lib/ip-math'
-import type { AllocationRange, NetworkPoolSpec, InfrastructureAllocation, IPAllocation } from '@/types/networks'
+import type { AllocationRange, NetworkPoolSpec, InfrastructureAllocation, NodeAllocation, IPAllocation } from '@/types/networks'
 
 /**
  * Returns the effective tenant allocation ranges for a NetworkPool.
@@ -46,6 +46,12 @@ export interface TenantDetail {
 	allocationName: string
 }
 
+export interface NodeDetail {
+	ip: number
+	ipStr: string
+	nodeName: string
+}
+
 export interface PoolRange {
 	kind: PoolRangeKind
 	startIP: number
@@ -57,6 +63,7 @@ export interface PoolRange {
 	freeIPs: number
 	infraDetails: InfraDetail[]
 	tenantDetails: TenantDetail[]
+	nodeDetails: NodeDetail[]
 }
 
 /**
@@ -70,6 +77,7 @@ export function computeRangeBreakdown(
 	tenantAllocation: NetworkPoolSpec['tenantAllocation'],
 	allocations: IPAllocation[],
 	infrastructureAllocations: InfrastructureAllocation[],
+	nodeAllocations: NodeAllocation[] = [],
 ): PoolRange[] {
 	const pool = parseCIDR(poolCidr)
 	const poolStart = pool.start
@@ -190,13 +198,19 @@ export function computeRangeBreakdown(
 		}
 	}
 
-	// 5. Pre-parse infra and allocation data for cross-referencing.
+	// 5. Pre-parse infra, node, and allocation data for cross-referencing.
 	const parsedInfra: InfraDetail[] = infrastructureAllocations.map(a => ({
 		ip: ipToInt(a.ip),
 		ipStr: a.ip,
 		source: a.source,
 		serviceName: a.serviceRef.name,
 		serviceNamespace: a.serviceRef.namespace,
+	}))
+
+	const parsedNodes: NodeDetail[] = nodeAllocations.map(a => ({
+		ip: ipToInt(a.ip),
+		ipStr: a.ip,
+		nodeName: a.nodeName,
 	}))
 
 	const parsedAllocations = allocations
@@ -222,6 +236,7 @@ export function computeRangeBreakdown(
 		let consumedIPs = 0
 		const infraDetails: InfraDetail[] = []
 		const tenantDetails: TenantDetail[] = []
+		const nodeDetails: NodeDetail[] = []
 
 		if (interval.kind === 'reserved' || interval.kind === 'unassigned') {
 			// Cross-reference infrastructure allocations
@@ -230,7 +245,13 @@ export function computeRangeBreakdown(
 					infraDetails.push(infra)
 				}
 			}
-			consumedIPs = infraDetails.length
+			// Cross-reference node DHCP leases
+			for (const node of parsedNodes) {
+				if (node.ip >= interval.start && node.ip <= interval.end) {
+					nodeDetails.push(node)
+				}
+			}
+			consumedIPs = infraDetails.length + nodeDetails.length
 		} else if (interval.kind === 'tenant') {
 			// Cross-reference tenant allocations
 			for (const alloc of parsedAllocations) {
@@ -265,6 +286,7 @@ export function computeRangeBreakdown(
 			freeIPs: totalIPs - consumedIPs,
 			infraDetails,
 			tenantDetails,
+			nodeDetails,
 		})
 	}
 

@@ -90,7 +90,7 @@ const STATUS_STYLES: Record<BlockStatus, { bg: string; border: string; text: str
 const STATUS_LABELS: Record<BlockStatus, string> = {
 	free: 'Available',
 	reserved: 'Reserved',
-	'reserved-infra': 'Infrastructure',
+	'reserved-infra': 'In Use (Service)',
 	'allocated-nodes': 'Nodes',
 	'allocated-lb': 'Load Balancer',
 	mixed: 'Mixed',
@@ -396,7 +396,7 @@ function RangeRow({
 					{/* Detail summary for reserved ranges */}
 					{range.kind === 'reserved' && range.infraDetails.length > 0 && (
 						<div className="text-xs text-neutral-400 px-1">
-							{range.infraDetails.length} infrastructure service{range.infraDetails.length !== 1 ? 's' : ''} allocated,{' '}
+							{range.infraDetails.length} service{range.infraDetails.length !== 1 ? 's' : ''} allocated,{' '}
 							{range.freeIPs} IP{range.freeIPs !== 1 ? 's' : ''} unused
 						</div>
 					)}
@@ -528,7 +528,7 @@ export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocation
 				<h3 className="text-sm font-medium text-neutral-200">IP Address Map</h3>
 				<span className="text-xs text-neutral-500">
 					{ranges.length} range{ranges.length !== 1 ? 's' : ''} &middot;{' '}
-					{summary.totalInfra > 0 && `${summary.totalInfra} infra &middot; `}
+					{summary.totalInfra > 0 && `${summary.totalInfra} in use &middot; `}
 					{summary.totalTenantUsed}/{summary.totalTenant} tenant IPs used
 				</span>
 			</div>
@@ -562,7 +562,7 @@ export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocation
 							{status === 'reserved' && (
 								<>
 									<div className={cn('w-3 h-3 rounded-sm border', STATUS_STYLES['reserved-infra'].bg, STATUS_STYLES['reserved-infra'].border)} />
-									<span className="text-xs text-indigo-400">Infra</span>
+									<span className="text-xs text-indigo-400">In Use</span>
 								</>
 							)}
 						</div>

@@ -44,7 +44,7 @@ const SEGMENT_STYLES: Record<SegmentKind, { bg: string; text: string }> = {
 const SEGMENT_LABELS: Record<SegmentKind, string> = {
 	gateway: 'Gateway',
 	reserved: 'Reserved',
-	'reserved-infra': 'Infrastructure',
+	'reserved-infra': 'In Use',
 	'tenant-allocated': 'Tenant (Allocated)',
 	'tenant-available': 'Tenant (Available)',
 	unassigned: 'Unassigned',
@@ -363,7 +363,7 @@ export function NetworkLayoutBar({ pool, allocatedIPs, infrastructureAllocations
 								<>
 									<div className={cn('w-3 h-3 rounded-sm', SEGMENT_STYLES['reserved-infra'].bg)} />
 									<span className={cn('text-xs', SEGMENT_STYLES['reserved-infra'].text)}>
-										{infraTotal} infra
+										{infraTotal} in use
 									</span>
 								</>
 							)}

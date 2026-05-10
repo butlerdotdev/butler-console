@@ -185,7 +185,7 @@ export function NetworkPoolDetailPage() {
 						<StatCard
 							label="Reserved"
 							value={fullPoolStats.reservedIPs.toLocaleString()}
-							subtitle={fullPoolStats.infraIPs > 0 ? `${fullPoolStats.infraIPs} in use by infra` : undefined}
+							subtitle={fullPoolStats.infraIPs > 0 ? `${fullPoolStats.infraIPs} in use by services` : undefined}
 						/>
 						<StatCard label="Tenant Range" value={fullPoolStats.tenantRangeSize.toLocaleString()} />
 						<StatCard label="Unassigned" value={fullPoolStats.unassigned.toLocaleString()} />

@@ -295,11 +295,11 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 					</span>
 					{(reservedTotal + infraTotal) > 0 && (
 						<span className="text-neutral-400">
-							<span className="inline-block w-2 h-2 rounded-sm bg-indigo-950/60 mr-1 align-middle" />
+							<span className="inline-block w-2 h-2 rounded-sm bg-slate-500/40 mr-1 align-middle" />
 							{(reservedTotal + infraTotal)} Reserved
 							{infraTotal > 0 && (
 								<span className="text-indigo-400 ml-1">
-									({infraTotal} <span className="inline-block w-2 h-2 rounded-sm bg-indigo-500/50 mx-0.5 align-middle" />infra)
+									({infraTotal} <span className="inline-block w-2 h-2 rounded-sm bg-indigo-400/60 mx-0.5 align-middle" />in use)
 								</span>
 							)}
 						</span>

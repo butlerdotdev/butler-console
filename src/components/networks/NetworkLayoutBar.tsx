@@ -340,8 +340,17 @@ export function NetworkLayoutBar({ pool, allocatedIPs, infrastructureAllocations
 			{/* Legend */}
 			<div className="flex flex-wrap gap-x-5 gap-y-1.5">
 				{(Object.keys(SEGMENT_LABELS) as SegmentKind[]).map(kind => {
+					// Skip reserved-infra here; it renders inline with reserved
+					if (kind === 'reserved-infra') return null
+
 					const style = SEGMENT_STYLES[kind]
-					const total = segments.filter(s => s.kind === kind).reduce((sum, s) => sum + s.size, 0)
+					let total = segments.filter(s => s.kind === kind).reduce((sum, s) => sum + s.size, 0)
+
+					// Merge infra count into reserved
+					const infraTotal = kind === 'reserved'
+						? segments.filter(s => s.kind === 'reserved-infra').reduce((sum, s) => sum + s.size, 0)
+						: 0
+					if (kind === 'reserved') total += infraTotal
 					if (total === 0) return null
 
 					return (
@@ -350,6 +359,14 @@ export function NetworkLayoutBar({ pool, allocatedIPs, infrastructureAllocations
 							<span className={cn('text-xs', style.text)}>
 								{SEGMENT_LABELS[kind]} ({total.toLocaleString()})
 							</span>
+							{kind === 'reserved' && infraTotal > 0 && (
+								<>
+									<div className={cn('w-3 h-3 rounded-sm', SEGMENT_STYLES['reserved-infra'].bg)} />
+									<span className={cn('text-xs', SEGMENT_STYLES['reserved-infra'].text)}>
+										{infraTotal} infra
+									</span>
+								</>
+							)}
 						</div>
 					)
 				})}

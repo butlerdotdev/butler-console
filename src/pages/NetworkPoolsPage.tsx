@@ -293,16 +293,15 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 					<span className="text-neutral-400">
 						{poolSize.toLocaleString()} IPs
 					</span>
-					{reservedTotal > 0 && (
+					{(reservedTotal + infraTotal) > 0 && (
 						<span className="text-neutral-400">
 							<span className="inline-block w-2 h-2 rounded-sm bg-neutral-600/60 mr-1 align-middle" />
-							{reservedTotal} Reserved
-						</span>
-					)}
-					{infraTotal > 0 && (
-						<span className="text-indigo-400">
-							<span className="inline-block w-2 h-2 rounded-sm bg-indigo-500/50 mr-1 align-middle" />
-							{infraTotal} Infrastructure
+							{(reservedTotal + infraTotal)} Reserved
+							{infraTotal > 0 && (
+								<span className="text-indigo-400 ml-1">
+									({infraTotal} <span className="inline-block w-2 h-2 rounded-sm bg-indigo-500/50 mx-0.5 align-middle" />infra)
+								</span>
+							)}
 						</span>
 					)}
 					{tenantTotalIPs > 0 && (

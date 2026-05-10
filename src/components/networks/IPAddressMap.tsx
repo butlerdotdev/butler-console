@@ -773,7 +773,7 @@ export function IPAddressMap({ cidr, reserved = [], allocations, infrastructureA
 				<div className="text-xs text-neutral-400">
 					{hasActiveFilter && filteredSummary
 						? `Showing ${filteredSummary.allocationCount} allocation${filteredSummary.allocationCount !== 1 ? 's' : ''} (${filteredSummary.ipCount} IPs) across ${filteredSummary.blockCount} ${unitLabel}`
-						: `${summary.free} available / ${allocated} allocated / ${summary.reserved} reserved of ${summary.total} total ${unitLabel}`
+						: `${summary.free} available / ${allocated} allocated / ${summary.reserved + summary.infra} reserved of ${summary.total} total ${unitLabel}`
 					}
 				</div>
 
@@ -803,14 +803,14 @@ export function IPAddressMap({ cidr, reserved = [], allocations, infrastructureA
 						<div
 							className="h-full bg-indigo-500/70 transition-all"
 							style={{ width: `${pct(summary.infra)}%` }}
-							title={`Infrastructure: ${summary.infra}`}
+							title={`Reserved (infra): ${summary.infra}`}
 						/>
 					)}
 					{pct(summary.reserved) > 0 && (
 						<div
 							className="h-full bg-neutral-600/70 transition-all"
 							style={{ width: `${pct(summary.reserved)}%` }}
-							title={`Reserved: ${summary.reserved}`}
+							title={`Reserved: ${summary.reserved + summary.infra} (${summary.reserved} unused)`}
 						/>
 					)}
 					{pct(summary.gateway) > 0 && (
@@ -887,11 +887,18 @@ export function IPAddressMap({ cidr, reserved = [], allocations, infrastructureA
 			{/* Legend */}
 			<div className="flex flex-wrap gap-x-5 gap-y-1.5">
 				{(Object.keys(STATUS_LABELS) as BlockStatus[]).map(status => {
+					if (status === 'reserved-infra') return null
 					const style = STATUS_STYLES[status]
 					return (
 						<div key={status} className="flex items-center gap-1.5">
 							<div className={cn('w-3 h-3 rounded-sm border', style.bg, style.border)} />
 							<span className="text-xs text-neutral-400">{STATUS_LABELS[status]}</span>
+							{status === 'reserved' && summary.infra > 0 && (
+								<>
+									<div className={cn('w-3 h-3 rounded-sm border', STATUS_STYLES['reserved-infra'].bg, STATUS_STYLES['reserved-infra'].border)} />
+									<span className="text-xs text-indigo-400">Infra</span>
+								</>
+							)}
 						</div>
 					)
 				})}

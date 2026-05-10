@@ -97,7 +97,7 @@ export function NetworkPoolDetailPage() {
 		const poolTotal = segments.reduce((sum, s) => sum + s.size, 0)
 		return {
 			poolTotal,
-			reservedIPs: (counts['reserved'] || 0) + (counts['gateway'] || 0),
+			reservedIPs: (counts['reserved'] || 0) + (counts['reserved-infra'] || 0) + (counts['gateway'] || 0),
 			infraIPs: counts['reserved-infra'] || 0,
 			tenantRangeSize: (counts['tenant-allocated'] || 0) + (counts['tenant-available'] || 0),
 			unassigned: counts['unassigned'] || 0,
@@ -180,10 +180,13 @@ export function NetworkPoolDetailPage() {
 				{/* Full Pool Stats */}
 				<div>
 					<h3 className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-3">Full Pool</h3>
-					<div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+					<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 						<StatCard label="Pool Size" value={fullPoolStats.poolTotal.toLocaleString()} />
-						<StatCard label="Reserved" value={fullPoolStats.reservedIPs.toLocaleString()} />
-						<StatCard label="Infrastructure" value={fullPoolStats.infraIPs.toLocaleString()} />
+						<StatCard
+							label="Reserved"
+							value={fullPoolStats.reservedIPs.toLocaleString()}
+							subtitle={fullPoolStats.infraIPs > 0 ? `${fullPoolStats.infraIPs} in use by infra` : undefined}
+						/>
 						<StatCard label="Tenant Range" value={fullPoolStats.tenantRangeSize.toLocaleString()} />
 						<StatCard label="Unassigned" value={fullPoolStats.unassigned.toLocaleString()} />
 					</div>
@@ -475,11 +478,12 @@ export function NetworkPoolDetailPage() {
 	)
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, subtitle }: { label: string; value: string; subtitle?: string }) {
 	return (
 		<Card className="p-4">
 			<p className="text-xs text-neutral-500 uppercase tracking-wide">{label}</p>
 			<p className="text-2xl font-semibold text-neutral-50 mt-1">{value}</p>
+			{subtitle && <p className="text-xs text-indigo-400 mt-0.5">{subtitle}</p>}
 		</Card>
 	)
 }

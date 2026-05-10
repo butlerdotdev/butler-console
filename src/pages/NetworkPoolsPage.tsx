@@ -195,6 +195,7 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 	const poolSize = parseCIDR(cidr).size
 
 	const infraAllocations = status?.infrastructureAllocations || []
+	const nodeAllocations = status?.nodeAllocations || []
 
 	const segments = useMemo(
 		() => computePoolLayout(pool, allocatedIPs, infraAllocations),
@@ -319,6 +320,11 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 					{unassigned > 0 && (
 						<span className="text-neutral-500">
 							{unassigned} DHCP
+							{nodeAllocations.length > 0 && (
+								<span className="text-orange-400 ml-1">
+									({nodeAllocations.length} leased)
+								</span>
+							)}
 						</span>
 					)}
 				</div>

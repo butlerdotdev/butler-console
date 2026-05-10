@@ -177,7 +177,7 @@ interface PoolCardProps {
 
 const MINI_BAR_COLORS: Record<string, string> = {
 	gateway: 'bg-cyan-500/30',
-	reserved: 'bg-neutral-600/60',
+	reserved: 'bg-indigo-950/60',
 	'reserved-infra': 'bg-indigo-500/50',
 	'tenant-allocated': 'bg-amber-500/50',
 	'tenant-available': 'bg-emerald-500/50',
@@ -295,7 +295,7 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 					</span>
 					{(reservedTotal + infraTotal) > 0 && (
 						<span className="text-neutral-400">
-							<span className="inline-block w-2 h-2 rounded-sm bg-neutral-600/60 mr-1 align-middle" />
+							<span className="inline-block w-2 h-2 rounded-sm bg-indigo-950/60 mr-1 align-middle" />
 							{(reservedTotal + infraTotal)} Reserved
 							{infraTotal > 0 && (
 								<span className="text-indigo-400 ml-1">

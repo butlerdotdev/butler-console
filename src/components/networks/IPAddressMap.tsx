@@ -73,14 +73,14 @@ const STATUS_STYLES: Record<BlockStatus, { bg: string; border: string; text: str
 		text: 'text-emerald-400',
 	},
 	reserved: {
-		bg: 'bg-neutral-700/40',
-		border: 'border-neutral-600/30',
-		text: 'text-neutral-400',
+		bg: 'bg-indigo-950/50',
+		border: 'border-indigo-800/30',
+		text: 'text-indigo-300',
 	},
 	'reserved-infra': {
-		bg: 'bg-indigo-500/30',
-		border: 'border-indigo-500/40',
-		text: 'text-indigo-400',
+		bg: 'bg-indigo-500/40',
+		border: 'border-indigo-400/50',
+		text: 'text-indigo-300',
 	},
 	'allocated-nodes': {
 		bg: 'bg-blue-500/30',
@@ -808,7 +808,7 @@ export function IPAddressMap({ cidr, reserved = [], allocations, infrastructureA
 					)}
 					{pct(summary.reserved) > 0 && (
 						<div
-							className="h-full bg-neutral-600/70 transition-all"
+							className="h-full bg-indigo-900/60 transition-all"
 							style={{ width: `${pct(summary.reserved)}%` }}
 							title={`Reserved: ${summary.reserved + summary.infra} (${summary.reserved} unused)`}
 						/>

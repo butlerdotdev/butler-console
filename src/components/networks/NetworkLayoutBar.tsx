@@ -47,7 +47,7 @@ const SEGMENT_LABELS: Record<SegmentKind, string> = {
 	'reserved-infra': 'In Use',
 	'tenant-allocated': 'Tenant (Allocated)',
 	'tenant-available': 'Tenant (Available)',
-	unassigned: 'Unassigned',
+	unassigned: 'DHCP',
 }
 
 // ---------------------------------------------------------------------------

@@ -188,7 +188,11 @@ export function NetworkPoolDetailPage() {
 							subtitle={fullPoolStats.infraIPs > 0 ? `${fullPoolStats.infraIPs} in use by services` : undefined}
 						/>
 						<StatCard label="Tenant Range" value={fullPoolStats.tenantRangeSize.toLocaleString()} />
-						<StatCard label="Unassigned" value={fullPoolStats.unassigned.toLocaleString()} />
+						<StatCard
+							label="DHCP Scope"
+							value={fullPoolStats.unassigned.toLocaleString()}
+							subtitle="Node leases — not tracked"
+						/>
 					</div>
 				</div>
 

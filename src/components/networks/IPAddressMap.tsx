@@ -101,7 +101,7 @@ const RANGE_KIND_STYLES: Record<PoolRangeKind, { dot: string; text: string; labe
 	gateway: { dot: 'bg-cyan-500', text: 'text-cyan-400', label: 'Gateway' },
 	reserved: { dot: 'bg-neutral-500', text: 'text-neutral-300', label: 'Reserved' },
 	tenant: { dot: 'bg-blue-500', text: 'text-blue-400', label: 'Tenant' },
-	unassigned: { dot: 'bg-neutral-700', text: 'text-neutral-500', label: 'Unassigned' },
+	unassigned: { dot: 'bg-neutral-700', text: 'text-neutral-500', label: 'DHCP' },
 }
 
 // ----------------------------------------------------------------------------

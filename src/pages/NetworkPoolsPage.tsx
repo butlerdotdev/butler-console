@@ -318,7 +318,7 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 					)}
 					{unassigned > 0 && (
 						<span className="text-neutral-500">
-							{unassigned} Unassigned
+							{unassigned} DHCP
 						</span>
 					)}
 				</div>

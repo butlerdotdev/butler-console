@@ -5,13 +5,13 @@ import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ipToInt, intToIp, parseCIDR, rangesOverlap } from '@/lib/ip-math'
 import { getEffectiveRanges } from '@/lib/network-pool'
-import type { NetworkPool } from '@/types/networks'
+import type { NetworkPool, InfrastructureAllocation } from '@/types/networks'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type SegmentKind = 'gateway' | 'reserved' | 'tenant-allocated' | 'tenant-available' | 'unassigned'
+type SegmentKind = 'gateway' | 'reserved' | 'reserved-infra' | 'node-allocated' | 'tenant-allocated' | 'tenant-available' | 'unmanaged'
 
 interface Segment {
 	kind: SegmentKind
@@ -25,6 +25,7 @@ interface Segment {
 interface NetworkLayoutBarProps {
 	pool: NetworkPool
 	allocatedIPs: number
+	infrastructureAllocations?: InfrastructureAllocation[]
 }
 
 // ---------------------------------------------------------------------------
@@ -33,25 +34,29 @@ interface NetworkLayoutBarProps {
 
 const SEGMENT_STYLES: Record<SegmentKind, { bg: string; text: string }> = {
 	gateway: { bg: 'bg-cyan-500/30', text: 'text-cyan-400' },
-	reserved: { bg: 'bg-neutral-600/60', text: 'text-neutral-400' },
+	reserved: { bg: 'bg-slate-500/40', text: 'text-slate-300' },
+	'reserved-infra': { bg: 'bg-indigo-400/60', text: 'text-indigo-300' },
+	'node-allocated': { bg: 'bg-orange-500/40', text: 'text-orange-400' },
 	'tenant-allocated': { bg: 'bg-amber-500/50', text: 'text-amber-400' },
 	'tenant-available': { bg: 'bg-emerald-500/50', text: 'text-emerald-400' },
-	unassigned: { bg: 'bg-neutral-800/60', text: 'text-neutral-500' },
+	unmanaged: { bg: 'bg-neutral-800/60', text: 'text-neutral-500' },
 }
 
 const SEGMENT_LABELS: Record<SegmentKind, string> = {
 	gateway: 'Gateway',
 	reserved: 'Reserved',
+	'reserved-infra': 'Services',
+	'node-allocated': 'Nodes',
 	'tenant-allocated': 'Tenant (Allocated)',
 	'tenant-available': 'Tenant (Available)',
-	unassigned: 'Unassigned',
+	unmanaged: 'Unmanaged',
 }
 
 // ---------------------------------------------------------------------------
 // Layout computation
 // ---------------------------------------------------------------------------
 
-export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segment[] {
+export function computePoolLayout(pool: NetworkPool, allocatedIPs: number, infraAllocations: InfrastructureAllocation[] = []): Segment[] {
 	const poolRange = parseCIDR(pool.spec.cidr)
 	const poolStart = poolRange.start
 	const poolEnd = poolRange.end
@@ -90,6 +95,22 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segm
 					description: r.description,
 				})
 			}
+		}
+	}
+
+	// Infrastructure allocations (individual IPs, higher priority than generic reserved).
+	// Services (source=metallb) render as reserved-infra; nodes and machines render
+	// as node-allocated so the layout bar visually separates the two categories.
+	for (const a of infraAllocations) {
+		const ip = ipToInt(a.ip)
+		if (ip >= poolStart && ip <= poolEnd) {
+			const isNode = a.source === 'node' || a.source === 'machine'
+			regions.push({
+				start: ip,
+				end: ip,
+				kind: isNode ? 'node-allocated' : 'reserved-infra',
+				description: a.source,
+			})
 		}
 	}
 
@@ -143,7 +164,7 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segm
 		if (size === 0) continue
 
 		// Determine kind by priority
-		let kind: SegmentKind = 'unassigned'
+		let kind: SegmentKind = 'unmanaged'
 		let description: string | undefined
 
 		// Check gateway (highest priority)
@@ -153,8 +174,19 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segm
 			description = 'Network/gateway address'
 		}
 
-		// Check reserved (next priority, but gateway wins)
-		if (kind === 'unassigned') {
+		// Check infrastructure allocations (higher priority than generic reserved)
+		if (kind === 'unmanaged') {
+			for (const r of regions) {
+				if ((r.kind === 'reserved-infra' || r.kind === 'node-allocated') && rangesOverlap(clampedStart, clampedEnd, r.start, r.end)) {
+					kind = r.kind
+					description = r.description
+					break
+				}
+			}
+		}
+
+		// Check reserved (next priority)
+		if (kind === 'unmanaged') {
 			for (const r of regions) {
 				if (r.kind === 'reserved' && rangesOverlap(clampedStart, clampedEnd, r.start, r.end)) {
 					kind = 'reserved'
@@ -165,7 +197,7 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number): Segm
 		}
 
 		// Check tenant (lower priority than reserved)
-		if (kind === 'unassigned') {
+		if (kind === 'unmanaged') {
 			for (const range of tenantRanges) {
 				if (rangesOverlap(clampedStart, clampedEnd, range.start, range.end)) {
 					kind = 'tenant-available'
@@ -264,14 +296,14 @@ function SegmentTooltip({ segment, totalIPs, x, y }: {
 // Component
 // ---------------------------------------------------------------------------
 
-export function NetworkLayoutBar({ pool, allocatedIPs }: NetworkLayoutBarProps) {
+export function NetworkLayoutBar({ pool, allocatedIPs, infrastructureAllocations = [] }: NetworkLayoutBarProps) {
 	const [tooltip, setTooltip] = useState<{ segment: Segment; x: number; y: number } | null>(null)
 
 	const poolSize = useMemo(() => parseCIDR(pool.spec.cidr).size, [pool.spec.cidr])
 
 	const segments = useMemo(
-		() => computePoolLayout(pool, allocatedIPs),
-		[pool, allocatedIPs],
+		() => computePoolLayout(pool, allocatedIPs, infrastructureAllocations),
+		[pool, allocatedIPs, infrastructureAllocations],
 	)
 
 	const handleMouseEnter = (segment: Segment, e: React.MouseEvent) => {

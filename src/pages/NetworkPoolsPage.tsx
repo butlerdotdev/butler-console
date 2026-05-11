@@ -177,10 +177,12 @@ interface PoolCardProps {
 
 const MINI_BAR_COLORS: Record<string, string> = {
 	gateway: 'bg-cyan-500/30',
-	reserved: 'bg-neutral-600/60',
+	reserved: 'bg-slate-500/40',
+	'reserved-infra': 'bg-indigo-400/60',
+	'node-allocated': 'bg-orange-500/40',
 	'tenant-allocated': 'bg-amber-500/50',
 	'tenant-available': 'bg-emerald-500/50',
-	unassigned: 'bg-neutral-800/60',
+	unmanaged: 'bg-neutral-800/60',
 }
 
 function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
@@ -193,9 +195,11 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 	const pct = tenantTotalIPs > 0 ? Math.round((allocatedIPs / tenantTotalIPs) * 100) : 0
 	const poolSize = parseCIDR(cidr).size
 
+	const infraAllocations = status?.infrastructureAllocations || []
+
 	const segments = useMemo(
-		() => computePoolLayout(pool, allocatedIPs),
-		[pool, allocatedIPs],
+		() => computePoolLayout(pool, allocatedIPs, infraAllocations),
+		[pool, allocatedIPs, infraAllocations],
 	)
 
 	// Summarize segment sizes by kind for the legend
@@ -208,9 +212,11 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 	}, [segments])
 
 	const reservedTotal = summary['reserved'] || 0
+	const infraTotal = summary['reserved-infra'] || 0
+	const nodeTotal = summary['node-allocated'] || 0
 	const tenantAllocated = summary['tenant-allocated'] || 0
 	const tenantAvailable = summary['tenant-available'] || 0
-	const unassigned = summary['unassigned'] || 0
+	const unmanaged = summary['unmanaged'] || 0
 
 	const age = creationTimestamp
 		? new Date(creationTimestamp).toLocaleDateString()
@@ -291,8 +297,20 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 					</span>
 					{reservedTotal > 0 && (
 						<span className="text-neutral-400">
-							<span className="inline-block w-2 h-2 rounded-sm bg-neutral-600/60 mr-1 align-middle" />
+							<span className="inline-block w-2 h-2 rounded-sm bg-slate-500/40 mr-1 align-middle" />
 							{reservedTotal} Reserved
+						</span>
+					)}
+					{infraTotal > 0 && (
+						<span className="text-indigo-400">
+							<span className="inline-block w-2 h-2 rounded-sm bg-indigo-400/60 mr-1 align-middle" />
+							{infraTotal} Services
+						</span>
+					)}
+					{nodeTotal > 0 && (
+						<span className="text-orange-400">
+							<span className="inline-block w-2 h-2 rounded-sm bg-orange-500/40 mr-1 align-middle" />
+							{nodeTotal} Nodes
 						</span>
 					)}
 					{tenantTotalIPs > 0 && (
@@ -307,9 +325,9 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 							{tenantAvailable} Tenant Free
 						</span>
 					)}
-					{unassigned > 0 && (
+					{unmanaged > 0 && (
 						<span className="text-neutral-500">
-							{unassigned} Unassigned
+							{unmanaged} Unmanaged
 						</span>
 					)}
 				</div>

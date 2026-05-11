@@ -29,6 +29,23 @@ export interface NetworkPoolSpec {
 	}
 }
 
+export interface NamespacedObjectReference {
+	namespace: string
+	name: string
+}
+
+export interface ClusterObjectReference {
+	name: string
+}
+
+export interface InfrastructureAllocation {
+	ip: string
+	source: string
+	serviceRef?: NamespacedObjectReference
+	nodeRef?: ClusterObjectReference
+	machineRef?: NamespacedObjectReference
+}
+
 export interface NetworkPoolStatus {
 	totalIPs?: number
 	allocatedIPs?: number
@@ -36,6 +53,12 @@ export interface NetworkPoolStatus {
 	allocationCount?: number
 	fragmentation?: number
 	largestFreeBlock?: number
+	infrastructureAllocations?: InfrastructureAllocation[]
+	poolSizeIPs?: number
+	reservedIPs?: number
+	unmanagedScopeIPs?: number
+	infrastructureConsumedIPs?: number
+	unmanagedRanges?: AllocationRange[]
 	conditions?: Condition[]
 }
 

@@ -88,8 +88,8 @@ export function NetworkPoolDetailPage() {
 	// Full-pool stats derived from layout segments (single source of truth).
 	// Hooks must run unconditionally, so these are placed before early returns.
 	const fullPoolStats = useMemo(() => {
-		if (!pool) return { poolTotal: 0, reservedIPs: 0, tenantRangeSize: 0, unassigned: 0 }
-		const segments = computePoolLayout(pool, pool.status?.allocatedIPs || 0)
+		if (!pool) return { poolTotal: 0, reservedIPs: 0, infraIPs: 0, nodeIPs: 0, tenantRangeSize: 0, unassigned: 0 }
+		const segments = computePoolLayout(pool, pool.status?.allocatedIPs || 0, pool.status?.infrastructureAllocations || [])
 		const counts: Record<string, number> = {}
 		for (const s of segments) {
 			counts[s.kind] = (counts[s.kind] || 0) + s.size
@@ -97,9 +97,11 @@ export function NetworkPoolDetailPage() {
 		const poolTotal = segments.reduce((sum, s) => sum + s.size, 0)
 		return {
 			poolTotal,
-			reservedIPs: (counts['reserved'] || 0) + (counts['gateway'] || 0),
+			reservedIPs: (counts['reserved'] || 0) + (counts['reserved-infra'] || 0) + (counts['gateway'] || 0),
+			infraIPs: counts['reserved-infra'] || 0,
+			nodeIPs: counts['node-allocated'] || 0,
 			tenantRangeSize: (counts['tenant-allocated'] || 0) + (counts['tenant-available'] || 0),
-			unassigned: counts['unassigned'] || 0,
+			unassigned: counts['unmanaged'] || 0,
 		}
 	}, [pool])
 
@@ -138,6 +140,9 @@ export function NetworkPoolDetailPage() {
 	const fragmentation = status?.fragmentation || 0
 	const largestFreeBlock = status?.largestFreeBlock || 0
 	const allocationCount = status?.allocationCount || 0
+	const infraAllocations = status?.infrastructureAllocations || []
+	const serviceCount = infraAllocations.filter(a => a.source === 'metallb').length
+	const nodeCount = infraAllocations.filter(a => a.source === 'node' || a.source === 'machine').length
 
 	return (
 		<FadeIn>
@@ -172,7 +177,7 @@ export function NetworkPoolDetailPage() {
 
 				{/* Network Layout Bar */}
 				<Card className="p-5">
-					<NetworkLayoutBar pool={pool} allocatedIPs={allocatedIPs} />
+					<NetworkLayoutBar pool={pool} allocatedIPs={allocatedIPs} infrastructureAllocations={infraAllocations} />
 				</Card>
 
 				{/* Full Pool Stats */}
@@ -180,9 +185,20 @@ export function NetworkPoolDetailPage() {
 					<h3 className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-3">Full Pool</h3>
 					<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 						<StatCard label="Pool Size" value={fullPoolStats.poolTotal.toLocaleString()} />
-						<StatCard label="Reserved" value={fullPoolStats.reservedIPs.toLocaleString()} />
+						<StatCard
+							label="Reserved"
+							value={fullPoolStats.reservedIPs.toLocaleString()}
+							subtitle={serviceCount > 0 ? `${serviceCount} service${serviceCount !== 1 ? 's' : ''} observed` : undefined}
+						/>
 						<StatCard label="Tenant Range" value={fullPoolStats.tenantRangeSize.toLocaleString()} />
-						<StatCard label="Unassigned" value={fullPoolStats.unassigned.toLocaleString()} />
+						<StatCard
+							label="Unmanaged"
+							value={fullPoolStats.unassigned.toLocaleString()}
+							subtitle={nodeCount > 0
+								? `${nodeCount} node${nodeCount !== 1 ? 's' : ''} observed`
+								: undefined
+							}
+						/>
 					</div>
 				</div>
 
@@ -224,7 +240,9 @@ export function NetworkPoolDetailPage() {
 					<IPAddressMap
 						cidr={pool.spec.cidr}
 						reserved={pool.spec.reserved}
+						tenantAllocation={pool.spec.tenantAllocation}
 						allocations={allocations}
+						infrastructureAllocations={infraAllocations}
 					/>
 				</Card>
 
@@ -471,11 +489,12 @@ export function NetworkPoolDetailPage() {
 	)
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, subtitle }: { label: string; value: string; subtitle?: string }) {
 	return (
 		<Card className="p-4">
 			<p className="text-xs text-neutral-500 uppercase tracking-wide">{label}</p>
 			<p className="text-2xl font-semibold text-neutral-50 mt-1">{value}</p>
+			{subtitle && <p className="text-xs text-indigo-400 mt-0.5">{subtitle}</p>}
 		</Card>
 	)
 }

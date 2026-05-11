@@ -11,7 +11,7 @@ import type { NetworkPool, InfrastructureAllocation } from '@/types/networks'
 // Types
 // ---------------------------------------------------------------------------
 
-type SegmentKind = 'gateway' | 'reserved' | 'reserved-infra' | 'tenant-allocated' | 'tenant-available' | 'unmanaged'
+type SegmentKind = 'gateway' | 'reserved' | 'reserved-infra' | 'node-allocated' | 'tenant-allocated' | 'tenant-available' | 'unmanaged'
 
 interface Segment {
 	kind: SegmentKind
@@ -36,6 +36,7 @@ const SEGMENT_STYLES: Record<SegmentKind, { bg: string; text: string }> = {
 	gateway: { bg: 'bg-cyan-500/30', text: 'text-cyan-400' },
 	reserved: { bg: 'bg-slate-500/40', text: 'text-slate-300' },
 	'reserved-infra': { bg: 'bg-indigo-400/60', text: 'text-indigo-300' },
+	'node-allocated': { bg: 'bg-orange-500/40', text: 'text-orange-400' },
 	'tenant-allocated': { bg: 'bg-amber-500/50', text: 'text-amber-400' },
 	'tenant-available': { bg: 'bg-emerald-500/50', text: 'text-emerald-400' },
 	unmanaged: { bg: 'bg-neutral-800/60', text: 'text-neutral-500' },
@@ -44,7 +45,8 @@ const SEGMENT_STYLES: Record<SegmentKind, { bg: string; text: string }> = {
 const SEGMENT_LABELS: Record<SegmentKind, string> = {
 	gateway: 'Gateway',
 	reserved: 'Reserved',
-	'reserved-infra': 'In Use',
+	'reserved-infra': 'Services',
+	'node-allocated': 'Nodes',
 	'tenant-allocated': 'Tenant (Allocated)',
 	'tenant-available': 'Tenant (Available)',
 	unmanaged: 'Unmanaged',
@@ -96,15 +98,18 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number, infra
 		}
 	}
 
-	// Infrastructure allocations (individual IPs, higher priority than generic reserved)
-	const parsedInfraIPs = infraAllocations.map(a => ipToInt(a.ip))
-	for (const ip of parsedInfraIPs) {
+	// Infrastructure allocations (individual IPs, higher priority than generic reserved).
+	// Services (source=metallb) render as reserved-infra; nodes and machines render
+	// as node-allocated so the layout bar visually separates the two categories.
+	for (const a of infraAllocations) {
+		const ip = ipToInt(a.ip)
 		if (ip >= poolStart && ip <= poolEnd) {
+			const isNode = a.source === 'node' || a.source === 'machine'
 			regions.push({
 				start: ip,
 				end: ip,
-				kind: 'reserved-infra',
-				description: infraAllocations[parsedInfraIPs.indexOf(ip)]?.source,
+				kind: isNode ? 'node-allocated' : 'reserved-infra',
+				description: a.source,
 			})
 		}
 	}
@@ -172,8 +177,8 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number, infra
 		// Check infrastructure allocations (higher priority than generic reserved)
 		if (kind === 'unmanaged') {
 			for (const r of regions) {
-				if (r.kind === 'reserved-infra' && rangesOverlap(clampedStart, clampedEnd, r.start, r.end)) {
-					kind = 'reserved-infra'
+				if ((r.kind === 'reserved-infra' || r.kind === 'node-allocated') && rangesOverlap(clampedStart, clampedEnd, r.start, r.end)) {
+					kind = r.kind
 					description = r.description
 					break
 				}
@@ -340,17 +345,8 @@ export function NetworkLayoutBar({ pool, allocatedIPs, infrastructureAllocations
 			{/* Legend */}
 			<div className="flex flex-wrap gap-x-5 gap-y-1.5">
 				{(Object.keys(SEGMENT_LABELS) as SegmentKind[]).map(kind => {
-					// Skip reserved-infra here; it renders inline with reserved
-					if (kind === 'reserved-infra') return null
-
 					const style = SEGMENT_STYLES[kind]
-					let total = segments.filter(s => s.kind === kind).reduce((sum, s) => sum + s.size, 0)
-
-					// Merge infra count into reserved
-					const infraTotal = kind === 'reserved'
-						? segments.filter(s => s.kind === 'reserved-infra').reduce((sum, s) => sum + s.size, 0)
-						: 0
-					if (kind === 'reserved') total += infraTotal
+					const total = segments.filter(s => s.kind === kind).reduce((sum, s) => sum + s.size, 0)
 					if (total === 0) return null
 
 					return (
@@ -359,14 +355,6 @@ export function NetworkLayoutBar({ pool, allocatedIPs, infrastructureAllocations
 							<span className={cn('text-xs', style.text)}>
 								{SEGMENT_LABELS[kind]} ({total.toLocaleString()})
 							</span>
-							{kind === 'reserved' && infraTotal > 0 && (
-								<>
-									<div className={cn('w-3 h-3 rounded-sm', SEGMENT_STYLES['reserved-infra'].bg)} />
-									<span className={cn('text-xs', SEGMENT_STYLES['reserved-infra'].text)}>
-										{infraTotal} in use
-									</span>
-								</>
-							)}
 						</div>
 					)
 				})}

@@ -179,6 +179,7 @@ const MINI_BAR_COLORS: Record<string, string> = {
 	gateway: 'bg-cyan-500/30',
 	reserved: 'bg-slate-500/40',
 	'reserved-infra': 'bg-indigo-400/60',
+	'node-allocated': 'bg-orange-500/40',
 	'tenant-allocated': 'bg-amber-500/50',
 	'tenant-available': 'bg-emerald-500/50',
 	unmanaged: 'bg-neutral-800/60',
@@ -212,6 +213,7 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 
 	const reservedTotal = summary['reserved'] || 0
 	const infraTotal = summary['reserved-infra'] || 0
+	const nodeTotal = summary['node-allocated'] || 0
 	const tenantAllocated = summary['tenant-allocated'] || 0
 	const tenantAvailable = summary['tenant-available'] || 0
 	const unmanaged = summary['unmanaged'] || 0
@@ -293,15 +295,22 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 					<span className="text-neutral-400">
 						{poolSize.toLocaleString()} IPs
 					</span>
-					{(reservedTotal + infraTotal) > 0 && (
+					{reservedTotal > 0 && (
 						<span className="text-neutral-400">
 							<span className="inline-block w-2 h-2 rounded-sm bg-slate-500/40 mr-1 align-middle" />
-							{(reservedTotal + infraTotal)} Reserved
-							{infraTotal > 0 && (
-								<span className="text-indigo-400 ml-1">
-									({infraTotal} <span className="inline-block w-2 h-2 rounded-sm bg-indigo-400/60 mx-0.5 align-middle" />in use)
-								</span>
-							)}
+							{reservedTotal} Reserved
+						</span>
+					)}
+					{infraTotal > 0 && (
+						<span className="text-indigo-400">
+							<span className="inline-block w-2 h-2 rounded-sm bg-indigo-400/60 mr-1 align-middle" />
+							{infraTotal} Services
+						</span>
+					)}
+					{nodeTotal > 0 && (
+						<span className="text-orange-400">
+							<span className="inline-block w-2 h-2 rounded-sm bg-orange-500/40 mr-1 align-middle" />
+							{nodeTotal} Nodes
 						</span>
 					)}
 					{tenantTotalIPs > 0 && (

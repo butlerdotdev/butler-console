@@ -88,7 +88,7 @@ export function NetworkPoolDetailPage() {
 	// Full-pool stats derived from layout segments (single source of truth).
 	// Hooks must run unconditionally, so these are placed before early returns.
 	const fullPoolStats = useMemo(() => {
-		if (!pool) return { poolTotal: 0, reservedIPs: 0, infraIPs: 0, tenantRangeSize: 0, unassigned: 0 }
+		if (!pool) return { poolTotal: 0, reservedIPs: 0, infraIPs: 0, nodeIPs: 0, tenantRangeSize: 0, unassigned: 0 }
 		const segments = computePoolLayout(pool, pool.status?.allocatedIPs || 0, pool.status?.infrastructureAllocations || [])
 		const counts: Record<string, number> = {}
 		for (const s of segments) {
@@ -99,6 +99,7 @@ export function NetworkPoolDetailPage() {
 			poolTotal,
 			reservedIPs: (counts['reserved'] || 0) + (counts['reserved-infra'] || 0) + (counts['gateway'] || 0),
 			infraIPs: counts['reserved-infra'] || 0,
+			nodeIPs: counts['node-allocated'] || 0,
 			tenantRangeSize: (counts['tenant-allocated'] || 0) + (counts['tenant-available'] || 0),
 			unassigned: counts['unmanaged'] || 0,
 		}
@@ -140,7 +141,8 @@ export function NetworkPoolDetailPage() {
 	const largestFreeBlock = status?.largestFreeBlock || 0
 	const allocationCount = status?.allocationCount || 0
 	const infraAllocations = status?.infrastructureAllocations || []
-	const nodeCount = infraAllocations.filter(a => a.nodeRef?.name).length
+	const serviceCount = infraAllocations.filter(a => a.source === 'metallb').length
+	const nodeCount = infraAllocations.filter(a => a.source === 'node' || a.source === 'machine').length
 
 	return (
 		<FadeIn>
@@ -186,7 +188,7 @@ export function NetworkPoolDetailPage() {
 						<StatCard
 							label="Reserved"
 							value={fullPoolStats.reservedIPs.toLocaleString()}
-							subtitle={fullPoolStats.infraIPs > 0 ? `${fullPoolStats.infraIPs} in use by services` : undefined}
+							subtitle={serviceCount > 0 ? `${serviceCount} service${serviceCount !== 1 ? 's' : ''} observed` : undefined}
 						/>
 						<StatCard label="Tenant Range" value={fullPoolStats.tenantRangeSize.toLocaleString()} />
 						<StatCard

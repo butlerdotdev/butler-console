@@ -120,6 +120,7 @@ interface ParsedInfraAllocation {
 	serviceName?: string
 	serviceNamespace?: string
 	nodeName?: string
+	machineName?: string
 }
 
 interface ParsedAllocationRange {
@@ -145,10 +146,10 @@ function classifyIP(
 
 	const infraMatch = infraAllocations.find(a => a.ip === ip)
 	if (infraMatch) {
-		if (infraMatch.source === 'node' && !infraMatch.serviceName) {
+		if ((infraMatch.source === 'node' || infraMatch.source === 'machine') && !infraMatch.serviceName) {
 			return {
 				start: ip, end: ip, label, status: 'node-allocated',
-				description: infraMatch.nodeName || 'Node',
+				description: infraMatch.machineName || infraMatch.nodeName || 'Node',
 			}
 		}
 		const parts: string[] = []
@@ -157,6 +158,9 @@ function classifyIP(
 		}
 		if (infraMatch.nodeName) {
 			parts.push(`Node: ${infraMatch.nodeName}`)
+		}
+		if (infraMatch.machineName) {
+			parts.push(`Machine: ${infraMatch.machineName}`)
 		}
 		return {
 			start: ip, end: ip, label, status: 'reserved-infra',
@@ -534,6 +538,7 @@ export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocation
 			serviceName: a.serviceRef?.name,
 			serviceNamespace: a.serviceRef?.namespace,
 			nodeName: a.nodeRef?.name,
+			machineName: a.machineRef?.name,
 		})),
 		[infrastructureAllocations],
 	)

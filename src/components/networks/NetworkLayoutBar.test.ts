@@ -33,7 +33,7 @@ function makePool(overrides: {
 	}
 }
 
-type SegmentKind = 'gateway' | 'reserved' | 'reserved-infra' | 'tenant-allocated' | 'tenant-available' | 'unmanaged'
+type SegmentKind = 'gateway' | 'reserved' | 'reserved-infra' | 'node-allocated' | 'tenant-allocated' | 'tenant-available' | 'unmanaged'
 
 /** Summarize segments into a map of kind -> total IPs */
 function summarize(segments: ReturnType<typeof computePoolLayout>): Record<string, number> {

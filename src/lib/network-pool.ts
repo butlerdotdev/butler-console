@@ -36,6 +36,7 @@ export interface InfraDetail {
 	serviceName?: string
 	serviceNamespace?: string
 	nodeName?: string
+	machineName?: string
 }
 
 export interface TenantDetail {
@@ -207,15 +208,16 @@ export function computeRangeBreakdown(
 		serviceName: a.serviceRef?.name,
 		serviceNamespace: a.serviceRef?.namespace,
 		nodeName: a.nodeRef?.name,
+		machineName: a.machineRef?.name,
 	}))
 
-	// Extract node details from infra allocations with source="node" or with nodeRef.
+	// Extract node details from infra allocations with source="node"/"machine" or with nodeRef/machineRef.
 	const parsedNodes: NodeDetail[] = infrastructureAllocations
-		.filter(a => a.nodeRef?.name)
+		.filter(a => a.nodeRef?.name || a.machineRef?.name)
 		.map(a => ({
 			ip: ipToInt(a.ip),
 			ipStr: a.ip,
-			nodeName: a.nodeRef!.name,
+			nodeName: a.nodeRef?.name || a.machineRef?.name || '',
 		}))
 
 	const parsedAllocations = allocations

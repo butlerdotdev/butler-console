@@ -43,6 +43,7 @@ export interface InfrastructureAllocation {
 	source: string
 	serviceRef?: NamespacedObjectReference
 	nodeRef?: ClusterObjectReference
+	machineRef?: NamespacedObjectReference
 }
 
 export interface NetworkPoolStatus {

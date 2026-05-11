@@ -34,11 +34,15 @@ export interface NamespacedObjectReference {
 	name: string
 }
 
+export interface ClusterObjectReference {
+	name: string
+}
+
 export interface InfrastructureAllocation {
 	ip: string
 	source: string
 	serviceRef?: NamespacedObjectReference
-	nodeRef?: NamespacedObjectReference
+	nodeRef?: ClusterObjectReference
 }
 
 export interface NetworkPoolStatus {

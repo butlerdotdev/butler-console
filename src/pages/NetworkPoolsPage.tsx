@@ -181,7 +181,7 @@ const MINI_BAR_COLORS: Record<string, string> = {
 	'reserved-infra': 'bg-indigo-400/60',
 	'tenant-allocated': 'bg-amber-500/50',
 	'tenant-available': 'bg-emerald-500/50',
-	unassigned: 'bg-neutral-800/60',
+	unmanaged: 'bg-neutral-800/60',
 }
 
 function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
@@ -195,7 +195,6 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 	const poolSize = parseCIDR(cidr).size
 
 	const infraAllocations = status?.infrastructureAllocations || []
-	const nodeAllocations = status?.nodeAllocations || []
 
 	const segments = useMemo(
 		() => computePoolLayout(pool, allocatedIPs, infraAllocations),
@@ -215,7 +214,7 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 	const infraTotal = summary['reserved-infra'] || 0
 	const tenantAllocated = summary['tenant-allocated'] || 0
 	const tenantAvailable = summary['tenant-available'] || 0
-	const unassigned = summary['unassigned'] || 0
+	const unmanaged = summary['unmanaged'] || 0
 
 	const age = creationTimestamp
 		? new Date(creationTimestamp).toLocaleDateString()
@@ -317,14 +316,9 @@ function PoolCard({ pool, onDelete, canMutate }: PoolCardProps) {
 							{tenantAvailable} Tenant Free
 						</span>
 					)}
-					{unassigned > 0 && (
+					{unmanaged > 0 && (
 						<span className="text-neutral-500">
-							{unassigned} DHCP
-							{nodeAllocations.length > 0 && (
-								<span className="text-orange-400 ml-1">
-									({nodeAllocations.length} leased)
-								</span>
-							)}
+							{unmanaged} Unmanaged
 						</span>
 					)}
 				</div>

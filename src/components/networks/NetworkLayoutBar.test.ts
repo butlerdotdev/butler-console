@@ -33,7 +33,7 @@ function makePool(overrides: {
 	}
 }
 
-type SegmentKind = 'gateway' | 'reserved' | 'reserved-infra' | 'tenant-allocated' | 'tenant-available' | 'unassigned'
+type SegmentKind = 'gateway' | 'reserved' | 'reserved-infra' | 'tenant-allocated' | 'tenant-available' | 'unmanaged'
 
 /** Summarize segments into a map of kind -> total IPs */
 function summarize(segments: ReturnType<typeof computePoolLayout>): Record<string, number> {
@@ -65,7 +65,7 @@ const layoutCases: LayoutCase[] = [
 		allocatedIPs: 0,
 		expectKinds: {
 			gateway: 1,
-			unassigned: 255,
+			unmanaged: 255,
 		},
 		expectTotalSize: 256,
 	},
@@ -129,7 +129,7 @@ const layoutCases: LayoutCase[] = [
 			reserved: 31,
 			'tenant-allocated': 5,
 			'tenant-available': 27,
-			unassigned: 448,
+			unmanaged: 448,
 		},
 		expectTotalSize: 512,
 	},
@@ -212,7 +212,7 @@ const layoutCases: LayoutCase[] = [
 			'tenant-available': 145,
 			// Unassigned: 512 - 1 - 89 - 173 = 249
 			// .1-.6 (6) + .64-.255 (192) + .91.0-.91.50 (51) = 249
-			unassigned: 249,
+			unmanaged: 249,
 		},
 		expectTotalSize: 512,
 	},

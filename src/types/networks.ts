@@ -37,12 +37,8 @@ export interface NamespacedObjectReference {
 export interface InfrastructureAllocation {
 	ip: string
 	source: string
-	serviceRef: NamespacedObjectReference
-}
-
-export interface NodeAllocation {
-	ip: string
-	nodeName: string
+	serviceRef?: NamespacedObjectReference
+	nodeRef?: NamespacedObjectReference
 }
 
 export interface NetworkPoolStatus {
@@ -53,7 +49,11 @@ export interface NetworkPoolStatus {
 	fragmentation?: number
 	largestFreeBlock?: number
 	infrastructureAllocations?: InfrastructureAllocation[]
-	nodeAllocations?: NodeAllocation[]
+	poolSizeIPs?: number
+	reservedIPs?: number
+	unmanagedScopeIPs?: number
+	infrastructureConsumedIPs?: number
+	unmanagedRanges?: AllocationRange[]
 	conditions?: Condition[]
 }
 

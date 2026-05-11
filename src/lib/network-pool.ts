@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ipToInt, intToIp, parseCIDR, rangesOverlap } from '@/lib/ip-math'
-import type { AllocationRange, NetworkPoolSpec, InfrastructureAllocation, NodeAllocation, IPAllocation } from '@/types/networks'
+import type { AllocationRange, NetworkPoolSpec, InfrastructureAllocation, IPAllocation } from '@/types/networks'
 
 /**
  * Returns the effective tenant allocation ranges for a NetworkPool.
@@ -27,14 +27,15 @@ export function getEffectiveRanges(
 // Range Breakdown — used by IPAddressMap
 // ---------------------------------------------------------------------------
 
-export type PoolRangeKind = 'gateway' | 'reserved' | 'tenant' | 'unassigned'
+export type PoolRangeKind = 'gateway' | 'reserved' | 'tenant' | 'unmanaged'
 
 export interface InfraDetail {
 	ip: number
 	ipStr: string
 	source: string
-	serviceName: string
-	serviceNamespace: string
+	serviceName?: string
+	serviceNamespace?: string
+	nodeName?: string
 }
 
 export interface TenantDetail {
@@ -77,7 +78,6 @@ export function computeRangeBreakdown(
 	tenantAllocation: NetworkPoolSpec['tenantAllocation'],
 	allocations: IPAllocation[],
 	infrastructureAllocations: InfrastructureAllocation[],
-	nodeAllocations: NodeAllocation[] = [],
 ): PoolRange[] {
 	const pool = parseCIDR(poolCidr)
 	const poolStart = pool.start
@@ -119,7 +119,7 @@ export function computeRangeBreakdown(
 	// 2. Sort defined ranges by start IP, then merge overlapping same-kind ranges.
 	defined.sort((a, b) => a.start - b.start || a.end - b.end)
 
-	// 3. Build final range list by filling gaps with 'unassigned'.
+	// 3. Build final range list by filling gaps with 'unmanaged'.
 	// Flatten into non-overlapping intervals. Higher-priority kinds win overlaps.
 	// Priority: gateway > reserved > tenant > unassigned.
 	// Use the same boundary-splitting approach as computePoolLayout.
@@ -155,7 +155,7 @@ export function computeRangeBreakdown(
 		if (clampedStart > clampedEnd) continue
 
 		// Determine kind by priority
-		let kind: PoolRangeKind = 'unassigned'
+		let kind: PoolRangeKind = 'unmanaged'
 		let description: string | undefined
 
 		// Gateway check
@@ -164,7 +164,7 @@ export function computeRangeBreakdown(
 		}
 
 		// Reserved check
-		if (kind === 'unassigned') {
+		if (kind === 'unmanaged') {
 			for (const d of defined) {
 				if (d.kind === 'reserved' && rangesOverlap(clampedStart, clampedEnd, d.start, d.end)) {
 					kind = 'reserved'
@@ -175,7 +175,7 @@ export function computeRangeBreakdown(
 		}
 
 		// Tenant check
-		if (kind === 'unassigned') {
+		if (kind === 'unmanaged') {
 			for (const d of defined) {
 				if (d.kind === 'tenant' && rangesOverlap(clampedStart, clampedEnd, d.start, d.end)) {
 					kind = 'tenant'
@@ -198,20 +198,25 @@ export function computeRangeBreakdown(
 		}
 	}
 
-	// 5. Pre-parse infra, node, and allocation data for cross-referencing.
+	// 5. Pre-parse infra and allocation data for cross-referencing.
+	// InfrastructureAllocations now carry both Service and Node references.
 	const parsedInfra: InfraDetail[] = infrastructureAllocations.map(a => ({
 		ip: ipToInt(a.ip),
 		ipStr: a.ip,
 		source: a.source,
-		serviceName: a.serviceRef.name,
-		serviceNamespace: a.serviceRef.namespace,
+		serviceName: a.serviceRef?.name,
+		serviceNamespace: a.serviceRef?.namespace,
+		nodeName: a.nodeRef?.name,
 	}))
 
-	const parsedNodes: NodeDetail[] = nodeAllocations.map(a => ({
-		ip: ipToInt(a.ip),
-		ipStr: a.ip,
-		nodeName: a.nodeName,
-	}))
+	// Extract node details from infra allocations with source="node" or with nodeRef.
+	const parsedNodes: NodeDetail[] = infrastructureAllocations
+		.filter(a => a.nodeRef?.name)
+		.map(a => ({
+			ip: ipToInt(a.ip),
+			ipStr: a.ip,
+			nodeName: a.nodeRef!.name,
+		}))
 
 	const parsedAllocations = allocations
 		.filter(a => a.status?.startAddress && a.status?.endAddress)
@@ -238,20 +243,21 @@ export function computeRangeBreakdown(
 		const tenantDetails: TenantDetail[] = []
 		const nodeDetails: NodeDetail[] = []
 
-		if (interval.kind === 'reserved' || interval.kind === 'unassigned') {
-			// Cross-reference infrastructure allocations
+		if (interval.kind === 'reserved' || interval.kind === 'unmanaged') {
+			// Cross-reference infrastructure allocations (Services and Nodes)
 			for (const infra of parsedInfra) {
 				if (infra.ip >= interval.start && infra.ip <= interval.end) {
 					infraDetails.push(infra)
 				}
 			}
-			// Cross-reference node DHCP leases
+			// Cross-reference nodes within this range
 			for (const node of parsedNodes) {
 				if (node.ip >= interval.start && node.ip <= interval.end) {
 					nodeDetails.push(node)
 				}
 			}
-			consumedIPs = infraDetails.length + nodeDetails.length
+			// Consumed = unique IPs (infra entries already deduplicate by IP)
+			consumedIPs = infraDetails.length
 		} else if (interval.kind === 'tenant') {
 			// Cross-reference tenant allocations
 			for (const alloc of parsedAllocations) {

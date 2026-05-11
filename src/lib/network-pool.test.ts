@@ -62,12 +62,12 @@ interface RangeCase {
 
 const rangeCases: RangeCase[] = [
 	{
-		name: 'empty pool — only gateway + unassigned',
+		name: 'empty pool — only gateway + unmanaged',
 		cidr: '10.1.1.0/24',
 		reserved: [],
 		allocations: [],
 		infraAllocations: [],
-		expectKinds: { gateway: 1, unassigned: 255 },
+		expectKinds: { gateway: 1, unmanaged: 255 },
 		expectTotalSize: 256,
 		expectRangeCount: 2,
 	},
@@ -78,7 +78,7 @@ const rangeCases: RangeCase[] = [
 		tenantAllocation: { start: '10.1.1.32', end: '10.1.1.63' },
 		allocations: [],
 		infraAllocations: [],
-		expectKinds: { gateway: 1, reserved: 15, tenant: 32, unassigned: 208 },
+		expectKinds: { gateway: 1, reserved: 15, tenant: 32, unmanaged: 208 },
 		expectTotalSize: 256,
 	},
 	{
@@ -91,7 +91,7 @@ const rangeCases: RangeCase[] = [
 			{ ip: '10.1.1.2', source: 'metallb', serviceRef: { namespace: 'ingress', name: 'traefik' } },
 			{ ip: '10.1.1.3', source: 'metallb', serviceRef: { namespace: 'monitoring', name: 'grafana' } },
 		],
-		expectKinds: { gateway: 1, reserved: 15, tenant: 32, unassigned: 208 },
+		expectKinds: { gateway: 1, reserved: 15, tenant: 32, unmanaged: 208 },
 		expectTotalSize: 256,
 		expectInfraInReserved: 2,
 	},
@@ -105,7 +105,7 @@ const rangeCases: RangeCase[] = [
 			{ name: 'alloc-2', cluster: 'prd-cluster', type: 'loadbalancer', start: '10.1.1.40', end: '10.1.1.42', count: 3 },
 		]),
 		infraAllocations: [],
-		expectKinds: { gateway: 1, tenant: 32, unassigned: 223 },
+		expectKinds: { gateway: 1, tenant: 32, unmanaged: 223 },
 		expectTotalSize: 256,
 		expectTenantConsumed: 8,
 	},
@@ -139,7 +139,7 @@ const rangeCases: RangeCase[] = [
 			// .32-.63 (32) + .91.51-.91.191 (141) = 173
 			tenant: 173,
 			// .1-.6 (6) + .64-.255 (192) + .91.0-.91.50 (51) = 249
-			unassigned: 249,
+			unmanaged: 249,
 		},
 		expectTotalSize: 512,
 		expectInfraInReserved: 3,
@@ -159,12 +159,12 @@ const rangeCases: RangeCase[] = [
 			{ name: 'a1', cluster: 'c1', type: 'nodes', start: '10.0.0.10', end: '10.0.0.14', count: 5 },
 		]),
 		infraAllocations: [],
-		expectKinds: { gateway: 1, tenant: 20, unassigned: 235 },
+		expectKinds: { gateway: 1, tenant: 20, unmanaged: 235 },
 		expectTotalSize: 256,
 		expectTenantConsumed: 5,
 	},
 	{
-		name: 'services in unassigned (DHCP) range',
+		name: 'services in unmanaged range',
 		cidr: '10.0.0.0/24',
 		reserved: [{ cidr: '10.0.0.0/28', description: 'mgmt' }],
 		tenantAllocation: { start: '10.0.0.32', end: '10.0.0.63' },
@@ -174,7 +174,7 @@ const rangeCases: RangeCase[] = [
 			{ ip: '10.0.0.100', source: 'metallb', serviceRef: { namespace: 'monitoring', name: 'grafana' } },
 			{ ip: '10.0.0.200', source: 'metallb', serviceRef: { namespace: 'logging', name: 'loki' } },
 		],
-		expectKinds: { gateway: 1, reserved: 15, tenant: 32, unassigned: 208 },
+		expectKinds: { gateway: 1, reserved: 15, tenant: 32, unmanaged: 208 },
 		expectTotalSize: 256,
 		expectInfraInReserved: 1,
 		expectInfraInUnassigned: 2,
@@ -235,14 +235,14 @@ export function validateRangeBreakdownCases(): void {
 			}
 		}
 
-		// Verify infra in unassigned ranges
+		// Verify infra in unmanaged ranges
 		if (c.expectInfraInUnassigned !== undefined) {
 			const totalInfra = ranges
-				.filter(r => r.kind === 'unassigned')
+				.filter(r => r.kind === 'unmanaged')
 				.reduce((sum, r) => sum + r.infraDetails.length, 0)
 			if (totalInfra !== c.expectInfraInUnassigned) {
 				throw new Error(
-					`[${c.name}] infra in unassigned: got ${totalInfra}, want ${c.expectInfraInUnassigned}`
+					`[${c.name}] infra in unmanaged: got ${totalInfra}, want ${c.expectInfraInUnassigned}`
 				)
 			}
 		}

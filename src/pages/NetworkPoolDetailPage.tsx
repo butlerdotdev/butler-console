@@ -100,7 +100,7 @@ export function NetworkPoolDetailPage() {
 			reservedIPs: (counts['reserved'] || 0) + (counts['reserved-infra'] || 0) + (counts['gateway'] || 0),
 			infraIPs: counts['reserved-infra'] || 0,
 			tenantRangeSize: (counts['tenant-allocated'] || 0) + (counts['tenant-available'] || 0),
-			unassigned: counts['unassigned'] || 0,
+			unassigned: counts['unmanaged'] || 0,
 		}
 	}, [pool])
 
@@ -140,7 +140,7 @@ export function NetworkPoolDetailPage() {
 	const largestFreeBlock = status?.largestFreeBlock || 0
 	const allocationCount = status?.allocationCount || 0
 	const infraAllocations = status?.infrastructureAllocations || []
-	const nodeAllocations = status?.nodeAllocations || []
+	const nodeCount = infraAllocations.filter(a => a.nodeRef?.name).length
 
 	return (
 		<FadeIn>
@@ -190,11 +190,11 @@ export function NetworkPoolDetailPage() {
 						/>
 						<StatCard label="Tenant Range" value={fullPoolStats.tenantRangeSize.toLocaleString()} />
 						<StatCard
-							label="DHCP Scope"
+							label="Unmanaged"
 							value={fullPoolStats.unassigned.toLocaleString()}
-							subtitle={nodeAllocations.length > 0
-								? `${nodeAllocations.length} node${nodeAllocations.length !== 1 ? 's' : ''} leased`
-								: 'No lease data available'
+							subtitle={nodeCount > 0
+								? `${nodeCount} node${nodeCount !== 1 ? 's' : ''} observed`
+								: undefined
 							}
 						/>
 					</div>
@@ -241,7 +241,6 @@ export function NetworkPoolDetailPage() {
 						tenantAllocation={pool.spec.tenantAllocation}
 						allocations={allocations}
 						infrastructureAllocations={infraAllocations}
-						nodeAllocations={nodeAllocations}
 					/>
 				</Card>
 

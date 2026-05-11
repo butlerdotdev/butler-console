@@ -11,7 +11,7 @@ import type { NetworkPool, InfrastructureAllocation } from '@/types/networks'
 // Types
 // ---------------------------------------------------------------------------
 
-type SegmentKind = 'gateway' | 'reserved' | 'reserved-infra' | 'tenant-allocated' | 'tenant-available' | 'unassigned'
+type SegmentKind = 'gateway' | 'reserved' | 'reserved-infra' | 'tenant-allocated' | 'tenant-available' | 'unmanaged'
 
 interface Segment {
 	kind: SegmentKind
@@ -38,7 +38,7 @@ const SEGMENT_STYLES: Record<SegmentKind, { bg: string; text: string }> = {
 	'reserved-infra': { bg: 'bg-indigo-400/60', text: 'text-indigo-300' },
 	'tenant-allocated': { bg: 'bg-amber-500/50', text: 'text-amber-400' },
 	'tenant-available': { bg: 'bg-emerald-500/50', text: 'text-emerald-400' },
-	unassigned: { bg: 'bg-neutral-800/60', text: 'text-neutral-500' },
+	unmanaged: { bg: 'bg-neutral-800/60', text: 'text-neutral-500' },
 }
 
 const SEGMENT_LABELS: Record<SegmentKind, string> = {
@@ -47,7 +47,7 @@ const SEGMENT_LABELS: Record<SegmentKind, string> = {
 	'reserved-infra': 'In Use',
 	'tenant-allocated': 'Tenant (Allocated)',
 	'tenant-available': 'Tenant (Available)',
-	unassigned: 'DHCP',
+	unmanaged: 'Unmanaged',
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number, infra
 		if (size === 0) continue
 
 		// Determine kind by priority
-		let kind: SegmentKind = 'unassigned'
+		let kind: SegmentKind = 'unmanaged'
 		let description: string | undefined
 
 		// Check gateway (highest priority)
@@ -170,7 +170,7 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number, infra
 		}
 
 		// Check infrastructure allocations (higher priority than generic reserved)
-		if (kind === 'unassigned') {
+		if (kind === 'unmanaged') {
 			for (const r of regions) {
 				if (r.kind === 'reserved-infra' && rangesOverlap(clampedStart, clampedEnd, r.start, r.end)) {
 					kind = 'reserved-infra'
@@ -181,7 +181,7 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number, infra
 		}
 
 		// Check reserved (next priority)
-		if (kind === 'unassigned') {
+		if (kind === 'unmanaged') {
 			for (const r of regions) {
 				if (r.kind === 'reserved' && rangesOverlap(clampedStart, clampedEnd, r.start, r.end)) {
 					kind = 'reserved'
@@ -192,7 +192,7 @@ export function computePoolLayout(pool: NetworkPool, allocatedIPs: number, infra
 		}
 
 		// Check tenant (lower priority than reserved)
-		if (kind === 'unassigned') {
+		if (kind === 'unmanaged') {
 			for (const range of tenantRanges) {
 				if (rangesOverlap(clampedStart, clampedEnd, range.start, range.end)) {
 					kind = 'tenant-available'

@@ -568,9 +568,9 @@ export function IPAddressMap({ cidr, reserved = [], tenantAllocation, allocation
 			<div className="flex items-baseline justify-between">
 				<h3 className="text-sm font-medium text-neutral-200">IP Address Map</h3>
 				<span className="text-xs text-neutral-500">
-					{ranges.length} range{ranges.length !== 1 ? 's' : ''} &middot;{' '}
-					{summary.totalInfra > 0 && `${summary.totalInfra} services &middot; `}
-					{summary.totalNodes > 0 && `${summary.totalNodes} nodes &middot; `}
+					{ranges.length} range{ranges.length !== 1 ? 's' : ''} {'\u00B7'}{' '}
+					{summary.totalInfra > 0 && `${summary.totalInfra} services \u00B7 `}
+					{summary.totalNodes > 0 && `${summary.totalNodes} nodes \u00B7 `}
 					{summary.totalTenantUsed}/{summary.totalTenant} tenant IPs used
 				</span>
 			</div>

@@ -30,6 +30,7 @@ interface TeamMember {
 	source: 'direct' | 'group' | 'elevated'
 	groupName?: string
 	groupRole?: string
+	groupIdentifier?: string
 	directRole?: string
 	canRemove?: boolean
 	removeNote?: string
@@ -106,6 +107,7 @@ export function AdminTeamDetailPage() {
 
 	// Group sync state
 	const [groupSyncs, setGroupSyncs] = useState<GroupSync[]>([])
+	const [groupMemberCounts, setGroupMemberCounts] = useState<Record<string, number>>({})
 	const [identityProviders, setIdentityProviders] = useState<IdentityProviderSummary[]>([])
 
 	// Add member modal
@@ -169,6 +171,7 @@ export function AdminTeamDetailPage() {
 			if (membersResponse.ok) {
 				const membersData = await membersResponse.json()
 				setMembers(membersData.members || [])
+				setGroupMemberCounts(membersData.groupMemberCounts || {})
 			}
 
 			// Fetch group syncs
@@ -1029,13 +1032,18 @@ export function AdminTeamDetailPage() {
 									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase">
 										Role
 									</th>
+									<th className="px-5 py-3 text-left text-xs font-medium text-neutral-400 uppercase">
+										Observed Members
+									</th>
 									<th className="px-5 py-3 text-right text-xs font-medium text-neutral-400 uppercase">
 										Actions
 									</th>
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-neutral-800">
-								{groupSyncs.map((group, index) => (
+								{groupSyncs.map((group, index) => {
+									const count = groupMemberCounts[group.name] ?? 0
+									return (
 									<tr key={`${group.name}-${group.identityProvider || index}`} className="hover:bg-neutral-800/30">
 										<td className="px-5 py-4">
 											<span className="text-neutral-200 font-mono text-sm">{group.name}</span>
@@ -1059,6 +1067,18 @@ export function AdminTeamDetailPage() {
 												<option value="admin">Admin</option>
 											</select>
 										</td>
+										<td className="px-5 py-4">
+											{count > 0 ? (
+												<span className="text-neutral-200">{count}</span>
+											) : (
+												<span
+													className="text-neutral-500 cursor-help"
+													title="No users have been observed with this group. Users appear after their first SSO login."
+												>
+													0
+												</span>
+											)}
+										</td>
 										<td className="px-5 py-4 text-right">
 											{canMutate && (
 												<button
@@ -1070,7 +1090,8 @@ export function AdminTeamDetailPage() {
 											)}
 										</td>
 									</tr>
-								))}
+									)
+								})}
 							</tbody>
 						</table>
 					)}

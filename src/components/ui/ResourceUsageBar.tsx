@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 interface ResourceUsageBarProps {
 	label: string
-	used: number | string
+	used: number | string | null | undefined
 	limit: number | string | null | undefined
 	unit?: string
 	className?: string
@@ -16,7 +16,8 @@ interface ResourceUsageBarProps {
  * into a numeric value. For simplicity, returns the base numeric value and
  * normalizes Gi/Mi/Ki suffixes.
  */
-function parseQuantity(value: string | number): number {
+function parseQuantity(value: string | number | null | undefined): number {
+	if (value == null) return 0
 	if (typeof value === 'number') return value
 	const str = value.trim()
 	if (!str) return 0
@@ -51,7 +52,8 @@ function parseQuantity(value: string | number): number {
 /**
  * Formats a quantity value for display with the appropriate unit.
  */
-function formatQuantity(value: string | number, unit?: string): string {
+function formatQuantity(value: string | number | null | undefined, unit?: string): string {
+	if (value == null) return unit ? `0 ${unit}` : '0'
 	if (typeof value === 'number') {
 		return unit ? `${value} ${unit}` : `${value}`
 	}

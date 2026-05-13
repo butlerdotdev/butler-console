@@ -754,12 +754,12 @@ export function AdminTeamDetailPage() {
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
 							<ResourceUsageBar
 								label="Clusters"
-								used={team.resourceUsage.clusters}
+								used={team.resourceUsage.clusters ?? 0}
 								limit={team.resourceLimits?.maxClusters}
 							/>
 							<ResourceUsageBar
 								label="Total Nodes"
-								used={team.resourceUsage.totalNodes}
+								used={team.resourceUsage.totalNodes ?? 0}
 								limit={team.resourceLimits?.maxTotalNodes}
 							/>
 							<ResourceUsageBar

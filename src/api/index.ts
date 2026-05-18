@@ -11,6 +11,8 @@ export { gitopsApi } from './gitops';
 export * from './gitops';
 
 export { identityProvidersApi, PROVIDER_PRESETS } from './identity-providers'
+export { policiesApi } from './policies'
+export type { ClusterCreationPolicy, PolicyOptionType, PolicyOptionMode, PolicyOptionRule, PolicyScope, PolicyListResponse, WebhookError } from './policies'
 export { networksApi } from './networks'
 export * from './certificates';
 export { observabilityApi } from './observability'

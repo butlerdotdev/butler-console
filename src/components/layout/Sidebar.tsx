@@ -160,6 +160,7 @@ export function Sidebar() {
 			items: [
 				{ to: '/admin/addons', label: 'Addon Catalog', icon: AddonsIcon },
 				{ to: '/admin/identity-providers', label: 'Identity Providers', icon: IdentityProvidersIcon },
+				{ to: '/admin/policies', label: 'Creation Policies', icon: AccessControlIcon },
 				{ to: '/admin/observability', label: 'Observability', icon: ObservabilityIcon },
 			],
 		},

@@ -40,6 +40,9 @@ import { DeviceAuthPage } from '@/pages/DeviceAuthPage'
 import { ProfileSettingsPage } from '@/pages/ProfileSettingsPage'
 import { PreferencesPage } from '@/pages/PreferencesPage'
 import { IdentityProvidersPage } from '@/pages/IdentityProvidersPage'
+import { PoliciesListPage } from '@/pages/PoliciesListPage'
+import { PolicyCreatePage } from '@/pages/PolicyCreatePage'
+import { PolicyDetailPage } from '@/pages/PolicyDetailPage'
 import { CreateIdentityProviderPage } from '@/pages/CreateIdentityProviderPage'
 import { NetworkPoolsPage } from '@/pages/NetworkPoolsPage'
 import { NetworkPoolDetailPage } from '@/pages/NetworkPoolDetailPage'
@@ -166,6 +169,9 @@ export default function App() {
 					<Route path="admin/networks/:namespace/:name" element={<RequireAdmin><NetworkPoolDetailPage /></RequireAdmin>} />
 					<Route path="admin/identity-providers" element={<RequireAdmin><IdentityProvidersPage /></RequireAdmin>} />
 					<Route path="admin/identity-providers/create" element={<RequireAdmin><CreateIdentityProviderPage /></RequireAdmin>} />
+					<Route path="admin/policies" element={<RequireAdmin><PoliciesListPage /></RequireAdmin>} />
+					<Route path="admin/policies/new" element={<RequireAdmin><PolicyCreatePage /></RequireAdmin>} />
+					<Route path="admin/policies/:name" element={<RequireAdmin><PolicyDetailPage /></RequireAdmin>} />
 					<Route path="admin/addons" element={<RequireAdmin><AddonCatalogPage /></RequireAdmin>} />
 					<Route path="admin/images" element={<RequireAdmin><ImagesPage /></RequireAdmin>} />
 					<Route path="admin/audit" element={<RequireAdmin><AuditLogPage /></RequireAdmin>} />

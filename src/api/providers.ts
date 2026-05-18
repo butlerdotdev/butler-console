@@ -197,8 +197,23 @@ export interface ImageInfo {
 	os?: string
 }
 
+// PolicyMode mirrors the ADR-018 OptionMode enum on the server.
+export type PolicyMode = 'pin' | 'allowList' | 'default' | 'recommended'
+
+// PolicyMetadata is the optional `policy` block butler-server adds to
+// option-list responses when an ADR-018 ClusterCreationPolicy applies.
+// See butler-controller/docs/architecture/ADR-018-cluster-creation-policy.md.
+export interface PolicyMetadata {
+	name: string
+	mode: PolicyMode
+	values?: string[]
+	default?: string
+	recommendedReason?: string
+}
+
 export interface ImageListResponse {
 	images: ImageInfo[]
+	policy?: PolicyMetadata
 }
 
 export interface NetworkInfo {
@@ -210,6 +225,7 @@ export interface NetworkInfo {
 
 export interface NetworkListResponse {
 	networks: NetworkInfo[]
+	policy?: PolicyMetadata
 }
 
 export interface ClusterInfo {
@@ -219,6 +235,7 @@ export interface ClusterInfo {
 
 export interface ClusterListResponse {
 	clusters: ClusterInfo[]
+	policy?: PolicyMetadata
 }
 
 export interface StorageContainerInfo {
@@ -228,6 +245,7 @@ export interface StorageContainerInfo {
 
 export interface StorageContainerListResponse {
 	storageContainers: StorageContainerInfo[]
+	policy?: PolicyMetadata
 }
 
 export const providersApi = {

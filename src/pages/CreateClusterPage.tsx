@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
-import { clustersApi, providersApi, apiClient, type Provider, type ImageInfo, type NetworkInfo, type ClusterInfo, type StorageContainerInfo, isCloudProvider, getProviderRegion, getProviderNetwork } from '@/api'
+import { clustersApi, providersApi, apiClient, type Provider, type ImageInfo, type NetworkInfo, type ClusterInfo, type StorageContainerInfo, type PolicyMetadata, isCloudProvider, getProviderRegion, getProviderNetwork } from '@/api'
 import { Card, Button, FadeIn, Spinner } from '@/components/ui'
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/SearchableSelect'
 import { parseQuantity } from '@/components/ui/ResourceUsageBar'
@@ -68,6 +68,15 @@ export function CreateClusterPage() {
 	// Nutanix storage containers
 	const [storageContainers, setStorageContainers] = useState<StorageContainerInfo[]>([])
 	const [loadingStorageContainers, setLoadingStorageContainers] = useState(false)
+
+	// ADR-018 policy metadata returned alongside each option list. When
+	// the server applies a ClusterCreationPolicy, this carries the policy
+	// name, mode, default value, and any recommended-reason text so the
+	// modal can render the affordances per mode.
+	const [imagePolicy, setImagePolicy] = useState<PolicyMetadata | null>(null)
+	const [networkPolicy, setNetworkPolicy] = useState<PolicyMetadata | null>(null)
+	const [clusterPolicy, setClusterPolicy] = useState<PolicyMetadata | null>(null)
+	const [storagePolicy, setStoragePolicy] = useState<PolicyMetadata | null>(null)
 
 	// Determine namespace based on team context
 	// If in team context, use team namespace; otherwise default to butler-tenants
@@ -484,9 +493,12 @@ export function CreateClusterPage() {
 			try {
 				const response = await providersApi.listImages(ns, selectedProvider.metadata.name)
 				setImages(response.images || [])
+				setImagePolicy(response.policy || null)
 
-				// Auto-select first non-Talos image for tenant clusters
-				const defaultImage = response.images?.find(i => i.os && i.os !== 'talos') || response.images?.[0]
+				// Auto-select: prefer policy default when present; otherwise
+				// fall back to the existing first-non-Talos heuristic.
+				const policyDefault = response.policy?.default && response.images?.find(i => i.id === response.policy?.default)
+				const defaultImage = policyDefault || response.images?.find(i => i.os && i.os !== 'talos') || response.images?.[0]
 				if (defaultImage) {
 					if (providerType === 'harvester') {
 						setForm(prev => ({ ...prev, harvesterImageName: defaultImage.id }))
@@ -507,10 +519,12 @@ export function CreateClusterPage() {
 			try {
 				const response = await providersApi.listNetworks(ns, selectedProvider.metadata.name)
 				setNetworks(response.networks || [])
+				setNetworkPolicy(response.policy || null)
 
-				// Auto-select first network
-				if (response.networks?.length > 0) {
-					const defaultNetwork = response.networks[0]
+				// Auto-select: policy default when present, otherwise first.
+				const policyDefault = response.policy?.default && response.networks?.find(n => n.id === response.policy?.default)
+				const defaultNetwork = policyDefault || (response.networks?.length > 0 ? response.networks[0] : undefined)
+				if (defaultNetwork) {
 					if (providerType === 'harvester') {
 						setForm(prev => ({ ...prev, harvesterNetworkName: defaultNetwork.id }))
 					} else if (providerType === 'nutanix') {
@@ -534,6 +548,10 @@ export function CreateClusterPage() {
 				try {
 					const response = await providersApi.listClusters(ns, selectedProvider.metadata.name)
 					setNutanixClusters(response.clusters || [])
+					setClusterPolicy(response.policy || null)
+					if (response.policy?.default && response.clusters?.find(c => c.id === response.policy?.default)) {
+						setForm(prev => ({ ...prev, nutanixClusterUUID: response.policy!.default! }))
+					}
 				} catch (err) {
 					console.error('Failed to fetch Nutanix clusters:', err)
 				} finally {
@@ -546,6 +564,10 @@ export function CreateClusterPage() {
 				try {
 					const response = await providersApi.listStorageContainers(ns, selectedProvider.metadata.name)
 					setStorageContainers(response.storageContainers || [])
+					setStoragePolicy(response.policy || null)
+					if (response.policy?.default && response.storageContainers?.find(s => s.id === response.policy?.default)) {
+						setForm(prev => ({ ...prev, nutanixStorageContainerUUID: response.policy!.default! }))
+					}
 				} catch (err) {
 					console.error('Failed to fetch storage containers:', err)
 				} finally {
@@ -953,6 +975,8 @@ export function CreateClusterPage() {
 										loadingImages={loadingImages}
 										networks={networks}
 										loadingNetworks={loadingNetworks}
+										imagePolicy={imagePolicy}
+										networkPolicy={networkPolicy}
 									/>
 								)}
 
@@ -969,6 +993,10 @@ export function CreateClusterPage() {
 										loadingClusters={loadingClusters}
 										storageContainers={storageContainers}
 										loadingStorageContainers={loadingStorageContainers}
+										imagePolicy={imagePolicy}
+										networkPolicy={networkPolicy}
+										clusterPolicy={clusterPolicy}
+										storagePolicy={storagePolicy}
 									/>
 								)}
 
@@ -1397,6 +1425,8 @@ interface FieldPropsWithResources extends FieldProps {
 	loadingImages: boolean
 	networks: NetworkInfo[]
 	loadingNetworks: boolean
+	imagePolicy?: PolicyMetadata | null
+	networkPolicy?: PolicyMetadata | null
 }
 
 interface NutanixFieldProps extends FieldPropsWithResources {
@@ -1406,9 +1436,33 @@ interface NutanixFieldProps extends FieldPropsWithResources {
 	loadingClusters: boolean
 	storageContainers: StorageContainerInfo[]
 	loadingStorageContainers: boolean
+	clusterPolicy?: PolicyMetadata | null
+	storagePolicy?: PolicyMetadata | null
 }
 
-function HarvesterFields({ form, onChange, images, loadingImages, networks, loadingNetworks }: FieldPropsWithResources) {
+// PolicyBadge renders the affordance below a dropdown that has been
+// curated by an ADR-018 ClusterCreationPolicy. The text matches the
+// curation mode: pin and allowList show "Curated by policy", recommended
+// adds the reason text, default is silent (no badge; the dropdown's
+// pre-selection conveys the intent without extra UI).
+function PolicyBadge({ policy }: { policy?: PolicyMetadata | null }) {
+	if (!policy) return null
+	if (policy.mode === 'default') return null
+	const verb =
+		policy.mode === 'pin' ? 'Pinned by'
+		: policy.mode === 'allowList' ? 'Filtered by'
+		: 'Recommended by'
+	return (
+		<p className="text-xs text-violet-400 mt-1">
+			{verb} policy <span className="font-mono">{policy.name}</span>
+			{policy.mode === 'recommended' && policy.recommendedReason ? (
+				<span className="text-neutral-500"> ({policy.recommendedReason})</span>
+			) : null}
+		</p>
+	)
+}
+
+function HarvesterFields({ form, onChange, images, loadingImages, networks, loadingNetworks, imagePolicy, networkPolicy }: FieldPropsWithResources) {
 	return (
 		<div className="grid grid-cols-2 gap-4">
 			<div>
@@ -1458,6 +1512,7 @@ function HarvesterFields({ form, onChange, images, loadingImages, networks, load
 					/>
 				)}
 				<p className="text-xs text-neutral-500 mt-1">VM network for worker nodes</p>
+				<PolicyBadge policy={networkPolicy} />
 			</div>
 			<div className="col-span-2">
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -1495,6 +1550,7 @@ function HarvesterFields({ form, onChange, images, loadingImages, networks, load
 				<p className="text-xs text-neutral-500 mt-1">
 					OS image for worker nodes
 				</p>
+				<PolicyBadge policy={imagePolicy} />
 			</div>
 		</div>
 	)
@@ -1511,6 +1567,10 @@ function NutanixFields({
 	loadingClusters,
 	storageContainers,
 	loadingStorageContainers,
+	imagePolicy,
+	networkPolicy,
+	clusterPolicy,
+	storagePolicy,
 }: NutanixFieldProps) {
 	const clusterOptions: SearchableSelectOption[] = clusters.map((c) => ({
 		value: c.id,
@@ -1552,6 +1612,7 @@ function NutanixFields({
 				<p className="text-xs text-neutral-500 mt-1">
 					Prism Element cluster for VM placement
 				</p>
+				<PolicyBadge policy={clusterPolicy} />
 			</div>
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -1565,6 +1626,7 @@ function NutanixFields({
 					loading={loadingNetworks}
 					loadingText="Loading subnets..."
 				/>
+				<PolicyBadge policy={networkPolicy} />
 			</div>
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -1581,6 +1643,7 @@ function NutanixFields({
 				<p className="text-xs text-neutral-500 mt-1">
 					OS image for worker nodes (uses provider default if not set)
 				</p>
+				<PolicyBadge policy={imagePolicy} />
 			</div>
 			<div>
 				<label className="block text-sm font-medium text-neutral-400 mb-1">
@@ -1594,6 +1657,7 @@ function NutanixFields({
 					loading={loadingStorageContainers}
 					loadingText="Loading storage containers..."
 				/>
+				<PolicyBadge policy={storagePolicy} />
 			</div>
 		</div>
 	)

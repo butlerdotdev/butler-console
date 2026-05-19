@@ -60,7 +60,7 @@ export function PoliciesListPage() {
 							Admin-curated defaults, pins, allow-lists, and recommendations for the create-cluster modal (ADR-018).
 						</p>
 					</div>
-					<Button onClick={() => navigate('/admin/policies/new')}>New Policy</Button>
+					<Button onClick={() => navigate('/admin/policies/cluster-creation/new')}>New Policy</Button>
 				</div>
 
 				{loading ? (
@@ -73,7 +73,7 @@ export function PoliciesListPage() {
 						<p className="text-sm text-neutral-500 mt-2">
 							Policies curate the create-cluster modal dropdowns. UI, GitOps, and kubectl all author the same resource.
 						</p>
-						<Button className="mt-4" onClick={() => navigate('/admin/policies/new')}>
+						<Button className="mt-4" onClick={() => navigate('/admin/policies/cluster-creation/new')}>
 							Create first policy
 						</Button>
 					</Card>
@@ -93,7 +93,7 @@ export function PoliciesListPage() {
 								{policies.map(p => (
 									<tr key={p.metadata.name} className="hover:bg-neutral-800/30">
 										<td className="px-5 py-4">
-											<Link to={`/admin/policies/${encodeURIComponent(p.metadata.name)}`} className="text-violet-400 hover:text-violet-300 font-mono text-sm">
+											<Link to={`/admin/policies/cluster-creation/${encodeURIComponent(p.metadata.name)}`} className="text-violet-400 hover:text-violet-300 font-mono text-sm">
 												{p.metadata.name}
 											</Link>
 										</td>

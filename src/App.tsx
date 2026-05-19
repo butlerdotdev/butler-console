@@ -40,6 +40,7 @@ import { DeviceAuthPage } from '@/pages/DeviceAuthPage'
 import { ProfileSettingsPage } from '@/pages/ProfileSettingsPage'
 import { PreferencesPage } from '@/pages/PreferencesPage'
 import { IdentityProvidersPage } from '@/pages/IdentityProvidersPage'
+import { PoliciesHubPage } from '@/pages/PoliciesHubPage'
 import { PoliciesListPage } from '@/pages/PoliciesListPage'
 import { PolicyCreatePage } from '@/pages/PolicyCreatePage'
 import { PolicyDetailPage } from '@/pages/PolicyDetailPage'
@@ -169,9 +170,10 @@ export default function App() {
 					<Route path="admin/networks/:namespace/:name" element={<RequireAdmin><NetworkPoolDetailPage /></RequireAdmin>} />
 					<Route path="admin/identity-providers" element={<RequireAdmin><IdentityProvidersPage /></RequireAdmin>} />
 					<Route path="admin/identity-providers/create" element={<RequireAdmin><CreateIdentityProviderPage /></RequireAdmin>} />
-					<Route path="admin/policies" element={<RequireAdmin><PoliciesListPage /></RequireAdmin>} />
-					<Route path="admin/policies/new" element={<RequireAdmin><PolicyCreatePage /></RequireAdmin>} />
-					<Route path="admin/policies/:name" element={<RequireAdmin><PolicyDetailPage /></RequireAdmin>} />
+					<Route path="admin/policies" element={<RequireAdmin><PoliciesHubPage /></RequireAdmin>} />
+					<Route path="admin/policies/cluster-creation" element={<RequireAdmin><PoliciesListPage /></RequireAdmin>} />
+					<Route path="admin/policies/cluster-creation/new" element={<RequireAdmin><PolicyCreatePage /></RequireAdmin>} />
+					<Route path="admin/policies/cluster-creation/:name" element={<RequireAdmin><PolicyDetailPage /></RequireAdmin>} />
 					<Route path="admin/addons" element={<RequireAdmin><AddonCatalogPage /></RequireAdmin>} />
 					<Route path="admin/images" element={<RequireAdmin><ImagesPage /></RequireAdmin>} />
 					<Route path="admin/audit" element={<RequireAdmin><AuditLogPage /></RequireAdmin>} />

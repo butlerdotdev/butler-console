@@ -41,7 +41,7 @@ export function PolicyCreatePage() {
 		try {
 			const created = await policiesApi.create(policy)
 			toast.success('Policy created', `${created.metadata.name} created successfully`)
-			navigate(`/admin/policies/${encodeURIComponent(created.metadata.name)}`)
+			navigate(`/admin/policies/cluster-creation/${encodeURIComponent(created.metadata.name)}`)
 		} catch (err: unknown) {
 			const we = extractWebhookError(err)
 			if (we) {
@@ -62,7 +62,7 @@ export function PolicyCreatePage() {
 				<PolicyForm
 					teams={teams}
 					onSubmit={handleSubmit}
-					onCancel={() => navigate('/admin/policies')}
+					onCancel={() => navigate('/admin/policies/cluster-creation')}
 					submitLabel="Create policy"
 					webhookError={webhookError}
 				/>

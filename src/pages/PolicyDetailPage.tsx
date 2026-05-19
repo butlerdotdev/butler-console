@@ -80,7 +80,7 @@ export function PolicyDetailPage() {
 		try {
 			await policiesApi.delete(name)
 			toast.success('Policy deleted', `${name} removed`)
-			navigate('/admin/policies')
+			navigate('/admin/policies/cluster-creation')
 		} catch (err) {
 			toast.error('Failed to delete policy', String(err))
 		} finally {
@@ -97,7 +97,7 @@ export function PolicyDetailPage() {
 		return (
 			<Card className="p-6">
 				<p className="text-red-400">Policy not found.</p>
-				<Button className="mt-2" variant="secondary" onClick={() => navigate('/admin/policies')}>Back to list</Button>
+				<Button className="mt-2" variant="secondary" onClick={() => navigate('/admin/policies/cluster-creation')}>Back to list</Button>
 			</Card>
 		)
 	}

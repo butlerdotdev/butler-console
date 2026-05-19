@@ -270,7 +270,11 @@ export function PolicyForm({
 		if (scopeKind === 'teamAndEnvironment' && !envName) return 'environment is required for teamAndEnvironment scope'
 		if (rules.length === 0) return 'at least one option rule is required'
 		for (const r of rules) {
-			if ((r.rule.mode === 'pin' || r.rule.mode === 'allowList' || r.rule.mode === 'recommended') && (!r.rule.values || r.rule.values.length === 0)) {
+			if (r.rule.mode === 'pin') {
+				if (!r.rule.values || r.rule.values.length !== 1) {
+					return `mode pin on ${r.optionType} requires exactly one value`
+				}
+			} else if ((r.rule.mode === 'allowList' || r.rule.mode === 'recommended') && (!r.rule.values || r.rule.values.length === 0)) {
 				return `mode ${r.rule.mode} on ${r.optionType} requires at least one value`
 			}
 			if (r.rule.mode === 'default' && !r.rule.default) {
@@ -456,7 +460,11 @@ export function PolicyForm({
 					const currentValues = r.rule.values || []
 					const allEntryOptions = entriesAsOptions(optionType)
 					const remainingEntryOptions = allEntryOptions.filter(o => !currentValues.includes(o.value))
-					const isList = r.rule.mode === 'pin' || r.rule.mode === 'allowList' || r.rule.mode === 'recommended'
+					// pin is exactly one value; treat as single-select.
+					// allowList and recommended accept multiple.
+					const isMultiValue = r.rule.mode === 'allowList' || r.rule.mode === 'recommended'
+					const isSinglePin = r.rule.mode === 'pin'
+					const pinnedValue = currentValues[0] || ''
 
 					return (
 						<div key={i} className={`p-4 border rounded-lg space-y-3 ${fieldDeniedFor(fieldPath) ? 'border-red-700 bg-red-950/30' : 'border-neutral-700 bg-neutral-900/50'}`}>
@@ -493,7 +501,42 @@ export function PolicyForm({
 								</p>
 							)}
 
-							{isList && (
+							{isSinglePin && (
+								<div className="space-y-2">
+									<div className="flex items-center justify-between">
+										<label className="block text-xs text-neutral-400">Pinned value (exactly one)</label>
+										{discoveryProvider && supportedOptionTypes.includes(optionType) && (
+											<button
+												type="button"
+												className="text-xs text-neutral-500 hover:text-neutral-300"
+												onClick={() => updateRule(i, { rawMode: !r.rawMode })}
+											>
+												{r.rawMode ? 'Use picker' : 'Edit raw ID'}
+											</button>
+										)}
+									</div>
+									{useRaw ? (
+										<Input
+											id={`rule-${i}-pin`}
+											label=""
+											value={pinnedValue}
+											onChange={e => updateRule(i, { rule: { ...r.rule, values: e.target.value ? [e.target.value.trim()] : [] } })}
+										/>
+									) : (
+										<SearchableSelect
+											value={pinnedValue}
+											onChange={val => updateRule(i, { rule: { ...r.rule, values: val ? [val] : [] } })}
+											options={allEntryOptions}
+											placeholder={entriesLoading[optionType] ? 'Loading…' : `Pin to one ${optionType}…`}
+											loading={!!entriesLoading[optionType]}
+											loadingText="Loading…"
+											focusRingColor="focus-within:ring-violet-500"
+										/>
+									)}
+								</div>
+							)}
+
+							{isMultiValue && (
 								<div className="space-y-2">
 									<div className="flex items-center justify-between">
 										<label className="block text-xs text-neutral-400">Values</label>

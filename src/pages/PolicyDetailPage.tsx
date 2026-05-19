@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { useToast } from '@/hooks/useToast'
 import { policiesApi, type ClusterCreationPolicy, type PolicyOptionType, type WebhookError } from '@/api/policies'
@@ -235,7 +235,48 @@ export function PolicyDetailPage() {
 
 				<Card className="p-5">
 					<h3 className="text-sm font-medium text-neutral-300 uppercase tracking-wide mb-3">Scope</h3>
-					<pre className="text-xs text-neutral-300 bg-neutral-900 p-3 rounded overflow-x-auto">{JSON.stringify(policy.spec.scope, null, 2)}</pre>
+					<dl className="grid grid-cols-[120px_1fr] gap-y-2 text-sm">
+						{policy.spec.scope.clusterWide && (
+							<>
+								<dt className="text-neutral-500">Type</dt>
+								<dd className="text-neutral-100">Cluster-wide</dd>
+								<dt className="text-neutral-500">Applies to</dt>
+								<dd className="text-neutral-400">Every team on this cluster</dd>
+							</>
+						)}
+						{policy.spec.scope.team && (
+							<>
+								<dt className="text-neutral-500">Type</dt>
+								<dd className="text-neutral-100">Team</dd>
+								<dt className="text-neutral-500">Team</dt>
+								<dd>
+									<Link
+										to={`/admin/teams/${encodeURIComponent(policy.spec.scope.team.teamRef.name)}`}
+										className="text-violet-400 hover:text-violet-300 font-mono"
+									>
+										{policy.spec.scope.team.teamRef.name}
+									</Link>
+								</dd>
+							</>
+						)}
+						{policy.spec.scope.teamAndEnvironment && (
+							<>
+								<dt className="text-neutral-500">Type</dt>
+								<dd className="text-neutral-100">Team and environment</dd>
+								<dt className="text-neutral-500">Team</dt>
+								<dd>
+									<Link
+										to={`/admin/teams/${encodeURIComponent(policy.spec.scope.teamAndEnvironment.teamRef.name)}`}
+										className="text-violet-400 hover:text-violet-300 font-mono"
+									>
+										{policy.spec.scope.teamAndEnvironment.teamRef.name}
+									</Link>
+								</dd>
+								<dt className="text-neutral-500">Environment</dt>
+								<dd className="text-neutral-100 font-mono">{policy.spec.scope.teamAndEnvironment.environmentName}</dd>
+							</>
+						)}
+					</dl>
 				</Card>
 
 				<Card className="p-5">

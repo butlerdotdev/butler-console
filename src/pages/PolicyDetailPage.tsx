@@ -236,12 +236,12 @@ export function PolicyDetailPage() {
 				<Card className="p-5">
 					<h3 className="text-sm font-medium text-neutral-300 uppercase tracking-wide mb-3">Scope</h3>
 					<dl className="grid grid-cols-[120px_1fr] gap-y-2 text-sm">
-						{policy.spec.scope.clusterWide && (
+						{policy.spec.scope.platformWide && (
 							<>
 								<dt className="text-neutral-500">Type</dt>
-								<dd className="text-neutral-100">Cluster-wide</dd>
+								<dd className="text-neutral-100">Platform-wide</dd>
 								<dt className="text-neutral-500">Applies to</dt>
-								<dd className="text-neutral-400">Every team on this cluster</dd>
+								<dd className="text-neutral-400">Every team and environment on this Butler platform</dd>
 							</>
 						)}
 						{policy.spec.scope.team && (

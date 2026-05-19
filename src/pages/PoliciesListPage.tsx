@@ -12,7 +12,7 @@ function scopeLabel(p: ClusterCreationPolicy): string {
 	const s = p.spec.scope
 	if (s.teamAndEnvironment) return `team/${s.teamAndEnvironment.teamRef.name}/${s.teamAndEnvironment.environmentName}`
 	if (s.team) return `team/${s.team.teamRef.name}`
-	if (s.clusterWide) return 'cluster-wide'
+	if (s.platformWide) return 'platform-wide'
 	return '(invalid)'
 }
 

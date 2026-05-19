@@ -35,7 +35,7 @@ export interface PolicyFormProps {
 	webhookError?: WebhookError | null
 }
 
-type ScopeKind = 'clusterWide' | 'team' | 'teamAndEnvironment'
+type ScopeKind = 'platformWide' | 'team' | 'teamAndEnvironment'
 
 interface RuleEntry {
 	optionType: PolicyOptionType
@@ -53,14 +53,14 @@ interface ProviderEntry {
 function blankPolicy(): ClusterCreationPolicy {
 	return {
 		metadata: { name: '' },
-		spec: { scope: { clusterWide: {} }, targetProviders: [], options: {} },
+		spec: { scope: { platformWide: {} }, targetProviders: [], options: {} },
 	}
 }
 
 function scopeKindOf(p: ClusterCreationPolicy): ScopeKind {
 	if (p.spec.scope.teamAndEnvironment) return 'teamAndEnvironment'
 	if (p.spec.scope.team) return 'team'
-	return 'clusterWide'
+	return 'platformWide'
 }
 
 function rulesFromPolicy(p: ClusterCreationPolicy): RuleEntry[] {
@@ -246,8 +246,8 @@ export function PolicyForm({
 			metadata: { name },
 			spec: {
 				scope:
-					scopeKind === 'clusterWide'
-						? { clusterWide: {} }
+					scopeKind === 'platformWide'
+						? { platformWide: {} }
 						: scopeKind === 'team'
 							? { team: { teamRef: { name: teamName } } }
 							: { teamAndEnvironment: { teamRef: { name: teamName }, environmentName: envName } },
@@ -266,7 +266,7 @@ export function PolicyForm({
 
 	function validateLocal(): string | null {
 		if (!name.trim()) return 'name is required'
-		if (scopeKind !== 'clusterWide' && !teamName) return 'team is required for team scope'
+		if (scopeKind !== 'platformWide' && !teamName) return 'team is required for team scope'
 		if (scopeKind === 'teamAndEnvironment' && !envName) return 'environment is required for teamAndEnvironment scope'
 		if (rules.length === 0) return 'at least one option rule is required'
 		for (const r of rules) {
@@ -351,7 +351,7 @@ export function PolicyForm({
 			<Card className="p-5 space-y-4">
 				<h3 className="text-sm font-medium text-neutral-300 uppercase tracking-wide">Scope</h3>
 				<div className="space-y-2 text-sm">
-					{(['clusterWide', 'team', 'teamAndEnvironment'] as ScopeKind[]).map(k => (
+					{(['platformWide', 'team', 'teamAndEnvironment'] as ScopeKind[]).map(k => (
 						<label key={k} className="flex items-center gap-2 cursor-pointer">
 							<input
 								type="radio"
@@ -359,11 +359,11 @@ export function PolicyForm({
 								checked={scopeKind === k}
 								onChange={() => setScopeKind(k)}
 							/>
-							<span className="text-neutral-200">{k === 'clusterWide' ? 'Cluster-wide' : k === 'team' ? 'Team' : 'Team and environment'}</span>
+							<span className="text-neutral-200">{k === 'platformWide' ? 'Platform-wide' : k === 'team' ? 'Team' : 'Team and environment'}</span>
 						</label>
 					))}
 				</div>
-				{scopeKind !== 'clusterWide' && (
+				{scopeKind !== 'platformWide' && (
 					<div className="grid grid-cols-2 gap-3">
 						<div>
 							<label className="block text-sm text-neutral-400 mb-1">Team</label>

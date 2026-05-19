@@ -17,7 +17,7 @@ export interface PolicyOptionRule {
 }
 
 export interface PolicyScope {
-	clusterWide?: Record<string, never>
+	platformWide?: Record<string, never>
 	team?: { teamRef: { name: string } }
 	teamAndEnvironment?: { teamRef: { name: string }; environmentName: string }
 }

@@ -14,8 +14,6 @@ interface TeamSummary {
 	environments?: Array<{ name: string }>
 }
 
-const PROVIDER_TYPES = ['harvester', 'nutanix', 'proxmox', 'aws', 'azure', 'gcp']
-
 async function fetchTeamsForForm(): Promise<TeamSummary[]> {
 	const res = await fetch('/api/teams', { credentials: 'include' })
 	if (!res.ok) return []
@@ -115,7 +113,6 @@ export function PolicyDetailPage() {
 						initial={policy}
 						nameLocked
 						teams={teams}
-						providerTypes={PROVIDER_TYPES}
 						onSubmit={handleUpdate}
 						onCancel={() => { setEditing(false); setWebhookError(null) }}
 						submitLabel="Save changes"

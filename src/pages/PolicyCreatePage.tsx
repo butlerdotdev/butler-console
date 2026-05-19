@@ -14,8 +14,6 @@ interface TeamSummary {
 	environments?: Array<{ name: string }>
 }
 
-const PROVIDER_TYPES = ['harvester', 'nutanix', 'proxmox', 'aws', 'azure', 'gcp']
-
 async function fetchTeamsForForm(): Promise<TeamSummary[]> {
 	const res = await fetch('/api/teams', { credentials: 'include' })
 	if (!res.ok) return []
@@ -63,7 +61,6 @@ export function PolicyCreatePage() {
 				</div>
 				<PolicyForm
 					teams={teams}
-					providerTypes={PROVIDER_TYPES}
 					onSubmit={handleSubmit}
 					onCancel={() => navigate('/admin/policies')}
 					submitLabel="Create policy"

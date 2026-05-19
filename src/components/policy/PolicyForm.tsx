@@ -300,113 +300,20 @@ export function PolicyForm({
 		return !!webhookError && webhookError.field === path
 	}
 
-	function ValuePicker({ i, r }: { i: number; r: RuleEntry }) {
-		const optionType = r.optionType
-		const pickerSupported = supportedOptionTypes.includes(optionType) && !!discoveryProvider
-		const useRaw = r.rawMode || !pickerSupported
-		const optionsForPicker = entriesAsOptions(optionType)
-		const currentValues = r.rule.values || []
-
-		useEffect(() => {
-			if (!useRaw && pickerSupported) {
-				void ensureEntries(optionType)
+	// Lazy-fetch entries for every option type referenced by a non-raw
+	// rule whenever the discovery provider changes. Centralised here
+	// (rather than inside per-rule inner components) so the rule cards
+	// can render plain JSX and the SearchableSelect inside them retains
+	// its open/query state across parent re-renders.
+	useEffect(() => {
+		if (!discoveryProvider) return
+		for (const r of rules) {
+			if (!r.rawMode && supportedOptionTypes.includes(r.optionType)) {
+				void ensureEntries(r.optionType)
 			}
-			// eslint-disable-next-line react-hooks/exhaustive-deps
-		}, [optionType, useRaw, pickerSupported, discoveryKey])
-
-		if (useRaw) {
-			return (
-				<>
-					{!pickerSupported && discoveryProvider && (
-						<p className="text-xs text-amber-400">
-							{discoveryProvider.spec.provider} does not expose {optionType} via list API; falling back to raw IDs.
-						</p>
-					)}
-					<textarea
-						value={currentValues.join('\n')}
-						onChange={e => updateRule(i, { rule: { ...r.rule, values: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) } })}
-						rows={3}
-						placeholder="One ID per line"
-						className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 text-sm font-mono"
-					/>
-				</>
-			)
 		}
-
-		const remaining = optionsForPicker.filter(o => !currentValues.includes(o.value))
-
-		return (
-			<>
-				{currentValues.length > 0 && (
-					<div className="flex flex-wrap gap-2">
-						{currentValues.map(v => (
-							<span key={v} className="inline-flex items-center gap-1 px-2 py-1 bg-violet-500/15 border border-violet-700/40 rounded text-xs">
-								<span className="text-violet-200 font-mono">{entryLabelById(optionType, v)}</span>
-								<button
-									type="button"
-									onClick={() => updateRule(i, { rule: { ...r.rule, values: currentValues.filter(x => x !== v) } })}
-									className="text-violet-300 hover:text-violet-100"
-									aria-label={`remove ${v}`}
-								>×</button>
-							</span>
-						))}
-					</div>
-				)}
-				<SearchableSelect
-					value=""
-					onChange={(val) => {
-						if (val && !currentValues.includes(val)) {
-							updateRule(i, { rule: { ...r.rule, values: [...currentValues, val] } })
-						}
-					}}
-					options={remaining}
-					placeholder={entriesLoading[optionType] ? 'Loading…' : `Add ${optionType}…`}
-					loading={!!entriesLoading[optionType]}
-					loadingText="Loading…"
-					focusRingColor="focus-within:ring-violet-500"
-				/>
-			</>
-		)
-	}
-
-	function DefaultPicker({ i, r }: { i: number; r: RuleEntry }) {
-		const optionType = r.optionType
-		const pickerSupported = supportedOptionTypes.includes(optionType) && !!discoveryProvider
-		const useRaw = r.rawMode || !pickerSupported
-
-		useEffect(() => {
-			if (!useRaw && pickerSupported) {
-				void ensureEntries(optionType)
-			}
-			// eslint-disable-next-line react-hooks/exhaustive-deps
-		}, [optionType, useRaw, pickerSupported, discoveryKey])
-
-		if (useRaw) {
-			return (
-				<Input
-					id={`rule-${i}-default`}
-					label="Default value (provider ID)"
-					value={r.rule.default || ''}
-					onChange={e => updateRule(i, { rule: { ...r.rule, default: e.target.value } })}
-				/>
-			)
-		}
-
-		return (
-			<div>
-				<label className="block text-xs text-neutral-400 mb-1">Default value</label>
-				<SearchableSelect
-					value={r.rule.default || ''}
-					onChange={val => updateRule(i, { rule: { ...r.rule, default: val } })}
-					options={entriesAsOptions(optionType)}
-					placeholder={entriesLoading[optionType] ? 'Loading…' : 'Select…'}
-					loading={!!entriesLoading[optionType]}
-					loadingText="Loading…"
-					focusRingColor="focus-within:ring-violet-500"
-				/>
-			</div>
-		)
-	}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [discoveryKey, rules.length])
 
 	return (
 		<form onSubmit={handleSubmit} className="space-y-6">
@@ -543,6 +450,14 @@ export function PolicyForm({
 				)}
 				{rules.map((r, i) => {
 					const fieldPath = `spec.options[${r.optionType}]`
+					const optionType = r.optionType
+					const pickerSupported = supportedOptionTypes.includes(optionType) && !!discoveryProvider
+					const useRaw = r.rawMode || !pickerSupported
+					const currentValues = r.rule.values || []
+					const allEntryOptions = entriesAsOptions(optionType)
+					const remainingEntryOptions = allEntryOptions.filter(o => !currentValues.includes(o.value))
+					const isList = r.rule.mode === 'pin' || r.rule.mode === 'allowList' || r.rule.mode === 'recommended'
+
 					return (
 						<div key={i} className={`p-4 border rounded-lg space-y-3 ${fieldDeniedFor(fieldPath) ? 'border-red-700 bg-red-950/30' : 'border-neutral-700 bg-neutral-900/50'}`}>
 							<div className="grid grid-cols-2 gap-3">
@@ -572,11 +487,17 @@ export function PolicyForm({
 								</div>
 							</div>
 
-							{(r.rule.mode === 'pin' || r.rule.mode === 'allowList' || r.rule.mode === 'recommended') && (
+							{!pickerSupported && discoveryProvider && (
+								<p className="text-xs text-amber-400">
+									{discoveryProvider.spec.provider} does not expose {optionType} via list API. Falling back to raw IDs.
+								</p>
+							)}
+
+							{isList && (
 								<div className="space-y-2">
 									<div className="flex items-center justify-between">
 										<label className="block text-xs text-neutral-400">Values</label>
-										{discoveryProvider && supportedOptionTypes.includes(r.optionType) && (
+										{discoveryProvider && supportedOptionTypes.includes(optionType) && (
 											<button
 												type="button"
 												className="text-xs text-neutral-500 hover:text-neutral-300"
@@ -586,7 +507,46 @@ export function PolicyForm({
 											</button>
 										)}
 									</div>
-									<ValuePicker i={i} r={r} />
+									{useRaw ? (
+										<textarea
+											value={currentValues.join('\n')}
+											onChange={e => updateRule(i, { rule: { ...r.rule, values: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) } })}
+											rows={3}
+											placeholder="One ID per line"
+											className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 text-sm font-mono"
+										/>
+									) : (
+										<>
+											{currentValues.length > 0 && (
+												<div className="flex flex-wrap gap-2">
+													{currentValues.map(v => (
+														<span key={v} className="inline-flex items-center gap-1 px-2 py-1 bg-violet-500/15 border border-violet-700/40 rounded text-xs">
+															<span className="text-violet-200 font-mono">{entryLabelById(optionType, v)}</span>
+															<button
+																type="button"
+																onClick={() => updateRule(i, { rule: { ...r.rule, values: currentValues.filter(x => x !== v) } })}
+																className="text-violet-300 hover:text-violet-100"
+																aria-label={`remove ${v}`}
+															>×</button>
+														</span>
+													))}
+												</div>
+											)}
+											<SearchableSelect
+												value=""
+												onChange={(val) => {
+													if (val && !currentValues.includes(val)) {
+														updateRule(i, { rule: { ...r.rule, values: [...currentValues, val] } })
+													}
+												}}
+												options={remainingEntryOptions}
+												placeholder={entriesLoading[optionType] ? 'Loading…' : `Add ${optionType}…`}
+												loading={!!entriesLoading[optionType]}
+												loadingText="Loading…"
+												focusRingColor="focus-within:ring-violet-500"
+											/>
+										</>
+									)}
 								</div>
 							)}
 
@@ -594,7 +554,7 @@ export function PolicyForm({
 								<div className="space-y-2">
 									<div className="flex items-center justify-between">
 										<label className="block text-xs text-neutral-400">Default</label>
-										{discoveryProvider && supportedOptionTypes.includes(r.optionType) && (
+										{discoveryProvider && supportedOptionTypes.includes(optionType) && (
 											<button
 												type="button"
 												className="text-xs text-neutral-500 hover:text-neutral-300"
@@ -604,7 +564,24 @@ export function PolicyForm({
 											</button>
 										)}
 									</div>
-									<DefaultPicker i={i} r={r} />
+									{useRaw ? (
+										<Input
+											id={`rule-${i}-default`}
+											label=""
+											value={r.rule.default || ''}
+											onChange={e => updateRule(i, { rule: { ...r.rule, default: e.target.value } })}
+										/>
+									) : (
+										<SearchableSelect
+											value={r.rule.default || ''}
+											onChange={val => updateRule(i, { rule: { ...r.rule, default: val } })}
+											options={allEntryOptions}
+											placeholder={entriesLoading[optionType] ? 'Loading…' : 'Select…'}
+											loading={!!entriesLoading[optionType]}
+											loadingText="Loading…"
+											focusRingColor="focus-within:ring-violet-500"
+										/>
+									)}
 								</div>
 							)}
 

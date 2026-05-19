@@ -74,7 +74,7 @@ export function PoliciesHubPage() {
 										<span className="font-mono">{card.count}</span> {card.count === 1 ? 'policy' : 'policies'}
 									</span>
 								) : (
-									<span className="text-neutral-600">—</span>
+									<span className="text-neutral-600">-</span>
 								)}
 								{card.available && (
 									<span className="text-violet-400 inline-flex items-center gap-1">

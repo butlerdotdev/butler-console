@@ -55,6 +55,16 @@ export function PolicyCreatePage() {
 	return (
 		<FadeIn>
 			<div className="space-y-6">
+				<button
+					type="button"
+					onClick={() => navigate('/admin/policies/cluster-creation')}
+					className="inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200"
+				>
+					<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+						<path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+					</svg>
+					Cluster Creation Policies
+				</button>
 				<div>
 					<h1 className="text-2xl font-semibold text-neutral-50">New Cluster Creation Policy</h1>
 					<p className="text-sm text-neutral-400 mt-1">Define scope, target providers, and per-option-type rules.</p>

@@ -53,11 +53,21 @@ export function PoliciesListPage() {
 	return (
 		<FadeIn>
 			<div className="space-y-6">
+				<button
+					type="button"
+					onClick={() => navigate('/admin/policies')}
+					className="inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200"
+				>
+					<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+						<path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+					</svg>
+					Policies
+				</button>
 				<div className="flex items-center justify-between">
 					<div>
 						<h1 className="text-2xl font-semibold text-neutral-50">Cluster Creation Policies</h1>
 						<p className="text-sm text-neutral-400 mt-1">
-							Admin-curated defaults, pins, allow-lists, and recommendations for the create-cluster modal (ADR-018).
+							Admin-curated defaults, pins, allow-lists, and recommendations for the create-cluster modal.
 						</p>
 					</div>
 					<Button onClick={() => navigate('/admin/policies/cluster-creation/new')}>New Policy</Button>

@@ -14,7 +14,6 @@ interface PolicyKindCard {
 	icon: React.ReactNode
 	count?: number
 	available: boolean
-	tag?: string
 }
 
 function ClusterCreationIcon() {
@@ -42,7 +41,6 @@ export function PoliciesHubPage() {
 			icon: <ClusterCreationIcon />,
 			count: creationCount,
 			available: true,
-			tag: 'ADR-018',
 		},
 	]
 
@@ -63,18 +61,11 @@ export function PoliciesHubPage() {
 							className={`p-5 transition-colors ${card.available ? 'cursor-pointer hover:border-violet-700/60 hover:bg-neutral-900/60' : 'opacity-60'}`}
 							onClick={() => card.available && navigate(card.to)}
 						>
-							<div className="flex items-start justify-between mb-3">
-								<div className="flex items-center gap-3">
-									<div className="p-2 rounded-lg bg-violet-500/10">
-										{card.icon}
-									</div>
-									<h3 className="text-base font-semibold text-neutral-100">{card.title}</h3>
+							<div className="flex items-center gap-3 mb-3">
+								<div className="p-2 rounded-lg bg-violet-500/10">
+									{card.icon}
 								</div>
-								{card.tag && (
-									<span className="px-2 py-0.5 text-[10px] font-mono bg-neutral-800 text-neutral-400 rounded">
-										{card.tag}
-									</span>
-								)}
+								<h3 className="text-base font-semibold text-neutral-100">{card.title}</h3>
 							</div>
 							<p className="text-sm text-neutral-400 leading-relaxed">{card.description}</p>
 							<div className="mt-4 flex items-center justify-between text-xs">

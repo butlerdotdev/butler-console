@@ -1,17 +1,28 @@
 // Copyright 2026 The Butler Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useDocumentTitle } from '@/hooks'
 import { useToast } from '@/hooks/useToast'
-import { policiesApi, type ClusterCreationPolicy, type WebhookError } from '@/api/policies'
+import { policiesApi, type ClusterCreationPolicy, type PolicyOptionType, type WebhookError } from '@/api/policies'
+import { providersApi, type Provider } from '@/api/providers'
 import { PolicyForm } from '@/components/policy/PolicyForm'
 import { Card, Button, FadeIn, Spinner, Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui'
 
 interface TeamSummary {
 	name: string
 	environments?: Array<{ name: string }>
+}
+
+interface ProviderEntry {
+	id: string
+	name: string
+}
+
+const PROVIDER_OPTION_SUPPORT: Record<string, PolicyOptionType[]> = {
+	nutanix: ['image', 'network', 'cluster', 'storageContainer'],
+	harvester: ['image', 'network'],
 }
 
 async function fetchTeamsForForm(): Promise<TeamSummary[]> {
@@ -38,6 +49,13 @@ export function PolicyDetailPage() {
 	const [showDelete, setShowDelete] = useState(false)
 	const [deleting, setDeleting] = useState(false)
 
+	// Cache of provider option lists for name resolution. Fetched once
+	// per discovery provider for each option type referenced by the
+	// policy. Falls back to raw IDs when fetch fails or the provider
+	// type does not expose that option type.
+	const [allProviders, setAllProviders] = useState<Provider[]>([])
+	const [entries, setEntries] = useState<Partial<Record<PolicyOptionType, ProviderEntry[]>>>({})
+
 	async function load() {
 		if (!name) return
 		setLoading(true)
@@ -54,7 +72,62 @@ export function PolicyDetailPage() {
 	useEffect(() => {
 		void load()
 		void fetchTeamsForForm().then(setTeams)
+		void providersApi.list().then(r => setAllProviders(r.providers || [])).catch(() => setAllProviders([]))
 	}, [name])
+
+	// Eligible discovery providers for name resolution: those whose
+	// type appears in the policy's targetProviders (or any configured
+	// provider if targetProviders is empty).
+	const discoveryProvider = useMemo(() => {
+		if (!policy) return undefined
+		const targets = policy.spec.targetProviders || []
+		const candidates = targets.length === 0
+			? allProviders
+			: allProviders.filter(p => targets.includes(p.spec.provider))
+		return candidates[0]
+	}, [policy, allProviders])
+
+	// Fetch the option-list entries for every option type the policy
+	// references. One pass per discovery provider; cached in state by
+	// option type.
+	useEffect(() => {
+		if (!discoveryProvider || !policy) return
+		const supportedTypes = PROVIDER_OPTION_SUPPORT[discoveryProvider.spec.provider] || []
+		const referenced = Object.keys(policy.spec.options || {}) as PolicyOptionType[]
+		const need = referenced.filter(t => supportedTypes.includes(t) && entries[t] === undefined)
+		if (need.length === 0) return
+		const ns = discoveryProvider.metadata.namespace
+		const nm = discoveryProvider.metadata.name
+		need.forEach(async (optionType) => {
+			try {
+				let items: ProviderEntry[] = []
+				if (optionType === 'image') {
+					const r = await providersApi.listImages(ns, nm)
+					items = (r.images || []).map(i => ({ id: i.id, name: i.name }))
+				} else if (optionType === 'network') {
+					const r = await providersApi.listNetworks(ns, nm)
+					items = (r.networks || []).map(i => ({ id: i.id, name: i.name }))
+				} else if (optionType === 'cluster') {
+					const r = await providersApi.listClusters(ns, nm)
+					items = (r.clusters || []).map(i => ({ id: i.id, name: i.name }))
+				} else if (optionType === 'storageContainer') {
+					const r = await providersApi.listStorageContainers(ns, nm)
+					items = (r.storageContainers || []).map(i => ({ id: i.id, name: i.name }))
+				}
+				setEntries(prev => ({ ...prev, [optionType]: items }))
+			} catch {
+				setEntries(prev => ({ ...prev, [optionType]: [] }))
+			}
+		})
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [discoveryProvider, policy])
+
+	function entryLabel(optionType: PolicyOptionType, id: string): string {
+		const list = entries[optionType]
+		if (!list) return id
+		const found = list.find(e => e.id === id)
+		return found ? found.name : id
+	}
 
 	async function handleUpdate(updated: ClusterCreationPolicy) {
 		if (!name) return
@@ -177,18 +250,54 @@ export function PolicyDetailPage() {
 					{optKeys.length === 0 && <p className="text-sm text-neutral-500">No option rules defined.</p>}
 					<div className="space-y-3">
 						{optKeys.map(k => {
-							const r = opts[k as keyof typeof opts]!
+							const optionType = k as PolicyOptionType
+							const r = opts[optionType]!
+							const isPin = r.mode === 'pin'
+							const isMulti = r.mode === 'allowList' || r.mode === 'recommended'
+							const pinnedValue = r.values && r.values[0]
 							return (
 								<div key={k} className="p-3 bg-neutral-900 border border-neutral-800 rounded">
 									<div className="flex items-center justify-between mb-2">
 										<span className="text-sm text-neutral-200 font-mono">{k}</span>
 										<span className="px-2 py-0.5 text-xs bg-violet-500/20 text-violet-300 rounded font-mono">{r.mode}</span>
 									</div>
-									{r.values && r.values.length > 0 && (
-										<div className="text-xs text-neutral-400 font-mono">values: {r.values.join(', ')}</div>
+
+									{isPin && pinnedValue && (
+										<div className="text-xs">
+											<span className="text-neutral-500">Value: </span>
+											<span className="text-neutral-200">{entryLabel(optionType, pinnedValue)}</span>
+											<span className="text-neutral-600 font-mono ml-2">({pinnedValue.slice(0, 8)})</span>
+										</div>
 									)}
-									{r.default && <div className="text-xs text-neutral-400 font-mono">default: {r.default}</div>}
-									{r.recommendedReason && <div className="text-xs text-neutral-400">reason: {r.recommendedReason}</div>}
+
+									{isMulti && r.values && r.values.length > 0 && (
+										<div className="text-xs space-y-1">
+											<div className="text-neutral-500">Values ({r.values.length}):</div>
+											<ul className="space-y-0.5 pl-2">
+												{r.values.map(v => (
+													<li key={v} className="flex items-center gap-2">
+														<span className="text-neutral-200">{entryLabel(optionType, v)}</span>
+														<span className="text-neutral-600 font-mono">({v.slice(0, 8)})</span>
+													</li>
+												))}
+											</ul>
+										</div>
+									)}
+
+									{r.default && (
+										<div className="text-xs mt-1">
+											<span className="text-neutral-500">Default: </span>
+											<span className="text-neutral-200">{entryLabel(optionType, r.default)}</span>
+											<span className="text-neutral-600 font-mono ml-2">({r.default.slice(0, 8)})</span>
+										</div>
+									)}
+
+									{r.recommendedReason && (
+										<div className="text-xs text-neutral-400 mt-1">
+											<span className="text-neutral-500">Reason: </span>
+											{r.recommendedReason}
+										</div>
+									)}
 								</div>
 							)
 						})}

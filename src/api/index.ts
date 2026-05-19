@@ -11,6 +11,8 @@ export { gitopsApi } from './gitops';
 export * from './gitops';
 
 export { identityProvidersApi, PROVIDER_PRESETS } from './identity-providers'
+export { policiesApi } from './policies'
+export type { ClusterCreationPolicy, PolicyOptionType, PolicyOptionMode, PolicyOptionRule, PolicyScope, PolicyListResponse, WebhookError } from './policies'
 export { networksApi } from './networks'
 export * from './certificates';
 export { observabilityApi } from './observability'
@@ -31,7 +33,7 @@ export type {
 	ConfigStatusInfo,
 } from './config'
 
-export type { Provider, ProviderListResponse, CreateProviderRequest, ValidateResponse, ImageInfo, NetworkInfo, ClusterInfo, StorageContainerInfo, CloudProviderType, OnPremProviderType } from './providers'
+export type { Provider, ProviderListResponse, CreateProviderRequest, ValidateResponse, ImageInfo, NetworkInfo, ClusterInfo, StorageContainerInfo, CloudProviderType, OnPremProviderType, PolicyMetadata, PolicyMode } from './providers'
 export { isCloudProvider, getProviderRegion, getProviderNetwork } from './providers'
 export type {
 	Cluster,

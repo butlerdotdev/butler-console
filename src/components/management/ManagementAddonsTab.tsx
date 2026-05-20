@@ -95,7 +95,7 @@ export function ManagementAddonsTab({ addons, onRefresh }: ManagementAddonsTabPr
 				if (config.configured) {
 					setLoadingRepos(true)
 					const repos = await gitopsApi.listRepositories()
-					setRepositories(repos)
+					setRepositories(repos ?? [])
 				}
 			} catch (err) {
 				console.warn('Failed to load git config:', err)

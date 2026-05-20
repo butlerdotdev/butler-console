@@ -64,7 +64,7 @@ export function ManagementGitOpsTab() {
 			if (config.configured) {
 				setLoadingRepos(true);
 				gitopsApi.listRepositories()
-					.then(repos => setRepositories(repos))
+					.then(repos => setRepositories(repos ?? []))
 					.catch(err => console.warn('Failed to load repositories:', err))
 					.finally(() => setLoadingRepos(false));
 			}
@@ -492,7 +492,7 @@ function EnableManagementGitOpsModal({
 			setLoadingBranches(true);
 			try {
 				const list = await gitopsApi.listBranches(repository);
-				setBranches(list);
+				setBranches(list ?? []);
 				const def = repositories.find(r => r.fullName === repository)?.defaultBranch;
 				if (def && branch === 'main') setBranch(def);
 			} catch {
@@ -850,7 +850,7 @@ function ManagementExportModal({
 			setLoadingBranches(true);
 			try {
 				const list = await gitopsApi.listBranches(repository);
-				setBranches(list);
+				setBranches(list ?? []);
 				const def = repositories.find(r => r.fullName === repository)?.defaultBranch;
 				if (def && branch === 'main') setBranch(def);
 			} catch {
@@ -1231,7 +1231,7 @@ function ManagementMigrateAllModal({
 			setLoadingBranches(true);
 			try {
 				const list = await gitopsApi.listBranches(repository);
-				setBranches(list);
+				setBranches(list ?? []);
 				const def = repositories.find(r => r.fullName === repository)?.defaultBranch;
 				if (def && branch === 'main') setBranch(def);
 			} catch {

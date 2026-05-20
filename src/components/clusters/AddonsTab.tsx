@@ -127,7 +127,7 @@ export function AddonsTab({ clusterNamespace, clusterName, addons, onRefresh }: 
 				if (config.configured) {
 					setLoadingRepos(true)
 					const repos = await gitopsApi.listRepositories()
-					setRepositories(repos)
+					setRepositories(repos ?? [])
 				}
 			} catch (err) {
 				console.warn('Failed to load git config:', err)

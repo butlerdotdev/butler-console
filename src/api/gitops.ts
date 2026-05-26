@@ -17,6 +17,10 @@ import type {
 	MigrationRequest,
 	MigrationResult,
 	GitOpsStatus,
+	PreviewClusterRequest,
+	PreviewClusterResponse,
+	ExportClusterRequest,
+	ExportClusterResponse,
 } from '@/types/gitops';
 
 /**
@@ -221,6 +225,67 @@ export const gitopsApi = {
 	async disableManagement(): Promise<void> {
 		return apiClient.delete('/management/gitops');
 	},
+
+	/**
+	 * v2 cluster-wide export — preview the whole cluster's tree before
+	 * commit. Runs discovery + layout + coverage; no git interaction.
+	 * The response carries the rendered files, the coverage report (with
+	 * source-classified captured items), and a summary block including
+	 * the native-inventory count — the agnostically-discovered surface.
+	 */
+	async previewCluster(
+		namespace: string,
+		name: string,
+		request: PreviewClusterRequest = {}
+	): Promise<PreviewClusterResponse> {
+		return apiClient.post<PreviewClusterResponse>(
+			`/clusters/${namespace}/${name}/gitops/preview-cluster`,
+			request
+		);
+	},
+
+	/**
+	 * v2 cluster-wide export — commit the whole cluster's tree (or a
+	 * subset, when selection is provided). Discovery is re-run at
+	 * export time; the selection from a stale preview is matched
+	 * against current state.
+	 */
+	async exportCluster(
+		namespace: string,
+		name: string,
+		request: ExportClusterRequest
+	): Promise<ExportClusterResponse> {
+		return apiClient.post<ExportClusterResponse>(
+			`/clusters/${namespace}/${name}/gitops/export-cluster`,
+			request
+		);
+	},
+
+	/**
+	 * v2 management cluster preview. Same shape as previewCluster but
+	 * for the mgmt cluster.
+	 */
+	async previewManagementCluster(
+		request: PreviewClusterRequest = {}
+	): Promise<PreviewClusterResponse> {
+		return apiClient.post<PreviewClusterResponse>(
+			'/management/gitops/preview-cluster',
+			request
+		);
+	},
+
+	/**
+	 * v2 management cluster export. Same shape as exportCluster but
+	 * for the mgmt cluster.
+	 */
+	async exportManagementCluster(
+		request: ExportClusterRequest
+	): Promise<ExportClusterResponse> {
+		return apiClient.post<ExportClusterResponse>(
+			'/management/gitops/export-cluster',
+			request
+		);
+	},
 };
 
 // Re-export types for convenience
@@ -239,4 +304,11 @@ export type {
 	MigrationResult,
 	GitOpsStatus,
 	GitOpsEngineStatus,
+	PreviewClusterRequest,
+	PreviewClusterResponse,
+	ExportClusterRequest,
+	ExportClusterResponse,
+	CapturedItem,
+	CapturedItemSource,
+	CapturedItemIdentity,
 } from '@/types/gitops';

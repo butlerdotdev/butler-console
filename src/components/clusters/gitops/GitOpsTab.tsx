@@ -19,7 +19,7 @@ import { sortReleases, GITOPS_TOOL_CONFIG } from '@/types/gitops';
 import { GitProviderSetup } from './GitProviderSetup';
 import { DiscoveredReleaseCard } from './DiscoveredReleaseCard';
 import { ExportModal } from './ExportModal';
-import { MigrateAllModal } from './MigrateAllModal';
+import { PreviewClusterModal } from './PreviewClusterModal';
 import { EnableGitOpsModal } from './EnableGitOpsModal';
 
 export function GitOpsTab() {
@@ -39,7 +39,7 @@ export function GitOpsTab() {
 
 	// Modal state
 	const [exportRelease, setExportRelease] = useState<DiscoveredRelease | null>(null);
-	const [showMigrateAll, setShowMigrateAll] = useState(false);
+	const [showPreviewCluster, setShowPreviewCluster] = useState(false);
 	const [showEnableModal, setShowEnableModal] = useState(false);
 	const [reconfiguring, setReconfiguring] = useState(false);
 	const [showDisableConfirm, setShowDisableConfirm] = useState(false);
@@ -107,13 +107,15 @@ export function GitOpsTab() {
 		}
 	};
 
-	// Handle migrate all success
-	const handleMigrateSuccess = (result: { prUrl?: string }) => {
-		setShowMigrateAll(false);
+	// Handle cluster-wide export success
+	const handleClusterExportSuccess = (result: { prUrl?: string; commitSha?: string }) => {
+		setShowPreviewCluster(false);
 		if (result.prUrl) {
-			success('Migration PR Created', 'A PR has been created with all releases');
+			success('Cluster Export PR Created', 'A PR with the cluster export has been created');
+		} else if (result.commitSha) {
+			success('Cluster Export Committed', `Commit ${result.commitSha.slice(0, 7)} landed on the target branch`);
 		} else {
-			success('Migration Complete', 'All releases have been exported to GitOps');
+			success('Cluster Export Complete', 'The cluster export has been committed to GitOps');
 		}
 	};
 
@@ -331,10 +333,9 @@ export function GitOpsTab() {
 								<Button
 									variant="secondary"
 									size="sm"
-									onClick={() => setShowMigrateAll(true)}
-									disabled={allReleases.length === 0}
+									onClick={() => setShowPreviewCluster(true)}
 								>
-									Export All to GitOps
+									Export Cluster to GitOps
 								</Button>
 							)}
 						</div>
@@ -425,17 +426,16 @@ export function GitOpsTab() {
 				/>
 			)}
 
-			{/* Migrate All Modal */}
-			{showMigrateAll && (
-				<MigrateAllModal
-					releases={allReleases}
-					repositories={repositories}
-					loadingRepos={loadingRepos}
+			{/* Preview Cluster Modal — v2 cluster-wide export with preview + selection */}
+			{showPreviewCluster && (
+				<PreviewClusterModal
 					clusterNamespace={namespace!}
 					clusterName={name!}
+					repositories={repositories}
+					loadingRepos={loadingRepos}
 					configuredRepository={gitopsEngine?.repository}
-					onClose={() => setShowMigrateAll(false)}
-					onSuccess={handleMigrateSuccess}
+					onClose={() => setShowPreviewCluster(false)}
+					onSuccess={handleClusterExportSuccess}
 				/>
 			)}
 

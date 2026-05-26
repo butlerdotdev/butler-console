@@ -7,5 +7,5 @@ export { GitOpsTab } from './GitOpsTab';
 export { GitProviderSetup } from './GitProviderSetup';
 export { DiscoveredReleaseCard } from './DiscoveredReleaseCard';
 export { ExportModal } from './ExportModal';
-export { MigrateAllModal } from './MigrateAllModal';
+export { PreviewClusterModal } from './PreviewClusterModal';
 export { EnableGitOpsModal } from './EnableGitOpsModal';

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Spinner, Button, SearchableSelect } from '@/components/ui';
 import { useToast } from '@/hooks/useToast';
 import { useTeamContext } from '@/hooks/useTeamContext';
@@ -15,9 +15,10 @@ import type {
 	Repository,
 	Branch,
 } from '@/types/gitops';
-import { sortReleases, GITOPS_TOOL_CONFIG, getCategoryLabel } from '@/types/gitops';
+import { sortReleases, GITOPS_TOOL_CONFIG } from '@/types/gitops';
 import { GitProviderSetup } from '@/components/clusters/gitops/GitProviderSetup';
 import { DiscoveredReleaseCard } from '@/components/clusters/gitops/DiscoveredReleaseCard';
+import { PreviewClusterModal } from '@/components/clusters/gitops/PreviewClusterModal';
 
 // Available extra components for Flux
 const FLUX_EXTRA_COMPONENTS = [
@@ -51,7 +52,7 @@ export function ManagementGitOpsTab() {
 	const [exportRelease, setExportRelease] = useState<DiscoveredRelease | null>(null);
 	const [showEnableModal, setShowEnableModal] = useState(false);
 	const [showDisableConfirm, setShowDisableConfirm] = useState(false);
-	const [showMigrateAll, setShowMigrateAll] = useState(false);
+	const [showPreviewCluster, setShowPreviewCluster] = useState(false);
 	const [reconfiguring, setReconfiguring] = useState(false);
 
 	// Load Git provider config
@@ -314,10 +315,10 @@ export function ManagementGitOpsTab() {
 							<Button
 								variant="secondary"
 								size="sm"
-								onClick={() => setShowMigrateAll(true)}
-								disabled={discovering || allReleases.length === 0}
+								onClick={() => setShowPreviewCluster(true)}
+								disabled={discovering}
 							>
-								Export All to GitOps
+								Export Cluster to GitOps
 							</Button>
 						</div>
 					)}
@@ -431,19 +432,22 @@ export function ManagementGitOpsTab() {
 				/>
 			)}
 
-			{/* Migrate All Modal */}
-			{showMigrateAll && (
-				<ManagementMigrateAllModal
-					releases={allReleases}
+			{/* Preview Cluster Modal — v2 cluster-wide export for management cluster */}
+			{showPreviewCluster && (
+				<PreviewClusterModal
+					clusterName="management"
+					isManagement
 					repositories={repositories}
 					loadingRepos={loadingRepos}
 					configuredRepository={gitopsEngine?.repository}
-					onClose={() => setShowMigrateAll(false)}
+					onClose={() => setShowPreviewCluster(false)}
 					onSuccess={(result) => {
-						setShowMigrateAll(false);
+						setShowPreviewCluster(false);
 						discoverReleases();
 						if (result.prUrl) {
 							success('Pull Request Created', 'A PR has been created for review');
+						} else if (result.commitSha) {
+							success('Exported Successfully', `Commit ${result.commitSha.slice(0, 7)} landed on the target branch`);
 						} else {
 							success('Exported Successfully', 'Manifests have been committed to your repository');
 						}
@@ -1173,410 +1177,6 @@ function ManagementExportModal({
 								'Export'
 							)}
 						</Button>
-					</div>
-				</div>
-			</div>
-		</div>
-	);
-}
-
-// Management Migrate All Modal Component
-interface ManagementMigrateAllModalProps {
-	releases: DiscoveredRelease[];
-	repositories: Repository[];
-	loadingRepos?: boolean;
-	configuredRepository?: string;
-	onClose: () => void;
-	onSuccess: (result: { prUrl?: string }) => void;
-}
-
-function ManagementMigrateAllModal({
-	releases,
-	repositories,
-	loadingRepos,
-	configuredRepository,
-	onClose,
-	onSuccess,
-}: ManagementMigrateAllModalProps) {
-	const { error: showError } = useToast();
-
-	// Selection state - select releases that have repoUrl (matched or auto-detected)
-	const [selected, setSelected] = useState<Set<string>>(
-		new Set(releases.filter(r => r.addonDefinition || r.repoUrl).map(r => `${r.namespace}/${r.name}`))
-	);
-
-	// Form state - auto-select configured repository if available
-	const [repository, setRepository] = useState(configuredRepository || '');
-	const [branch, setBranch] = useState('main');
-	const [basePath, setBasePath] = useState('clusters/management');
-	const [createPR, setCreatePR] = useState(true);
-
-	// Update repository when configuredRepository becomes available
-	useEffect(() => {
-		if (configuredRepository && !repository) {
-			setRepository(configuredRepository);
-		}
-	}, [configuredRepository, repository]);
-
-	// Branch loading
-	const [branches, setBranches] = useState<Branch[]>([]);
-	const [loadingBranches, setLoadingBranches] = useState(false);
-
-	useEffect(() => {
-		if (!repository) {
-			setBranches([]);
-			return;
-		}
-		const load = async () => {
-			setLoadingBranches(true);
-			try {
-				const list = await gitopsApi.listBranches(repository);
-				setBranches(list ?? []);
-				const def = repositories.find(r => r.fullName === repository)?.defaultBranch;
-				if (def && branch === 'main') setBranch(def);
-			} catch {
-				setBranches([]);
-			} finally {
-				setLoadingBranches(false);
-			}
-		};
-		load();
-	}, [repository, repositories]);
-
-	// Loading state
-	const [migrating, setMigrating] = useState(false);
-
-	// Unmatched releases that need repo URL (user-provided overrides)
-	const [customRepoUrls, setCustomRepoUrls] = useState<Record<string, string>>({});
-
-	// Sort releases
-	const sortedReleases = useMemo(() => sortReleases(releases), [releases]);
-
-	// Check if all selected releases have required info
-	const selectedReleases = useMemo(() => {
-		return sortedReleases.filter(r => selected.has(`${r.namespace}/${r.name}`));
-	}, [sortedReleases, selected]);
-
-	// Only count as "needing URL" if no addonDefinition AND no repoUrl AND no custom URL provided
-	const unmatchedSelected = useMemo(() => {
-		return selectedReleases.filter(r =>
-			!r.addonDefinition &&
-			!r.repoUrl &&
-			!customRepoUrls[`${r.namespace}/${r.name}`]
-		);
-	}, [selectedReleases, customRepoUrls]);
-
-	const canMigrate = repository && selected.size > 0 && unmatchedSelected.length === 0;
-
-	// Toggle selection
-	const toggleRelease = (release: DiscoveredRelease) => {
-		const key = `${release.namespace}/${release.name}`;
-		const newSelected = new Set(selected);
-		if (newSelected.has(key)) {
-			newSelected.delete(key);
-		} else {
-			newSelected.add(key);
-		}
-		setSelected(newSelected);
-	};
-
-	// Select all / none
-	const selectAll = () => {
-		setSelected(new Set(sortedReleases.map(r => `${r.namespace}/${r.name}`)));
-	};
-
-	const selectNone = () => {
-		setSelected(new Set());
-	};
-
-	// Handle migration
-	const handleMigrate = async () => {
-		if (!canMigrate) return;
-
-		setMigrating(true);
-		try {
-			const migrationReleases = selectedReleases.map(r => ({
-				name: r.name,
-				namespace: r.namespace,
-				repoUrl: r.repoUrl || customRepoUrls[`${r.namespace}/${r.name}`] || '',
-				chartName: r.chart,
-				chartVersion: r.chartVersion,
-				values: r.values,
-				category: r.category,
-			}));
-
-			const result = await gitopsApi.migrateManagement({
-				releases: migrationReleases,
-				repository,
-				branch,
-				basePath,
-				createPR,
-				prTitle: `Migrate ${selected.size} management cluster releases to GitOps`,
-			});
-
-			if (result.success) {
-				onSuccess({ prUrl: result.prUrl });
-			} else {
-				showError('Migration Failed', result.message);
-			}
-		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to migrate';
-			showError('Migration Failed', message);
-		} finally {
-			setMigrating(false);
-		}
-	};
-
-	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center">
-			{/* Backdrop */}
-			<div
-				className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-				onClick={onClose}
-			/>
-
-			{/* Modal */}
-			<div className="relative bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-				<div className="p-6">
-					<h3 className="text-lg font-semibold text-neutral-100 mb-4">
-						Export All Releases to GitOps
-					</h3>
-
-					<div className="space-y-4">
-						{/* Summary */}
-						<div className="p-3 rounded-lg bg-neutral-800/50 border border-neutral-700">
-							<div className="flex items-center justify-between">
-								<p className="text-neutral-200">
-									<span className="font-medium">{selected.size}</span> of{' '}
-									<span className="font-medium">{releases.length}</span> releases selected
-								</p>
-								<div className="flex gap-2">
-									<button
-										onClick={selectAll}
-										className="text-sm text-violet-400 hover:text-violet-300"
-									>
-										Select All
-									</button>
-									<span className="text-neutral-600">|</span>
-									<button
-										onClick={selectNone}
-										className="text-sm text-neutral-400 hover:text-neutral-300"
-									>
-										Select None
-									</button>
-								</div>
-							</div>
-						</div>
-
-						{/* Repository Selection */}
-						<div className="grid grid-cols-3 gap-4">
-							<div className="col-span-2">
-								<label className="block text-sm font-medium text-neutral-300 mb-1">
-									Target Repository
-									{configuredRepository && (
-										<span className="ml-2 text-xs text-violet-400">(GitOps configured)</span>
-									)}
-								</label>
-								<SearchableSelect
-									value={repository}
-									onChange={setRepository}
-									options={repositories.map((repo) => ({
-										value: repo.fullName,
-										label: repo.fullName,
-										suffix: [
-											repo.fullName === configuredRepository ? '✓' : '',
-											repo.private ? '(private)' : '',
-										].filter(Boolean).join(' ') || undefined,
-									}))}
-									placeholder="Select a repository..."
-									loading={loadingRepos}
-									loadingText="Loading repositories..."
-									focusRingColor="focus-within:ring-violet-500"
-								/>
-							</div>
-
-							<div>
-								<label className="block text-sm font-medium text-neutral-300 mb-1">
-									{createPR ? 'Target Branch' : 'Branch'}
-								</label>
-								{createPR && (
-									<p className="text-xs text-neutral-500 mb-1">MR will be opened against this branch</p>
-								)}
-								{loadingBranches ? (
-									<div className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-500 flex items-center gap-2">
-										<Spinner size="sm" /> Loading branches...
-									</div>
-								) : branches.length > 0 ? (
-									<select
-										value={branch}
-										onChange={(e) => setBranch(e.target.value)}
-										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-									>
-										{branches.map((b) => (
-											<option key={b.name} value={b.name}>
-												{b.name}{b.default ? ' (default)' : ''}
-											</option>
-										))}
-									</select>
-								) : (
-									<input
-										type="text"
-										value={branch}
-										onChange={(e) => setBranch(e.target.value)}
-										className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-									/>
-								)}
-							</div>
-						</div>
-
-						{/* Base Path */}
-						<div>
-							<label className="block text-sm font-medium text-neutral-300 mb-1">
-								Base Path
-							</label>
-							<input
-								type="text"
-								value={basePath}
-								onChange={(e) => setBasePath(e.target.value)}
-								placeholder="clusters/management"
-								className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
-							/>
-							<p className="text-xs text-neutral-500 mt-1">
-								Releases will be organized as: {basePath}/infrastructure/[addon] and {basePath}/apps/[addon]
-							</p>
-						</div>
-
-						{/* Create PR option */}
-						<label className="flex items-center gap-3 cursor-pointer">
-							<input
-								type="checkbox"
-								checked={createPR}
-								onChange={(e) => setCreatePR(e.target.checked)}
-								className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-violet-500 focus:ring-violet-500"
-							/>
-							<div>
-								<span className="text-neutral-200">Create Pull Request</span>
-								<p className="text-xs text-neutral-500">
-									Create a PR for review instead of committing directly
-								</p>
-							</div>
-						</label>
-
-						{/* Releases List */}
-						<div className="border border-neutral-700 rounded-lg overflow-hidden">
-							<div className="bg-neutral-800 px-3 py-2 text-sm font-medium text-neutral-300 border-b border-neutral-700">
-								Select Releases to Export
-							</div>
-							<div className="max-h-64 overflow-y-auto divide-y divide-neutral-800">
-								{sortedReleases.map((release) => {
-									const key = `${release.namespace}/${release.name}`;
-									const isSelected = selected.has(key);
-									const needsRepoUrl = !release.addonDefinition && !release.repoUrl;
-									const hasRepoUrl = release.repoUrl || customRepoUrls[key];
-
-									return (
-										<div
-											key={key}
-											className={`p-3 ${isSelected ? 'bg-violet-900/10' : 'hover:bg-neutral-800/50'}`}
-										>
-											<div className="flex items-center gap-3">
-												<input
-													type="checkbox"
-													checked={isSelected}
-													onChange={() => toggleRelease(release)}
-													className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-violet-500 focus:ring-violet-500"
-												/>
-												<div className="flex-1 min-w-0">
-													<div className="flex items-center gap-2">
-														<span className="text-neutral-200 font-medium truncate">
-															{release.name}
-														</span>
-														{release.platform && (
-															<span className="px-1.5 py-0.5 text-xs bg-purple-500/10 text-purple-400 rounded">
-																Platform
-															</span>
-														)}
-														<span className="px-1.5 py-0.5 text-xs bg-neutral-700 text-neutral-400 rounded">
-															{getCategoryLabel(release.category)}
-														</span>
-													</div>
-													<p className="text-xs text-neutral-500 mt-0.5">
-														{release.namespace} • {release.chart}:{release.chartVersion}
-														{release.repoUrl && !release.addonDefinition && (
-															<span className="ml-2 text-neutral-600">• {release.repoUrl}</span>
-														)}
-													</p>
-												</div>
-												{needsRepoUrl && !hasRepoUrl && isSelected && (
-													<span className="text-yellow-400 text-xs">
-														Needs repo URL
-													</span>
-												)}
-											</div>
-
-											{/* Repo URL input for unmatched releases without auto-detected URL */}
-											{needsRepoUrl && isSelected && (
-												<div className="mt-2 pl-7">
-													<input
-														type="url"
-														value={customRepoUrls[key] || ''}
-														onChange={(e) => setCustomRepoUrls({ ...customRepoUrls, [key]: e.target.value })}
-														placeholder="Enter Helm repository URL..."
-														className={`w-full px-2 py-1 text-sm bg-neutral-800 border rounded text-neutral-200 focus:outline-none focus:ring-1 focus:ring-violet-500 ${hasRepoUrl ? 'border-neutral-700' : 'border-yellow-500/50'
-															}`}
-													/>
-												</div>
-											)}
-										</div>
-									);
-								})}
-							</div>
-						</div>
-
-						{/* Validation Warning */}
-						{unmatchedSelected.length > 0 && (
-							<div className="p-3 rounded-lg bg-yellow-900/20 border border-yellow-500/30">
-								<div className="flex items-start gap-2">
-									<svg className="w-5 h-5 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-									</svg>
-									<div>
-										<p className="text-yellow-200 font-medium text-sm">
-											{unmatchedSelected.length} selected release{unmatchedSelected.length > 1 ? 's' : ''} need Helm repository URL
-										</p>
-										<p className="text-yellow-300/70 text-xs mt-1">
-											{unmatchedSelected.map(r => r.name).join(', ')}
-										</p>
-									</div>
-								</div>
-							</div>
-						)}
-
-						{/* Actions */}
-						<div className="flex justify-end gap-3 pt-2">
-							<Button
-								variant="secondary"
-								onClick={onClose}
-								disabled={migrating}
-							>
-								Cancel
-							</Button>
-							<Button
-								onClick={handleMigrate}
-								disabled={migrating || !canMigrate}
-							>
-								{migrating ? (
-									<>
-										<Spinner size="sm" />
-										<span className="ml-2">Exporting {selected.size} releases...</span>
-									</>
-								) : createPR ? (
-									`Create PR with ${selected.size} releases`
-								) : (
-									`Export ${selected.size} releases`
-								)}
-							</Button>
-						</div>
 					</div>
 				</div>
 			</div>

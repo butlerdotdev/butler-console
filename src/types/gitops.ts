@@ -143,6 +143,192 @@ export interface PreviewManifestRequest {
 export type PreviewManifestResponse = Record<string, string>;
 
 /**
+ * v2 cluster-wide export preview types. The preview-cluster endpoint
+ * runs discovery + layout + coverage on the whole cluster (no git
+ * interaction) and returns the rendered tree plus a coverage report
+ * with Source classification surfaced for the modal's three-section
+ * UI: summary, captured-by-source, file tree.
+ */
+
+/**
+ * Source classification for a captured item. The native-inventory
+ * bucket is the v2 capability made visible — items the Flux
+ * inventory walk found that Butler has no AddonDefinition for.
+ */
+export type CapturedItemSource = 'helm-addon' | 'helm-unmatched' | 'native-inventory';
+
+/**
+ * One captured resource as the preview API returns it. The Source
+ * field tells the operator how this item was discovered: as a known
+ * Butler addon, as an unmatched Helm release, or as an
+ * agnostically-discovered native resource (the unknown-to-Butler
+ * bucket).
+ */
+export interface CapturedItem {
+	apiVersion: string;
+	kind: string;
+	namespace?: string;
+	name: string;
+	path?: string;
+	sourceKustomization?: string;
+	source: CapturedItemSource;
+	addonDefinition?: string;
+}
+
+/**
+ * Identity tuple used for selection in the preview. When the operator
+ * selects a subset, the console sends a list of these identities; the
+ * server filters discovery output to just those items before running
+ * the export.
+ */
+export interface CapturedItemIdentity {
+	kind: string;
+	namespace?: string;
+	name: string;
+}
+
+/**
+ * Inline patch observed on a Flux Kustomization's spec.patches block.
+ * Carried in the preview's coverage report so operators see env
+ * overrides the v1 emit does not preserve as separate overlays.
+ */
+export interface InlinePatchCoverage {
+	targetKind: string;
+	targetName: string;
+	targetNamespace?: string;
+	targetGroup?: string;
+	patchSize: number;
+	note: string;
+}
+
+/**
+ * Per-Kustomization observation. Loud surface for inline patches that
+ * the v1 export does not preserve.
+ */
+export interface KustomizationCoverage {
+	name: string;
+	namespace: string;
+	ready: boolean;
+	lastAppliedRevision?: string;
+	inventoryItemCount: number;
+	skipped?: boolean;
+	skipReason?: string;
+	inlinePatches?: InlinePatchCoverage[];
+}
+
+/**
+ * Discovery failure: inventory entry the walk found but couldn't
+ * fetch (CRD version mismatch, RBAC, stale inventory). Loud surface
+ * for the silent-drop class the v2 design exists to prevent.
+ */
+export interface DiscoveryFailureCoverage {
+	inventoryID: string;
+	group?: string;
+	kind: string;
+	namespace?: string;
+	name: string;
+	sourceKustomization?: string;
+	error: string;
+	hint?: string;
+}
+
+/**
+ * Path collision: two distinct emitted objects resolving to the same
+ * tree path. Empty in normal operation; populated when something
+ * unexpected fires.
+ */
+export interface PathCollisionCoverage {
+	path: string;
+	conflicts: CapturedItem[];
+}
+
+/**
+ * Coverage section of the preview response.
+ */
+export interface PreviewClusterCoverage {
+	captured: CapturedItem[];
+	fluxSelfManagement: CapturedItem[];
+	kustomizationObservations: KustomizationCoverage[];
+	discoveryFailures?: DiscoveryFailureCoverage[];
+	pathCollisions?: PathCollisionCoverage[];
+}
+
+/**
+ * Summary section of the preview response. The
+ * capturedBySource.nativeInventory count is the load-bearing surface
+ * — the visible answer to "how much did agnostic discovery find that
+ * Butler doesn't recognize?"
+ */
+export interface PreviewClusterSummary {
+	fileCount: number;
+	capturedByKind: Record<string, number>;
+	capturedBySource: {
+		helmAddon: number;
+		helmUnmatched: number;
+		nativeInventory: number;
+	};
+	collisions: number;
+	failures: number;
+}
+
+/**
+ * Preview request body. Env defaults to "prd" if omitted.
+ * clusterName overrides the directory name under clusters/; when
+ * omitted, the server derives it from the cluster's Flux root path.
+ */
+export interface PreviewClusterRequest {
+	env?: string;
+	clusterName?: string;
+}
+
+/**
+ * Preview response body. Files is the rendered tree (filename to
+ * content); coverage carries the classification + loud surfaces;
+ * summary is the at-a-glance numbers for the modal header.
+ * clusterName is the resolved name used (Flux-path-derived or
+ * override); the UI seeds its editable override field with this.
+ */
+export interface PreviewClusterResponse {
+	clusterName: string;
+	files: Record<string, string>;
+	coverage: PreviewClusterCoverage;
+	summary: PreviewClusterSummary;
+}
+
+/**
+ * Export request body. Selection is the optional subset chosen in
+ * the preview; an empty/undefined selection exports everything the
+ * fresh discovery finds.
+ */
+export interface ExportClusterRequest {
+	env?: string;
+	clusterName?: string;
+	repository: string;
+	branch?: string;
+	createPR?: boolean;
+	prTitle?: string;
+	prBody?: string;
+	commitMessage?: string;
+	selection?: CapturedItemIdentity[];
+}
+
+/**
+ * Export response body. Mirrors ExportAddonResponse shape so the
+ * console can render commit/PR metadata consistently across paths.
+ */
+export interface ExportClusterResponse {
+	success: boolean;
+	message: string;
+	mode?: 'direct-push' | 'feature-branch-mr';
+	branch?: string;
+	commitSha?: string;
+	prUrl?: string;
+	prNumber?: number;
+	filesCount?: number;
+	files?: string[];
+}
+
+/**
  * Request to migrate releases to GitOps
  */
 export interface MigrationRequest {

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Spinner, Button, SearchableSelect } from '@/components/ui';
 import { useToast } from '@/hooks/useToast';
 import { useTeamContext } from '@/hooks/useTeamContext';
@@ -15,7 +15,7 @@ import type {
 	Repository,
 	Branch,
 } from '@/types/gitops';
-import { sortReleases, GITOPS_TOOL_CONFIG, getCategoryLabel } from '@/types/gitops';
+import { sortReleases, GITOPS_TOOL_CONFIG } from '@/types/gitops';
 import { GitProviderSetup } from '@/components/clusters/gitops/GitProviderSetup';
 import { DiscoveredReleaseCard } from '@/components/clusters/gitops/DiscoveredReleaseCard';
 import { PreviewClusterModal } from '@/components/clusters/gitops/PreviewClusterModal';

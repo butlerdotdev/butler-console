@@ -48,7 +48,7 @@ export function CertificateHealthOverview({
 	return (
 		<Card className="p-6">
 			<div className="flex items-center justify-between mb-6">
-				<h3 className="text-lg font-semibold text-gray-900">Certificate Health</h3>
+				<h3 className="text-lg font-semibold text-gray-100">Certificate Health</h3>
 				<span
 					className={`px-3 py-1 rounded-full text-sm font-medium ${healthConfig.bgColor} ${healthConfig.color}`}
 				>
@@ -75,7 +75,7 @@ export function CertificateHealthOverview({
 				/>
 				<div className="bg-gray-50 rounded-lg p-4">
 					<div className="text-sm text-gray-500">Earliest Expiry</div>
-					<div className="text-lg font-semibold text-gray-900">
+					<div className="text-lg font-semibold text-gray-500">
 						{certificates.earliestExpiry
 							? formatCertDate(certificates.earliestExpiry)
 							: 'N/A'}

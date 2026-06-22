@@ -139,7 +139,7 @@ function CertificateCard({ cert }: CertificateCardProps) {
 								{cert.dnsNames.map((dns) => (
 									<span
 										key={dns}
-										className="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono"
+										className="px-2 py-0.5 bg-neutral-700 text-neutral-100 rounded text-xs font-mono"
 									>
 										{dns}
 									</span>
@@ -155,7 +155,7 @@ function CertificateCard({ cert }: CertificateCardProps) {
 								{cert.ipAddresses.map((ip) => (
 									<span
 										key={ip}
-										className="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono"
+										className="px-2 py-0.5 bg-neutral-700 text-neutral-100 rounded text-xs font-mono"
 									>
 										{ip}
 									</span>
@@ -179,7 +179,7 @@ function DetailRow({ label, value, mono }: DetailRowProps) {
 	return (
 		<div className="flex py-1">
 			<span className="w-24 text-gray-500 flex-shrink-0">{label}:</span>
-			<span className={`text-gray-900 break-all ${mono ? 'font-mono text-xs' : ''}`}>
+			<span className={`text-gray-100 break-all ${mono ? 'font-mono text-xs' : ''}`}>
 				{value}
 			</span>
 		</div>

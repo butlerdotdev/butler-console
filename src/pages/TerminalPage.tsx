@@ -14,7 +14,7 @@ export function TerminalPage() {
 		cluster: string
 	}>()
 	const navigate = useNavigate()
-	const { canMutate, buildPath } = useTeamContext()
+	const { canOperate, buildPath } = useTeamContext()
 
 	useDocumentTitle(`Terminal - ${cluster}`)
 
@@ -49,7 +49,7 @@ export function TerminalPage() {
 					type={type as 'management' | 'tenant'}
 					namespace={namespace}
 					cluster={cluster}
-					readOnly={!canMutate}
+					readOnly={!canOperate}
 				/>
 			</Card>
 		</div>

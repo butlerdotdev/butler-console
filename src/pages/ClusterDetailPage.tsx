@@ -42,7 +42,7 @@ export function ClusterDetailPage() {
 	const { namespace, name } = useParams<{ namespace: string; name: string }>()
 	const navigate = useNavigate()
 	const { success, error: showError } = useToast()
-	const { buildPath, canMutate } = useTeamContext()
+	const { buildPath, canMutate, canOperate } = useTeamContext()
 	const isAdmin = canMutate
 
 	// URL-based tab persistence
@@ -435,7 +435,7 @@ export function ClusterDetailPage() {
 							type="tenant"
 							namespace={clusterNamespace}
 							cluster={clusterName}
-							readOnly={!canMutate}
+							readOnly={!canOperate}
 						/>
 					</Card>
 				)}

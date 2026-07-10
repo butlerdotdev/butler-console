@@ -42,7 +42,7 @@ export function ClusterDetailPage() {
 	const { namespace, name } = useParams<{ namespace: string; name: string }>()
 	const navigate = useNavigate()
 	const { success, error: showError } = useToast()
-	const { buildPath, canMutate, canOperate } = useTeamContext()
+	const { buildPath, canMutate, canOperate, mode } = useTeamContext()
 	const isAdmin = canMutate
 
 	// URL-based tab persistence
@@ -328,14 +328,16 @@ export function ClusterDetailPage() {
 						</div>
 					</div>
 					<div className="flex items-center gap-3">
-						<Link to={buildPath(`terminal/tenant/${namespace}/${name}`)}>
-							<Button variant="secondary" disabled={phase !== 'Ready'}>
-								<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-								</svg>
-								Terminal
-							</Button>
-						</Link>
+						{mode !== 'overview' && (
+							<Link to={buildPath(`terminal/tenant/${namespace}/${name}`)}>
+								<Button variant="secondary" disabled={phase !== 'Ready'}>
+									<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+									</svg>
+									Terminal
+								</Button>
+							</Link>
+						)}
 						<Button
 							variant="secondary"
 							onClick={handleExportYAML}

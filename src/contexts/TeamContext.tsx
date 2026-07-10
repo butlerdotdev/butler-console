@@ -38,6 +38,12 @@ export interface TeamContextValue {
 	 *  True for platform admins, false for platform viewers. */
 	canMutate: boolean
 
+	/** Whether user can perform team-scoped write actions on the current team's
+	 *  resources. True for platform admins and for team admins or operators of the
+	 *  current team. Falls back to canMutate outside team mode, so platform viewers
+	 *  stay read-only everywhere. */
+	canOperate: boolean
+
 	/** Whether user is an admin of the current team (team-level admin, not platform admin) */
 	isTeamAdmin: boolean
 

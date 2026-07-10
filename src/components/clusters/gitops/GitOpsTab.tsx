@@ -24,7 +24,7 @@ import { EnableGitOpsModal } from './EnableGitOpsModal';
 
 export function GitOpsTab() {
 	const { namespace, name } = useParams<{ namespace: string; name: string }>();
-	const { canMutate } = useTeamContext();
+	const { canMutate, canOperate } = useTeamContext();
 	const { success, error: showError } = useToast();
 
 	// State
@@ -221,7 +221,7 @@ export function GitOpsTab() {
 								}`}>
 								{gitopsEngine?.ready ? 'Ready' : 'Degraded'}
 							</span>
-							{canMutate && (
+							{canOperate && (
 								<Button
 									variant="danger"
 									size="sm"
@@ -236,7 +236,7 @@ export function GitOpsTab() {
 			)}
 
 			{/* Enable GitOps Banner - Show when NOT installed */}
-			{!isGitOpsInstalled && canMutate && (
+			{!isGitOpsInstalled && canOperate && (
 				<Card className="p-6 border-dashed border-2 border-neutral-700 bg-neutral-900/50">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-4">

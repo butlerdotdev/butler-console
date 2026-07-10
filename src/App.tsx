@@ -151,6 +151,7 @@ export default function App() {
 					<Route path="t/:team/clusters" element={<RequireTeamAccess><ClustersPage /></RequireTeamAccess>} />
 					<Route path="t/:team/clusters/new" element={<RequireTeamAccess><CreateClusterPage /></RequireTeamAccess>} />
 					<Route path="t/:team/clusters/:namespace/:name" element={<RequireTeamAccess><ClusterDetailPage /></RequireTeamAccess>} />
+					<Route path="t/:team/terminal/:type/:namespace/:cluster" element={<RequireTeamAccess><TerminalPage /></RequireTeamAccess>} />
 					<Route path="t/:team/providers" element={<RequireTeamAccess><TeamProvidersPage /></RequireTeamAccess>} />
 					<Route path="t/:team/members" element={<RequireTeamAccess><TeamMembersPage /></RequireTeamAccess>} />
 					<Route path="t/:team/environments" element={<RequireTeamAccess><TeamEnvironmentsPage /></RequireTeamAccess>} />
@@ -160,6 +161,7 @@ export default function App() {
 					<Route path="admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
 					<Route path="admin/clusters" element={<RequireAdmin><AdminClustersPage /></RequireAdmin>} />
 					<Route path="admin/clusters/:namespace/:name" element={<RequireAdmin><ClusterDetailPage /></RequireAdmin>} />
+					<Route path="admin/terminal/:type/:namespace/:cluster" element={<RequireAdmin><TerminalPage /></RequireAdmin>} />
 					<Route path="admin/management" element={<RequireAdmin><ManagementPage /></RequireAdmin>} />
 					<Route path="admin/teams" element={<RequireAdmin><AdminTeamsPage /></RequireAdmin>} />
 					<Route path="admin/teams/:teamName" element={<RequireAdmin><AdminTeamDetailPage /></RequireAdmin>} />
@@ -190,7 +192,6 @@ export default function App() {
 					<Route path="providers" element={<ProvidersPage />} />
 					<Route path="providers/create" element={<CreateProviderPage />} />
 					<Route path="settings" element={<SettingsPage />} />
-					<Route path="terminal/:type/:namespace/:cluster" element={<TerminalPage />} />
 				</Route>
 
 				{/* Catch all */}

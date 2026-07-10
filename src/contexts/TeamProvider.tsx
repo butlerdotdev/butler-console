@@ -136,6 +136,11 @@ export function TeamContextProvider({ children }: TeamContextProviderProps) {
 	// Platform admins can mutate; platform viewers cannot
 	const canMutate = canAccessAdmin && !isPlatformViewer
 
+	// Team admins and operators can perform team-scoped write actions. Outside team
+	// mode currentTeamRole is undefined, so this falls back to canMutate and platform
+	// viewers stay read-only.
+	const canOperate = canMutate || currentTeamRole === 'admin' || currentTeamRole === 'operator'
+
 	// Navigation functions
 	const switchToTeam = useCallback(
 		(teamName: string) => {
@@ -193,6 +198,7 @@ export function TeamContextProvider({ children }: TeamContextProviderProps) {
 			canAccessAdmin,
 			isPlatformViewer,
 			canMutate,
+			canOperate,
 			isTeamAdmin,
 			currentTeamRole,
 			switchToTeam,
@@ -209,6 +215,7 @@ export function TeamContextProvider({ children }: TeamContextProviderProps) {
 			canAccessAdmin,
 			isPlatformViewer,
 			canMutate,
+			canOperate,
 			isTeamAdmin,
 			currentTeamRole,
 			switchToTeam,

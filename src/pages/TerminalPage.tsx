@@ -14,7 +14,7 @@ export function TerminalPage() {
 		cluster: string
 	}>()
 	const navigate = useNavigate()
-	const { canMutate } = useTeamContext()
+	const { canMutate, canOperate, buildPath } = useTeamContext()
 
 	useDocumentTitle(`Terminal - ${cluster}`)
 
@@ -30,7 +30,7 @@ export function TerminalPage() {
 		<div className="h-full flex flex-col">
 			<div className="flex items-center gap-4 mb-4">
 				<button
-					onClick={() => navigate(`/clusters/${namespace}/${cluster}`)}
+					onClick={() => navigate(buildPath(`clusters/${namespace}/${cluster}`))}
 					className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
 				>
 					<svg className="w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,7 +49,7 @@ export function TerminalPage() {
 					type={type as 'management' | 'tenant'}
 					namespace={namespace}
 					cluster={cluster}
-					readOnly={!canMutate}
+					readOnly={type === 'management' ? !canMutate : !canOperate}
 				/>
 			</Card>
 		</div>
